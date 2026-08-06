@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Food Order Bridge - Đặt Đồ Ăn Nhanh Telegram</title>
+  <meta name="description" content="Hệ thống đặt đồ ăn nhanh chóng, thực đơn đa dạng, giao hàng tận nơi với thông báo đơn hàng trực tiếp qua Telegram Bot.">
+
+  <!-- CSS Design System -->
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/storefront.css">
+</head>
+<body>
+
+  <!-- App Header -->
+  <header class="store-header">
+    <div class="container header-content">
+      <div class="brand-logo">
+        <span>🍲 Food Order Bridge</span>
+        <span class="brand-badge">Đang mở cửa</span>
+      </div>
+      <div>
+        <a href="admin.html" class="btn btn-outline" style="min-height: 38px; padding: 4px 12px;">
+          ⚙️ Admin
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sticky Category Navigation Bar -->
+  <nav class="sticky-category-bar" aria-label="Danh mục thực đơn">
+    <div class="container">
+      <div class="category-nav" id="category-nav">
+        <!-- Dynamic Category Tabs -->
+      </div>
+    </div>
+  </nav>
+
+  <!-- Search & Filter Bar -->
+  <section class="search-filter-section">
+    <div class="container">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="search" id="search-food-input" class="form-control" placeholder="Tìm kiếm món ăn, thức uống..." aria-label="Tìm kiếm món ăn" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Food Catalog Sections -->
+  <main class="container" id="catalog-container">
+    <!-- Dynamic Food Grid & Skeleton Screens rendered via JS -->
+  </main>
+
+  <!-- Floating Cart Bar (Mobile Bottom Sheet trigger) -->
+  <div class="floating-cart-bar" id="floating-cart-bar">
+    <div class="cart-info">
+      <div class="cart-badge" id="cart-count-badge">0</div>
+      <div>
+        <div class="cart-total-text">Tổng tạm tính</div>
+        <div class="cart-total-amount" id="cart-total-amount">0đ</div>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="btn-open-checkout" style="min-height: 40px; padding: 0 16px;">
+      Xem giỏ hàng →
+    </button>
+  </div>
+
+  <!-- Bottom Sheet Drawer / Quick View / Checkout Modal -->
+  <div class="modal-overlay" id="modal-overlay" aria-hidden="true">
+    <div class="bottom-sheet" id="drawer-content">
+      <!-- Dynamic Drawer Content -->
+    </div>
+  </div>
+
+  <!-- JavaScript Modules Entrypoint -->
+  <script type="module">
+    import { loadMenuCatalog } from './js/storefront/menu-catalog.js';
+    import { setupQuickViewDrawer } from './js/storefront/quick-view-drawer.js';
+    import { setupCheckoutModal } from './js/storefront/checkout.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setupQuickViewDrawer();
+      setupCheckoutModal();
+      loadMenuCatalog();
+    });
+  </script>
+</body>
+</html>

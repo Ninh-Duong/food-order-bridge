@@ -1,0 +1,136 @@
+/* ==========================================================================
+   Food Order Bridge - Admin Dashboard Styles
+   ========================================================================== */
+
+.admin-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-navbar {
+  background-color: #0F172A;
+  color: #FFFFFF;
+  padding: var(--space-3) 0;
+}
+
+.admin-nav-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-nav-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-tab-btn {
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+  transition: var(--transition-fast);
+}
+
+.admin-tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* Dashboard Cards */
+.admin-card {
+  background-color: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Table Styles */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.admin-table th, .admin-table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.admin-table th {
+  background-color: var(--color-bg-alt);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+}
+
+.item-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+}
+
+/* Toggle Switch Component for Active Status */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #CBD5E1;
+  transition: var(--transition-fast);
+  border-radius: 26px;
+}
+
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: var(--transition-fast);
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--color-secondary);
+}
+
+input:checked + .slider::before {
+  transform: translateX(22px);
+}

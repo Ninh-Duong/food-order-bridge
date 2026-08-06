@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: food-order-bridge
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SHOP_NAME
+        value: Food Order Shop
+      - key: ORDER_TIMEZONE
+        value: Asia/Bangkok
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false

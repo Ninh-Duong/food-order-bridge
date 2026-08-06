@@ -1,0 +1,297 @@
+/* ==========================================================================
+   Food Order Bridge - Storefront Layout & Responsive Food Grid
+   ========================================================================== */
+
+/* App Header */
+.store-header {
+  position: sticky;
+  top: 0;
+  background-color: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 50;
+  box-shadow: var(--shadow-sm);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.brand-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 800;
+  font-size: var(--font-size-xl);
+  color: var(--color-primary);
+}
+
+.brand-badge {
+  font-size: var(--font-size-xs);
+  padding: 2px 8px;
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+}
+
+/* Sticky Category Bar */
+.sticky-category-bar {
+  position: sticky;
+  top: 64px;
+  background-color: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+  z-index: 40;
+  padding: var(--space-2) 0;
+}
+
+.category-nav {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  padding: 4px 0;
+}
+
+.category-nav::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.category-tab {
+  white-space: nowrap;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background-color: var(--color-bg-alt);
+  transition: var(--transition-fast);
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.category-tab:hover {
+  color: var(--color-text-main);
+  background-color: var(--color-border);
+}
+
+.category-tab.active {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: 0 2px 8px rgba(255, 107, 0, 0.3);
+}
+
+/* Quick Filter & Search Bar */
+.search-filter-section {
+  padding: var(--space-4) 0;
+}
+
+.search-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.search-input-wrapper input {
+  width: 100%;
+  padding-left: var(--space-10);
+  background-color: var(--color-bg-surface);
+  border-radius: var(--radius-full);
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* Section Title */
+.category-section {
+  scroll-margin-top: 130px; /* offset for sticky navbar when scrollspy triggers */
+  margin-bottom: var(--space-8);
+}
+
+.section-title {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  margin-bottom: var(--space-4);
+  color: var(--color-text-main);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Food Card Grid (Mobile 1-Col / Mobile Small 2-Col / Desktop 3-4 Col) */
+.food-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
+}
+
+@media (min-width: 480px) {
+  .food-grid {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .food-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-6);
+  }
+}
+
+/* Food Card Architecture */
+.food-card {
+  background-color: var(--color-bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: var(--transition-normal);
+  position: relative;
+}
+
+.food-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-border-hover);
+}
+
+.food-card-img-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background-color: var(--color-bg-alt);
+  cursor: pointer;
+}
+
+.food-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-normal);
+}
+
+.food-card:hover .food-card-img {
+  transform: scale(1.05);
+}
+
+.food-card-badges {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.food-card-body {
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  gap: var(--space-2);
+}
+
+.food-card-title {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  color: var(--color-text-main);
+  cursor: pointer;
+}
+
+.food-card-title:hover {
+  color: var(--color-primary);
+}
+
+.food-card-desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.food-card-footer {
+  margin-top: auto;
+  padding-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.price-box {
+  display: flex;
+  flex-direction: column;
+}
+
+.price-current {
+  font-size: var(--font-size-lg);
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.price-original {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+/* Floating Cart Bottom Bar (Mobile Specific) */
+.floating-cart-bar {
+  position: fixed;
+  bottom: var(--space-4);
+  left: var(--space-4);
+  right: var(--space-4);
+  max-width: 500px;
+  margin: 0 auto;
+  background-color: var(--color-text-main);
+  color: var(--color-text-inverse);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-float);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 90;
+  transform: translateY(120%);
+  transition: transform var(--transition-bounce);
+}
+
+.floating-cart-bar.active {
+  transform: translateY(0);
+}
+
+.cart-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cart-badge {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: var(--font-size-sm);
+}
+
+.cart-total-text {
+  font-size: var(--font-size-xs);
+  color: #94A3B8;
+}
+
+.cart-total-amount {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+}

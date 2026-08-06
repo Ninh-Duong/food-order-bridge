@@ -1,0 +1,324 @@
+/* ==========================================================================
+   Food Order Bridge - UI Components (Buttons, Steppers, Modals, Skeleton, Badges)
+   ========================================================================== */
+
+/* Buttons & Touch Targets */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  transition: var(--transition-fast);
+  text-align: center;
+  user-select: none;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  box-shadow: 0 4px 12px rgba(255, 107, 0, 0.25);
+}
+
+.btn-primary:hover {
+  background-color: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background-color: var(--color-bg-alt);
+  color: var(--color-text-main);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-border);
+}
+
+.btn-outline {
+  border: 1.5px solid var(--color-border);
+  color: var(--color-text-main);
+  background-color: transparent;
+}
+
+.btn-outline:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.btn-icon {
+  padding: 0;
+  width: var(--touch-target-min);
+  height: var(--touch-target-min);
+  border-radius: var(--radius-full);
+}
+
+/* Stepper Component [-] count [+] */
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  background-color: var(--color-primary-light);
+  border: 1px solid rgba(255, 107, 0, 0.3);
+  border-radius: var(--radius-full);
+  padding: 2px;
+  min-height: var(--touch-target-min);
+  transition: var(--transition-bounce);
+}
+
+.stepper-btn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-bg-surface);
+  color: var(--color-primary);
+  font-weight: 800;
+  font-size: var(--font-size-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-fast);
+}
+
+.stepper-btn:hover {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.stepper-val {
+  padding: 0 var(--space-3);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  min-width: 24px;
+  text-align: center;
+}
+
+/* Quick Add Button on Cards */
+.btn-quick-add {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+
+.btn-quick-add:hover {
+  background-color: var(--color-primary);
+  color: var(--color-text-inverse);
+  transform: scale(1.05);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-bestseller {
+  background-color: #FEF3C7;
+  color: #D97706;
+}
+
+.badge-spicy {
+  background-color: #FEE2E2;
+  color: #DC2626;
+}
+
+.badge-active {
+  background-color: #D1FAE5;
+  color: #059669;
+}
+
+.badge-inactive {
+  background-color: #F3F4F6;
+  color: #6B7280;
+}
+
+/* Skeleton Loading Wave State */
+.skeleton {
+  background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 50%, #E2E8F0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-wave 1.5s infinite ease-in-out;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-wave {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.skeleton-card {
+  background-color: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.skeleton-img {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+}
+
+.skeleton-title {
+  height: 20px;
+  width: 75%;
+}
+
+.skeleton-text {
+  height: 14px;
+  width: 90%;
+}
+
+.skeleton-price {
+  height: 24px;
+  width: 40%;
+}
+
+/* Form Inputs */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.form-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-main);
+}
+
+.form-control {
+  min-height: var(--touch-target-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-main);
+  transition: var(--transition-fast);
+}
+
+.form-control:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-light);
+}
+
+/* Modal Overlay & Bottom Sheet Drawer */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end; /* Mobile Bottom Sheet */
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bottom-sheet {
+  width: 100%;
+  max-width: 600px;
+  background-color: var(--color-bg-surface);
+  border-top-left-radius: var(--radius-xl);
+  border-top-right-radius: var(--radius-xl);
+  padding: var(--space-6);
+  max-height: 85vh;
+  overflow-y: auto;
+  transform: translateY(100%);
+  transition: transform var(--transition-bounce);
+  box-shadow: var(--shadow-lg);
+}
+
+.modal-overlay.active .bottom-sheet {
+  transform: translateY(0);
+}
+
+@media (min-width: 768px) {
+  .modal-overlay {
+    align-items: center; /* Center Modal on Desktop */
+  }
+
+  .bottom-sheet {
+    border-radius: var(--radius-xl);
+    transform: scale(0.95);
+  }
+
+  .modal-overlay.active .bottom-sheet {
+    transform: scale(1);
+  }
+}
+
+.drawer-drag-handle {
+  width: 40px;
+  height: 4px;
+  background-color: var(--color-border);
+  border-radius: var(--radius-full);
+  margin: 0 auto var(--space-4) auto;
+}
+
+/* Toast Notifications */
+.toast-container {
+  position: fixed;
+  top: var(--space-4);
+  right: var(--space-4);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.toast {
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--color-text-main);
+  color: var(--color-text-inverse);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  animation: toast-in 0.3s ease;
+}
+
+.toast-success { background-color: var(--color-secondary); }
+.toast-error { background-color: var(--color-accent-spicy); }
+
+@keyframes toast-in {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}

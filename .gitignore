@@ -1,0 +1,42 @@
+# Environment & Secret Configuration Files
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Dynamic Runtime Settings (Contains Saved Telegram Bot Tokens & Chat IDs)
+src/data/settings.json
+
+# Node.js Dependencies & Package Manager Logs
+node_modules/
+jspm_packages/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# User Uploaded Media & Runtime Files
+uploads/
+*.log
+
+# Build & Coverage Outputs
+dist/
+build/
+coverage/
+.next/
+.nuxt/
+
+# IDE & OS System Files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
