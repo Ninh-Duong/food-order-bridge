@@ -8,6 +8,41 @@
   flex-direction: column;
 }
 
+.auth-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: linear-gradient(135deg, #0f172a, #1e3a5f);
+}
+
+.auth-screen[hidden], .admin-protected[hidden] { display: none !important; }
+
+.auth-card {
+  width: min(100%, 420px);
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-card);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-card h1 { margin-bottom: var(--space-2); }
+.auth-card p { color: var(--color-text-muted); margin-bottom: var(--space-6); }
+.auth-card .btn { width: 100%; }
+.auth-logo { font-size: 2.5rem; margin-bottom: var(--space-3); }
+.auth-error { min-height: 24px; color: #dc2626; font-size: var(--font-size-sm); }
+.auth-message { min-height: 24px; color: var(--color-secondary); }
+.admin-user-area, .staff-form { display: flex; align-items: center; gap: var(--space-3); }
+.staff-form { margin-bottom: var(--space-3); }
+.staff-form .form-control { max-width: 260px; }
+
+@media (max-width: 720px) {
+  .admin-nav-content, .admin-user-area, .staff-form { align-items: stretch; flex-direction: column; }
+  .admin-nav-tabs { overflow-x: auto; }
+}
+
 .admin-navbar {
   background-color: #0F172A;
   color: #FFFFFF;

@@ -87,6 +87,14 @@ food-order-bridge/
    ```
 
 2. Chạy ứng dụng ở chế độ Development:
+   Tạo file `.env` hoặc cấu hình các biến môi trường sau trước khi chạy:
+   ```env
+   AUTH_SECRET=chuoi-ngau-nhien-dai-it-nhat-32-ky-tu
+   ADMIN_USERNAME=admin
+   ADMIN_PASSWORD=mat-khau-manh-it-nhat-8-ky-tu
+   ```
+   Lần chạy đầu tiên hệ thống sẽ tạo duy nhất một tài khoản admin. Sau đó admin có thể tạo tài khoản nhân viên trong tab **Tài khoản nhân viên**.
+
    ```bash
    npm run dev
    ```
@@ -112,5 +120,8 @@ food-order-bridge/
    - Start Command: `npm start`
    - Health Check Path: `/health`
 5. Thêm các Biến Môi Trường (Environment Variables) trên Render Dashboard nếu muốn hardcode cố định:
+   - `AUTH_SECRET` (chuỗi ngẫu nhiên, tối thiểu 32 ký tự)
+   - `ADMIN_USERNAME`
+   - `ADMIN_PASSWORD` (tối thiểu 8 ký tự; chỉ dùng để khởi tạo admin lần đầu)
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`

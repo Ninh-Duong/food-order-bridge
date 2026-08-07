@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const orderService = require('../services/order-service');
+const { requireAuth } = require('../middleware/auth');
 
 // POST /api/orders - Submit order
 router.post('/', async (req, res) => {
@@ -17,7 +18,7 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/orders - List all orders (Admin)
-router.get('/', async (req, res) => {
+router.get('/', requireAuth, async (req, res) => {
   try {
     const orders = await orderService.getAllOrders();
     res.json({ orders });

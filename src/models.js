@@ -37,8 +37,24 @@ const settingsSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  passwordHash: { type: String, required: true },
+  role: { type: String, required: true, enum: ['admin', 'staff'] },
+  active: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+// The service also checks this rule so it is enforced in file fallback mode.
+userSchema.index(
+  { role: 1 },
+  { unique: true, partialFilterExpression: { role: 'admin' }, name: 'single_admin_account' }
+);
+
 module.exports = {
   MenuItemModel: mongoose.model('MenuItem', menuItemSchema),
   OrderModel: mongoose.model('Order', orderSchema),
-  SettingsModel: mongoose.model('Settings', settingsSchema)
+  SettingsModel: mongoose.model('Settings', settingsSchema),
+  UserModel: mongoose.model('User', userSchema)
 };

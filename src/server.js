@@ -8,6 +8,9 @@ const menuRoutes = require('./routes/menu-routes');
 const orderRoutes = require('./routes/order-routes');
 const settingsRoutes = require('./routes/settings-routes');
 const healthRoutes = require('./routes/health-routes');
+const authRoutes = require('./routes/auth-routes');
+const authService = require('./services/auth-service');
+const { requireAuth, requireAdmin } = require('./middleware/auth');
 
 const app = express();
 
@@ -27,9 +30,13 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // API Routes
 app.use('/health', healthRoutes);
-app.use('/api/menu', menuRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/menu', (req, res, next) => {
+  if (req.method === 'GET') return next();
+  return requireAuth(req, res, next);
+}, menuRoutes);
 app.use('/api/orders', orderLimiter, orderRoutes);
-app.use('/api/settings', settingsRoutes);
+app.use('/api/settings', requireAuth, requireAdmin, settingsRoutes);
 
 // Fallback to index.html for SPA routing
 app.get('*', (req, res) => {
@@ -39,6 +46,7 @@ app.get('*', (req, res) => {
 // Start Server with DB Initialization
 async function startServer() {
   await connectDB();
+  await authService.bootstrapAdmin();
 
   const server = app.listen(config.PORT, () => {
     console.log(`================================================`);
