@@ -8,6 +8,7 @@
 
 # Dynamic Runtime Settings (Contains Saved Telegram Bot Tokens & Chat IDs)
 src/data/settings.json
+src/data/users.json
 
 # Node.js Dependencies & Package Manager Logs
 node_modules/
