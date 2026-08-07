@@ -3,7 +3,6 @@ const orderRepository = require('../repositories/order-repository');
 const menuService = require('./menu-service');
 const telegramService = require('./telegram-service');
 
-// Zod validation schema for incoming order payload
 const OrderSchema = z.object({
   requestId: z.string().min(1, 'requestId là bắt buộc'),
   customer: z.object({
@@ -43,7 +42,7 @@ class OrderService {
     const { requestId, customer, items } = parseResult.data;
 
     // 2. Check Idempotency via requestId
-    const existingOrder = orderRepository.findByRequestId(requestId);
+    const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       console.log(`[Idempotency] Duplicate request found for requestId ${requestId}. Returning cached order ${existingOrder.id}`);
       return {
@@ -62,7 +61,7 @@ class OrderService {
     const processedItems = [];
 
     for (const itemReq of items) {
-      const menuItem = menuService.getMenuItem(itemReq.productId);
+      const menuItem = await menuService.getMenuItem(itemReq.productId);
       if (!menuItem) {
         throw { status: 422, message: `Món ăn với mã ${itemReq.productId} không tồn tại` };
       }
@@ -99,12 +98,12 @@ class OrderService {
       updatedAt: new Date().toISOString()
     };
 
-    orderRepository.save(newOrder);
+    await orderRepository.save(newOrder);
 
     // 5. Trigger Telegram Notification
     try {
       const result = await telegramService.notifyNewOrder(newOrder);
-      orderRepository.update(orderId, {
+      await orderRepository.update(orderId, {
         notificationStatus: 'SENT',
         telegramMessageId: result.messageId,
         notificationAttempts: 1
@@ -121,7 +120,7 @@ class OrderService {
       };
     } catch (telegramErr) {
       console.error(`[Telegram Error for Order ${orderId}]:`, telegramErr.message);
-      orderRepository.update(orderId, {
+      await orderRepository.update(orderId, {
         notificationStatus: 'FAILED',
         notificationAttempts: 1,
         notificationError: telegramErr.message
@@ -140,8 +139,8 @@ class OrderService {
     }
   }
 
-  getOrderStatus(orderId) {
-    const order = orderRepository.findById(orderId);
+  async getOrderStatus(orderId) {
+    const order = await orderRepository.findById(orderId);
     if (!order) return null;
     return {
       orderId: order.id,
@@ -152,8 +151,8 @@ class OrderService {
     };
   }
 
-  getAllOrders() {
-    return orderRepository.getAll();
+  async getAllOrders() {
+    return await orderRepository.getAll();
   }
 }
 

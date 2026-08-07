@@ -32,6 +32,17 @@ function renderMenuTable(items) {
   const tableBody = document.getElementById('admin-menu-table-body');
   if (!tableBody) return;
 
+  window.openItemModal = openItemModal;
+  window.toggleItemActive = async (itemId, activeState) => {
+    try {
+      await API.put(`/api/menu/${itemId}/status`, { active: activeState });
+      showToast(activeState ? 'Đã bật bán món hôm nay' : 'Đã ngưng bán món hôm nay', 'success');
+      await fetchAdminMenu();
+    } catch (error) {
+      showToast('Lỗi cập nhật trạng thái món', 'error');
+    }
+  };
+
   if (items.length === 0) {
     tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted);">Chưa có món ăn nào.</td></tr>`;
     return;
@@ -63,18 +74,6 @@ function renderMenuTable(items) {
       </td>
     </tr>
   `).join('');
-
-  window.toggleItemActive = async (itemId, activeState) => {
-    try {
-      await API.put(`/api/menu/${itemId}/status`, { active: activeState });
-      showToast(activeState ? 'Đã bật bán món hôm nay' : 'Đã ngưng bán món hôm nay', 'success');
-      await fetchAdminMenu();
-    } catch (error) {
-      showToast('Lỗi cập nhật trạng thái món', 'error');
-    }
-  };
-
-  window.openItemModal = openItemModal;
 }
 
 function openItemModal(itemId = null) {
@@ -91,7 +90,7 @@ function openItemModal(itemId = null) {
     </h3>
     <form id="admin-item-form">
       <div class="form-group">
-        <label class="form-label" for="item-id-input">Mã món (ID)</label>
+        <label class="form-label" for="item-id-input">Mã món (ID) *</label>
         <input type="text" id="item-id-input" class="form-control" value="${item ? item.id : ''}" ${item ? 'disabled' : 'required'} placeholder="VD: COM_GA" />
       </div>
 
@@ -113,7 +112,7 @@ function openItemModal(itemId = null) {
 
       <div class="form-group">
         <label class="form-label" for="item-price-input">Giá bán (VND) *</label>
-        <input type="number" id="item-price-input" class="form-control" value="${item ? item.price : ''}" required placeholder="VD: 50000" />
+        <input type="number" id="item-price-input" class="form-control" value="${item ? item.price : ''}" required min="0" step="1000" placeholder="VD: 50000" />
       </div>
 
       <div class="form-group">
@@ -139,11 +138,25 @@ function openItemModal(itemId = null) {
   if (form) {
     form.onsubmit = async (e) => {
       e.preventDefault();
+      const rawPrice = document.getElementById('item-price-input').value;
+      const parsedPrice = parseInt(rawPrice, 10);
+
+      if (isNaN(parsedPrice) || parsedPrice < 0) {
+        showToast('Giá bán phải là số nguyên dương hợp lệ', 'error');
+        return;
+      }
+
+      const itemIdVal = item ? item.id : document.getElementById('item-id-input').value.trim().toUpperCase().replace(/\s+/g, '_');
+      if (!itemIdVal) {
+        showToast('Vui lòng nhập Mã món (ID)', 'error');
+        return;
+      }
+
       const payload = {
-        id: item ? item.id : document.getElementById('item-id-input').value.trim().toUpperCase(),
+        id: itemIdVal,
         name: document.getElementById('item-name-input').value.trim(),
         category: document.getElementById('item-category-input').value,
-        price: parseInt(document.getElementById('item-price-input').value, 10),
+        price: parsedPrice,
         image: document.getElementById('item-image-input').value.trim(),
         description: document.getElementById('item-desc-input').value.trim(),
         active: item ? item.active : true

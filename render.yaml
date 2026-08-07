@@ -12,6 +12,8 @@ services:
         value: Food Order Shop
       - key: ORDER_TIMEZONE
         value: Asia/Bangkok
+      - key: MONGODB_URI
+        sync: false
       - key: TELEGRAM_BOT_TOKEN
         sync: false
       - key: TELEGRAM_CHAT_ID

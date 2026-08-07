@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const config = require('./config');
+const { connectDB } = require('./db');
 
 const menuRoutes = require('./routes/menu-routes');
 const orderRoutes = require('./routes/order-routes');
@@ -35,11 +36,29 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// Start Server
-app.listen(config.PORT, () => {
-  console.log(`================================================`);
-  console.log(`🚀 Food Order Bridge Server is running on port ${config.PORT}`);
-  console.log(`🌐 Storefront: http://localhost:${config.PORT}`);
-  console.log(`⚙️ Admin Page: http://localhost:${config.PORT}/admin.html`);
-  console.log(`================================================`);
-});
+// Start Server with DB Initialization
+async function startServer() {
+  await connectDB();
+
+  const server = app.listen(config.PORT, () => {
+    console.log(`================================================`);
+    console.log(`🚀 Food Order Bridge Server is running on port ${config.PORT}`);
+    console.log(`🌐 Storefront: http://localhost:${config.PORT}`);
+    console.log(`⚙️ Admin Page: http://localhost:${config.PORT}/admin.html`);
+    console.log(`================================================`);
+  });
+
+  // Graceful shutdown handling for Render
+  const gracefulShutdown = (signal) => {
+    console.log(`🛑 Received ${signal}. Shutting down HTTP server gracefully...`);
+    server.close(() => {
+      console.log('👋 HTTP server closed.');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+}
+
+startServer();

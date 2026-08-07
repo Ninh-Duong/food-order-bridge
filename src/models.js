@@ -1,0 +1,44 @@
+const mongoose = require('mongoose');
+
+const menuItemSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, uppercase: true, trim: true },
+  name: { type: String, required: true, trim: true },
+  category: { type: String, default: 'Món chính' },
+  price: { type: Number, required: true, min: 0 },
+  originalPrice: { type: Number },
+  image: { type: String, default: '' },
+  description: { type: String, default: '' },
+  isBestseller: { type: Boolean, default: false },
+  isSpicy: { type: Boolean, default: false },
+  active: { type: Boolean, default: true },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const orderSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  requestId: { type: String, required: true, unique: true, index: true },
+  customerName: { type: String, required: true },
+  phone: { type: String, required: true },
+  address: { type: String, required: true },
+  note: { type: String, default: '' },
+  items: { type: Array, required: true },
+  totalPrice: { type: Number, required: true },
+  telegramSent: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+const settingsSchema = new mongoose.Schema({
+  key: { type: String, required: true, unique: true, default: 'global_settings' },
+  telegramBotToken: { type: String, default: '' },
+  telegramChatId: { type: String, default: '' },
+  shopName: { type: String, default: 'Food Order Shop' },
+  timezone: { type: String, default: 'Asia/Bangkok' },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+module.exports = {
+  MenuItemModel: mongoose.model('MenuItem', menuItemSchema),
+  OrderModel: mongoose.model('Order', orderSchema),
+  SettingsModel: mongoose.model('Settings', settingsSchema)
+};

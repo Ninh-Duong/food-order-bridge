@@ -3,9 +3,9 @@ const router = express.Router();
 const menuService = require('../services/menu-service');
 
 // GET /api/menu - Get menu catalog
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const items = menuService.getMenu();
+    const items = await menuService.getMenu();
     res.json({ items });
   } catch (err) {
     res.status(500).json({ message: 'Lỗi lấy thực đơn' });
@@ -13,9 +13,9 @@ router.get('/', (req, res) => {
 });
 
 // POST /api/menu - Add or update menu item (Admin)
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    const saved = menuService.saveMenuItem(req.body);
+    const saved = await menuService.saveMenuItem(req.body);
     res.status(200).json({ item: saved });
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -23,10 +23,10 @@ router.post('/', (req, res) => {
 });
 
 // PUT /api/menu/:id/status - Toggle active state (Admin)
-router.put('/:id/status', (req, res) => {
+router.put('/:id/status', async (req, res) => {
   try {
     const { active } = req.body;
-    const updated = menuService.toggleItemActive(req.params.id, Boolean(active));
+    const updated = await menuService.toggleItemActive(req.params.id, Boolean(active));
     res.json({ item: updated });
   } catch (err) {
     res.status(400).json({ message: err.message });

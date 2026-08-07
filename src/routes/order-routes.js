@@ -17,9 +17,9 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/orders - List all orders (Admin)
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const orders = orderService.getAllOrders();
+    const orders = await orderService.getAllOrders();
     res.json({ orders });
   } catch (err) {
     res.status(500).json({ message: 'Lỗi lấy danh sách đơn hàng' });
@@ -27,9 +27,9 @@ router.get('/', (req, res) => {
 });
 
 // GET /api/orders/:orderId - Check order status
-router.get('/:orderId', (req, res) => {
+router.get('/:orderId', async (req, res) => {
   try {
-    const order = orderService.getOrderStatus(req.params.orderId);
+    const order = await orderService.getOrderStatus(req.params.orderId);
     if (!order) {
       return res.status(404).json({ message: 'Không tìm thấy đơn hàng' });
     }
