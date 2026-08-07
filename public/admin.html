@@ -47,6 +47,7 @@
     <div class="container">
       <div class="admin-nav-tabs">
         <button class="admin-tab-btn active" data-target="tab-items">🍔 Quản lý Món ăn</button>
+        <button class="admin-tab-btn" data-target="tab-categories">🗂 Quản lý Danh mục</button>
         <button class="admin-tab-btn admin-only" data-target="tab-telegram">🤖 Cấu hình Telegram Bot</button>
         <button class="admin-tab-btn" data-target="tab-orders">📋 Lịch sử Đơn hàng</button>
         <button class="admin-tab-btn admin-only" data-target="tab-accounts">👥 Tài khoản nhân viên</button>
@@ -78,6 +79,33 @@
             </thead>
             <tbody id="admin-menu-table-body">
               <!-- Rendered via item-manager.js -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB CATEGORIES: CATEGORY MANAGEMENT -->
+    <section id="tab-categories" class="admin-tab-content" style="display: none;">
+      <div class="admin-card">
+        <div class="admin-card-header">
+          <h2 style="font-size: var(--font-size-lg); font-weight: 800;">Danh sách danh mục món ăn</h2>
+          <button class="btn btn-primary" id="btn-open-add-category">+ Thêm danh mục mới</button>
+        </div>
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Thứ tự</th>
+                <th>Mã (ID)</th>
+                <th>Tên danh mục</th>
+                <th>Số món</th>
+                <th>Trạng thái</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody id="admin-category-table-body">
+              <!-- Rendered via category-manager.js -->
             </tbody>
           </table>
         </div>
@@ -169,6 +197,7 @@
 
   <script type="module">
     import { initItemManager } from './js/admin/item-manager.js';
+    import { initCategoryManager } from './js/admin/category-manager.js';
     import { initTelegramSettings } from './js/admin/telegram-settings.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
     import { initAuth } from './js/admin/auth.js';
@@ -190,6 +219,7 @@
         });
       });
 
+      initCategoryManager();
       initItemManager();
       if (user.role === 'admin') initTelegramSettings();
       initOrderMonitor();

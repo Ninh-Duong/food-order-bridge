@@ -1,0 +1,12 @@
+[
+  {
+    "id": "COM_GA",
+    "name": "Cơm Gà",
+    "slug": "com-ga",
+    "description": "",
+    "sortOrder": 1,
+    "active": true,
+    "createdAt": "2026-08-07T19:13:13.466Z",
+    "updatedAt": "2026-08-07T19:13:13.466Z"
+  }
+]

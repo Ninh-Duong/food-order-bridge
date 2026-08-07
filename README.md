@@ -14,12 +14,14 @@ Hệ thống đặt đồ ăn nhanh tích hợp nhận đơn trực tiếp qua n
 - **Performance & Skeleton Wave**: Khung xương hiệu ứng sóng mờ mịn trong lúc load dữ liệu, lazy loading ảnh chống giật trang (CLS).
 
 ### ⚙️ Trang Quản Trị (Admin Dashboard - `admin.html`)
-- **Quản lý Món ăn**: Thêm/sửa món ăn, tên, ảnh WebP, mô tả, giá cả.
+- **Quản lý Danh mục (Category Management)**: Xem danh sách, tạo mới, chỉnh sửa tên/mô tả/thứ tự hiển thị (`sortOrder`), bật/tắt danh mục (`active`).
+- **Quản lý Món ăn**: Thêm/sửa món ăn, tên, ảnh WebP, mô tả, giá cả và chọn danh mục thực tế từ backend.
 - **Cờ Bật/Tắt Kinh Doanh (`active`)**: Công tắc chuyển đổi để ngưng bán món hết hàng hôm nay và bật lại dễ dàng vào hôm sau mà không cần xóa dữ liệu.
 - **Cấu hình Telegram Bot API**: Giao diện điền `TELEGRAM_BOT_TOKEN` & `TELEGRAM_CHAT_ID`, nút Lưu và nút **Gửi tin nhắn thử (Test Telegram)**.
 - **Theo dõi Đơn hàng**: Xem lịch sử các đơn hàng được ghi nhận và trạng thái bắn Telegram.
 
 ### 🛡 Backend Node.js / Express
+- **Category Entity độc lập**: Mô hình hóa Category độc lập, sinh slug tự động, kiểm tra trùng lặp tên normalized, tự động đồng bộ snapshot tên danh mục đối với các món ăn liên kết.
 - **Tính giá Server-side**: Giá món ăn luôn lấy từ `menu.json` trên server, ngăn chặn tuyệt đối việc can thiệp sửa giá từ DevTools.
 - **Chống trùng đơn (`requestId`)**: Sử dụng UUID client-side để đảm bảo 1 hành động bấm chỉ tạo 1 đơn duy nhất.
 - **Telegram Bot API Native Client**: Xử lý gửi tin nhắn Telegram HTTPS API với retry (1s, 3s), timeout 8s, error handling (400, 401, 403, 429, 5xx).

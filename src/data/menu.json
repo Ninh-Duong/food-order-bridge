@@ -2,7 +2,8 @@
   {
     "id": "COM_GA",
     "name": "Cơm Gà Sốt Xối Mỡ",
-    "category": "Món chính",
+    "categoryId": "COM_GA",
+    "category": "Cơm Gà",
     "price": 50000,
     "originalPrice": 60000,
     "image": "https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?w=500&auto=format&fit=crop&q=80",
@@ -14,6 +15,7 @@
   {
     "id": "PHO_BO",
     "name": "Phở Bò Tái Nạm",
+    "categoryId": "MON_NUOC",
     "category": "Món nước",
     "price": 55000,
     "image": "https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=500&auto=format&fit=crop&q=80",
@@ -25,6 +27,7 @@
   {
     "id": "BUN_CHA",
     "name": "Bún Chả Hà Nội",
+    "categoryId": "MON_CHINH",
     "category": "Món chính",
     "price": 45000,
     "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80",
@@ -36,6 +39,7 @@
   {
     "id": "TRA_DAO",
     "name": "Trà Đào Cam Sả",
+    "categoryId": "DO_UONG",
     "category": "Đồ uống",
     "price": 25000,
     "image": "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&auto=format&fit=crop&q=80",
@@ -47,6 +51,7 @@
   {
     "id": "CA_PHE_SUA",
     "name": "Cà Phê Sữa Đá",
+    "categoryId": "DO_UONG",
     "category": "Đồ uống",
     "price": 22000,
     "image": "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?w=500&auto=format&fit=crop&q=80",

@@ -1,8 +1,20 @@
 const mongoose = require('mongoose');
 
+const categorySchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, uppercase: true, trim: true },
+  name: { type: String, required: true, trim: true },
+  slug: { type: String, required: true, unique: true },
+  description: { type: String, default: '' },
+  sortOrder: { type: Number, default: 0 },
+  active: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
 const menuItemSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, uppercase: true, trim: true },
   name: { type: String, required: true, trim: true },
+  categoryId: { type: String, trim: true, uppercase: true },
   category: { type: String, default: 'Món chính' },
   price: { type: Number, required: true, min: 0 },
   originalPrice: { type: Number },
@@ -53,6 +65,7 @@ userSchema.index(
 );
 
 module.exports = {
+  CategoryModel: mongoose.model('Category', categorySchema),
   MenuItemModel: mongoose.model('MenuItem', menuItemSchema),
   OrderModel: mongoose.model('Order', orderSchema),
   SettingsModel: mongoose.model('Settings', settingsSchema),

@@ -30,6 +30,7 @@ class MenuRepository {
     try {
       if (fs.existsSync(MENU_FILE)) {
         const raw = fs.readFileSync(MENU_FILE, 'utf8');
+        if (!raw || !raw.trim()) return [];
         return JSON.parse(raw);
       }
     } catch (err) {
@@ -53,7 +54,14 @@ class MenuRepository {
 
   saveAll(items) {
     fs.mkdirSync(path.dirname(MENU_FILE), { recursive: true });
-    fs.writeFileSync(MENU_FILE, JSON.stringify(items, null, 2), 'utf8');
+    const tempFile = `${MENU_FILE}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    fs.writeFileSync(tempFile, JSON.stringify(items, null, 2), 'utf8');
+    try {
+      fs.renameSync(tempFile, MENU_FILE);
+    } catch (e) {
+      fs.writeFileSync(MENU_FILE, JSON.stringify(items, null, 2), 'utf8');
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    }
     return items;
   }
 
@@ -102,6 +110,65 @@ class MenuRepository {
       return item;
     }
     return null;
+  }
+
+  async countByCategoryId(categoryId) {
+    if (!categoryId) return 0;
+    const upperId = categoryId.trim().toUpperCase();
+    if (isDBConnected()) {
+      try {
+        return await MenuItemModel.countDocuments({ categoryId: upperId });
+      } catch (err) {
+        console.error('Error counting items by categoryId in MongoDB:', err.message);
+      }
+    }
+    const items = this.getFromFile();
+    return items.filter(i => (i.categoryId || '').toUpperCase() === upperId).length;
+  }
+
+  async getByCategoryId(categoryId) {
+    if (!categoryId) return [];
+    const upperId = categoryId.trim().toUpperCase();
+    if (isDBConnected()) {
+      try {
+        const items = await MenuItemModel.find({ categoryId: upperId }).lean();
+        return items.map(i => ({ ...i, id: i.id || i._id }));
+      } catch (err) {
+        console.error('Error fetching items by categoryId in MongoDB:', err.message);
+      }
+    }
+    const items = this.getFromFile();
+    return items.filter(i => (i.categoryId || '').toUpperCase() === upperId);
+  }
+
+  async updateCategorySnapshot(categoryId, categoryName) {
+    if (!categoryId || !categoryName) return;
+    const upperId = categoryId.trim().toUpperCase();
+    const cleanName = categoryName.trim();
+
+    if (isDBConnected()) {
+      try {
+        await MenuItemModel.updateMany(
+          { categoryId: upperId },
+          { $set: { category: cleanName, updatedAt: new Date() } }
+        );
+      } catch (err) {
+        console.error('Error updating category snapshot in MongoDB:', err.message);
+      }
+    }
+
+    const items = this.getFromFile();
+    let modified = false;
+    items.forEach(item => {
+      if ((item.categoryId || '').toUpperCase() === upperId) {
+        item.category = cleanName;
+        modified = true;
+      }
+    });
+
+    if (modified) {
+      this.saveAll(items);
+    }
   }
 }
 

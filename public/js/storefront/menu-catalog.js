@@ -2,28 +2,48 @@
  * Food Order Bridge - Menu Catalog, Sticky Scrollspy & Category Tabs
  */
 import { API } from '../common/api.js';
-import { formatVND, buildAltText, showToast } from '../common/utils.js';
+import { formatVND, buildAltText, showToast, escapeHTML } from '../common/utils.js';
 import { cart } from './cart.js';
 import { openQuickView } from './quick-view-drawer.js';
 
 let menuItems = [];
+let categoriesList = [];
+let activeScrollspyObserver = null;
 
 export async function loadMenuCatalog() {
   const catalogContainer = document.getElementById('catalog-container');
-  const categoryNav = document.getElementById('category-nav');
-
   if (!catalogContainer) return;
 
   // Render Skeleton Screens during initial fetch
   renderSkeleton(catalogContainer);
 
   try {
-    const data = await API.get('/api/menu');
-    menuItems = (data.items || []).filter(item => item.active !== false); // Only display active items
-    
-    renderCategories(menuItems);
+    const [menuRes, catRes] = await Promise.all([
+      API.get('/api/menu'),
+      API.get('/api/categories')
+    ]);
+
+    const rawCategories = catRes.categories || [];
+    categoriesList = rawCategories.filter(c => c.active !== false);
+
+    const rawItems = menuRes.items || [];
+    // Only active items whose category is active (or legacy fallback)
+    menuItems = rawItems.filter(item => {
+      if (item.active === false) return false;
+
+      if (item.categoryId) {
+        const cat = categoriesList.find(c => c.id === item.categoryId);
+        return Boolean(cat);
+      } else if (item.category) {
+        const cat = categoriesList.find(c => c.name === item.category);
+        // If legacy item category name is found in active categories or default fallback
+        return cat ? cat.active !== false : true;
+      }
+      return true;
+    });
+
+    renderCategories();
     renderGrid(menuItems);
-    setupScrollspy();
     setupSearchFilter();
   } catch (error) {
     showToast('Không thể tải menu. Vui lòng thử lại sau.', 'error');
@@ -47,29 +67,74 @@ function renderSkeleton(container) {
   container.innerHTML = skeletonsHtml;
 }
 
-function renderCategories(items) {
+function getActiveCategoriesWithItems(items) {
+  // Determine which categories have active items
+  const catMap = new Map();
+
+  categoriesList.forEach(cat => {
+    catMap.set(cat.id, { ...cat, items: [] });
+  });
+
+  const uncategorizedItems = [];
+
+  items.forEach(item => {
+    let catObj = null;
+    if (item.categoryId && catMap.has(item.categoryId)) {
+      catObj = catMap.get(item.categoryId);
+    } else if (item.category) {
+      catObj = Array.from(catMap.values()).find(c => c.name === item.category);
+    }
+
+    if (catObj) {
+      catObj.items.push(item);
+    } else {
+      uncategorizedItems.push(item);
+    }
+  });
+
+  // Filter out categories with 0 items
+  const result = Array.from(catMap.values()).filter(c => c.items.length > 0);
+
+  if (uncategorizedItems.length > 0) {
+    result.push({
+      id: 'OTHER',
+      name: 'Món khác',
+      slug: 'mon-khac',
+      sortOrder: 999,
+      active: true,
+      items: uncategorizedItems
+    });
+  }
+
+  return result.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
+function renderCategories() {
   const categoryNav = document.getElementById('category-nav');
   if (!categoryNav) return;
 
-  const categories = ['Tất cả', ...new Set(items.map(i => i.category || 'Món chính'))];
+  const validCategories = getActiveCategoriesWithItems(menuItems);
 
-  categoryNav.innerHTML = categories.map((cat, idx) => `
-    <button class="category-tab ${idx === 0 ? 'active' : ''}" data-category="${cat}">
-      ${cat}
-    </button>
-  `).join('');
+  categoryNav.innerHTML = `
+    <button class="category-tab active" data-category-id="ALL">Tất cả</button>
+    ${validCategories.map(cat => `
+      <button class="category-tab" data-category-id="${escapeHTML(cat.id)}" data-category-slug="${escapeHTML(cat.slug)}">
+        ${escapeHTML(cat.name)}
+      </button>
+    `).join('')}
+  `;
 
   categoryNav.querySelectorAll('.category-tab').forEach(tab => {
     tab.addEventListener('click', () => {
-      const cat = tab.dataset.category;
+      const catId = tab.dataset.categoryId;
       categoryNav.querySelectorAll('.category-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
 
-      if (cat === 'Tất cả') {
+      if (catId === 'ALL') {
         renderGrid(menuItems);
       } else {
-        const filtered = menuItems.filter(i => (i.category || 'Món chính') === cat);
-        renderGrid(filtered);
+        const cat = validCategories.find(c => c.id === catId);
+        renderGrid(cat ? cat.items : []);
       }
     });
   });
@@ -81,46 +146,47 @@ function renderGrid(items) {
 
   if (items.length === 0) {
     catalogContainer.innerHTML = `<div style="text-align: center; padding: var(--space-8); color: var(--color-text-muted);">Không tìm thấy món ăn phù hợp.</div>`;
+    if (activeScrollspyObserver) {
+      activeScrollspyObserver.disconnect();
+      activeScrollspyObserver = null;
+    }
     return;
   }
 
-  // Group items by category
-  const grouped = {};
-  items.forEach(item => {
-    const cat = item.category || 'Món chính';
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(item);
-  });
+  const activeCategories = getActiveCategoriesWithItems(items);
 
   let html = '';
-  for (const [catName, catItems] of Object.entries(grouped)) {
-    const catId = `cat-${catName.replace(/\s+/g, '-').toLowerCase()}`;
+  activeCategories.forEach(cat => {
+    const sectionDomId = `cat-${cat.slug || cat.id.toLowerCase()}`;
     html += `
-      <section class="category-section" id="${catId}" data-section-category="${catName}">
+      <section class="category-section" id="${sectionDomId}" data-section-category-id="${escapeHTML(cat.id)}">
         <h2 class="section-title">
-          <span>${catName}</span>
-          <span style="font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted);">(${catItems.length} món)</span>
+          <span>${escapeHTML(cat.name)}</span>
+          <span style="font-size: var(--font-size-xs); font-weight: 500; color: var(--color-text-muted);">(${cat.items.length} món)</span>
         </h2>
         <div class="food-grid">
-          ${catItems.map(item => createCardHtml(item)).join('')}
+          ${cat.items.map(item => createCardHtml(item)).join('')}
         </div>
       </section>
     `;
-  }
+  });
 
   catalogContainer.innerHTML = html;
 
-  // Bind card action buttons & Steppers
-  bindCardEvents(catalogContainer);
+  bindCardEvents();
+  setupScrollspy();
 }
 
 function createCardHtml(item) {
   const qty = cart.getItemQuantity(item.id);
-  const altText = buildAltText(item.name, item.category);
+  const safeName = escapeHTML(item.name);
+  const safeCategory = escapeHTML(item.category);
+  const safeDesc = escapeHTML(item.description || '');
+  const altText = buildAltText(safeName, safeCategory);
 
   return `
-    <article class="food-card" data-item-id="${item.id}">
-      <div class="food-card-img-wrapper" onclick="window.triggerQuickView('${item.id}')">
+    <article class="food-card" data-item-id="${escapeHTML(item.id)}">
+      <div class="food-card-img-wrapper" onclick="window.triggerQuickView('${escapeHTML(item.id)}')">
         <img src="${item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80'}" 
              alt="${altText}" 
              class="food-card-img" 
@@ -131,14 +197,14 @@ function createCardHtml(item) {
         </div>
       </div>
       <div class="food-card-body">
-        <h3 class="food-card-title line-clamp-1" onclick="window.triggerQuickView('${item.id}')">${item.name}</h3>
-        <p class="food-card-desc line-clamp-2">${item.description || ''}</p>
+        <h3 class="food-card-title line-clamp-1" onclick="window.triggerQuickView('${escapeHTML(item.id)}')">${safeName}</h3>
+        <p class="food-card-desc line-clamp-2">${safeDesc}</p>
         <div class="food-card-footer">
           <div class="price-box">
             <span class="price-current">${formatVND(item.price)}</span>
             ${item.originalPrice ? `<span class="price-original">${formatVND(item.originalPrice)}</span>` : ''}
           </div>
-          <div class="action-box" id="action-box-${item.id}">
+          <div class="action-box" id="action-box-${escapeHTML(item.id)}">
             ${renderActionBtn(item, qty)}
           </div>
         </div>
@@ -148,17 +214,18 @@ function createCardHtml(item) {
 }
 
 function renderActionBtn(item, qty) {
+  const safeId = escapeHTML(item.id);
   if (qty > 0) {
     return `
       <div class="stepper">
-        <button class="stepper-btn" onclick="window.handleCartChange('${item.id}', -1)" aria-label="Giảm số lượng">-</button>
+        <button class="stepper-btn" onclick="window.handleCartChange('${safeId}', -1)" aria-label="Giảm số lượng">-</button>
         <span class="stepper-val">${qty}</span>
-        <button class="stepper-btn" onclick="window.handleCartChange('${item.id}', 1)" aria-label="Tăng số lượng">+</button>
+        <button class="stepper-btn" onclick="window.handleCartChange('${safeId}', 1)" aria-label="Tăng số lượng">+</button>
       </div>
     `;
   }
   return `
-    <button class="btn-quick-add" onclick="window.handleCartChange('${item.id}', 1)" aria-label="Thêm món ${item.name}">
+    <button class="btn-quick-add" onclick="window.handleCartChange('${safeId}', 1)" aria-label="Thêm món ${escapeHTML(item.name)}">
       +
     </button>
   `;
@@ -177,7 +244,6 @@ function bindCardEvents() {
     cart.addItem(item, delta);
     const newQty = cart.getItemQuantity(itemId);
     
-    // Update card action box instantly
     const actionBox = document.getElementById(`action-box-${itemId}`);
     if (actionBox) {
       actionBox.innerHTML = renderActionBtn(item, newQty);
@@ -186,17 +252,22 @@ function bindCardEvents() {
 }
 
 function setupScrollspy() {
+  if (activeScrollspyObserver) {
+    activeScrollspyObserver.disconnect();
+    activeScrollspyObserver = null;
+  }
+
   const sections = document.querySelectorAll('.category-section');
   const navTabs = document.querySelectorAll('.category-tab');
 
   if (!('IntersectionObserver' in window) || sections.length === 0) return;
 
-  const observer = new IntersectionObserver((entries) => {
+  activeScrollspyObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        const category = entry.target.dataset.sectionCategory;
+        const categoryId = entry.target.dataset.sectionCategoryId;
         navTabs.forEach(tab => {
-          if (tab.dataset.category === category) {
+          if (tab.dataset.categoryId === categoryId) {
             tab.classList.add('active');
             tab.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
           } else {
@@ -207,7 +278,7 @@ function setupScrollspy() {
     });
   }, { rootMargin: '-130px 0px -60% 0px', threshold: 0 });
 
-  sections.forEach(sec => observer.observe(sec));
+  sections.forEach(sec => activeScrollspyObserver.observe(sec));
 }
 
 function setupSearchFilter() {

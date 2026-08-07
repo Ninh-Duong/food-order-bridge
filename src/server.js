@@ -5,6 +5,7 @@ const config = require('./config');
 const { connectDB } = require('./db');
 
 const menuRoutes = require('./routes/menu-routes');
+const categoryRoutes = require('./routes/category-routes');
 const orderRoutes = require('./routes/order-routes');
 const settingsRoutes = require('./routes/settings-routes');
 const healthRoutes = require('./routes/health-routes');
@@ -31,6 +32,10 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // API Routes
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/categories', (req, res, next) => {
+  if (req.method === 'GET') return next();
+  return requireAuth(req, res, next);
+}, categoryRoutes);
 app.use('/api/menu', (req, res, next) => {
   if (req.method === 'GET') return next();
   return requireAuth(req, res, next);
