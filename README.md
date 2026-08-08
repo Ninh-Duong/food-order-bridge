@@ -7,24 +7,29 @@ Hệ thống đặt đồ ăn nhanh tích hợp nhận đơn trực tiếp qua n
 ## 🌟 Tính Năng Nổi Bật
 
 ### 🛒 Trang Bán Hàng (Storefront - `index.html`)
+- **Sale-Focused UI & Smart Badges**: Hiển thị nổi bật badge giảm giá (`-XX%`), giá sau giảm to đậm, giá gốc gạch ngang và số tiền tiết kiệm ("Tiết kiệm 20.000đ").
+- **Tùy chọn thành phần miễn phí (Product Options)**: Cho phép khách hàng chọn/bỏ chọn các thành phần kèm theo món (Hành phi, Tỏi phi, Nước tương, Dưa leo...). Giỏ hàng quản lý theo cấu hình độc lập (`lineId`), cho phép đặt cùng một món với các yêu cầu chế biến khác nhau mà không bị nén/gộp nhầm.
+- **Quản lý Tồn kho & Trạng thái Hết hàng**: Khóa bộ đếm (+) khi chạm giới hạn tồn kho. Kiểm tra tổng tồn kho chính xác trên tất cả các cấu hình tùy chọn của cùng một món. Món hết hàng (`stockQuantity = 0`) hiển thị badge "Hết hàng" với hiệu ứng mờ nhẹ, ngăn chặn chọn vượt tồn kho ở mọi điểm chạm (Card, Quick View, Checkout Drawer).
+- **Revalidation & 409 Conflict Handling**: Tự động revalidate menu khi mở Checkout. Nếu tồn kho thay đổi bị từ chối 409 Conflict `INSUFFICIENT_STOCK`, hệ thống giữ nguyên giỏ hàng và highlight dòng món lỗi cho khách chỉnh sửa.
 - **Mobile-First & Responsive Grid**: Tự động tương thích hoàn hảo từ Điện thoại màn hình nhỏ đến Desktop 4K.
 - **Sticky Category Bar & Scrollspy**: Vuốt ngang mượt mà trên Mobile, tự động highlight danh mục theo vị trí cuộn màn hình (`IntersectionObserver`).
-- **Food Card Architecture**: Tỷ lệ ảnh cố định `1:1` không vỡ khung, bộ đếm số lượng `[-] 1 [+]` biến đổi tức thì (Optimistic UI Update $0\text{ms}$ delay).
 - **Mobile Bottom Sheet Drawer & Floating Cart Bar**: Thanh giỏ hàng nổi ở đáy màn hình Mobile, Drawer trượt từ dưới lên cho Quick View & Checkout.
-- **Performance & Skeleton Wave**: Khung xương hiệu ứng sóng mờ mịn trong lúc load dữ liệu, lazy loading ảnh chống giật trang (CLS).
 
 ### ⚙️ Trang Quản Trị (Admin Dashboard - `admin.html`)
+- **Quản lý Tùy chọn thành phần theo món**: Admin thiết lập mã tùy chọn, tên thành phần, thứ tự hiển thị, trạng thái mặc định chọn và bật/tắt tùy chọn trực tiếp trong form sửa món. Tự động gợi ý mã ID in hoa slugify từ tên.
+- **In Hóa đơn & Xem trước (Invoice Preview & Print View)**: Nút `[🖨 In hóa đơn]` hiển thị Modal xem trước hóa đơn với đầy đủ thông tin cửa hàng, thông tin khách hàng, số lượng, đơn giá, chiết khấu, tùy chọn loại trừ thành phần (`KHÔNG LẤY`) và tổng tiền thanh toán. Nút `[In ngay]` kích hoạt `window.print()` tối ưu cho cả giấy nhiệt 80mm và khổ A4.
+- **Quản lý Tồn kho & Khuyến mãi (Inventory & Discount)**: Admin nhập Giá gốc (VND), Phần trăm giảm giá (0-100%) và Số lượng tồn kho. Hỗ trợ Preview real-time giá sau giảm & số tiền tiết kiệm trong modal.
+- **Bảng Món ăn Thông Minh**: Cảnh báo màu sắc trực quan về tồn kho (Còn X: xanh, Sắp hết <= 5: cam, Hết hàng: đỏ) và Badge % giảm giá.
 - **Quản lý Danh mục (Category Management)**: Xem danh sách, tạo mới, chỉnh sửa tên/mô tả/thứ tự hiển thị (`sortOrder`), bật/tắt danh mục (`active`).
-- **Quản lý Món ăn**: Thêm/sửa món ăn, tên, ảnh WebP, mô tả, giá cả và chọn danh mục thực tế từ backend.
-- **Cờ Bật/Tắt Kinh Doanh (`active`)**: Công tắc chuyển đổi để ngưng bán món hết hàng hôm nay và bật lại dễ dàng vào hôm sau mà không cần xóa dữ liệu.
+- **Cờ Bật/Tắt Kinh Doanh (`active`)**: Công tắc chuyển đổi độc lập với tồn kho. `active = false` đại diện cửa hàng chủ động ngưng bán; `stockQuantity = 0` đại diện hết hàng.
 - **Cấu hình Telegram Bot API**: Giao diện điền `TELEGRAM_BOT_TOKEN` & `TELEGRAM_CHAT_ID`, nút Lưu và nút **Gửi tin nhắn thử (Test Telegram)**.
-- **Theo dõi Đơn hàng**: Xem lịch sử các đơn hàng được ghi nhận và trạng thái bắn Telegram.
+- **Theo dõi Đơn hàng**: Xem lịch sử đơn hàng chi tiết với snapshot tên thành phần loại bỏ (`KHÔNG LẤY: ...`), giá gốc, % giảm giá, tổng giảm giá và số tiền thực trả.
 
 ### 🛡 Backend Node.js / Express
-- **Category Entity độc lập**: Mô hình hóa Category độc lập, sinh slug tự động, kiểm tra trùng lặp tên normalized, tự động đồng bộ snapshot tên danh mục đối với các món ăn liên kết.
-- **Tính giá Server-side**: Giá món ăn luôn lấy từ `menu.json` trên server, ngăn chặn tuyệt đối việc can thiệp sửa giá từ DevTools.
-- **Chống trùng đơn (`requestId`)**: Sử dụng UUID client-side để đảm bảo 1 hành động bấm chỉ tạo 1 đơn duy nhất.
-- **Telegram Bot API Native Client**: Xử lý gửi tin nhắn Telegram HTTPS API với retry (1s, 3s), timeout 8s, error handling (400, 401, 403, 429, 5xx).
+- **Atomic Stock Decrement & Concurrency Control**: Luồng trừ kho là thao tác atomic ở MongoDB (dùng `findOneAndUpdate` điều kiện `stockQuantity >= quantity` trong session transaction) hoặc Async Mutex Lock ở JSON Fallback Mode, ngăn chặn tuyệt đối việc bán vượt kho (overselling) khi nhiều khách mua đồng thời.
+- **Tính giá Server-side & Safe Formula**: Công thức quy chuẩn toàn hệ thống `Math.round(price * (100 - discountPercent) / 100)`. Backend tự tính lại toàn bộ giá trị từ thực đơn tác quyền, không tin giá do client gửi lên.
+- **Idempotency & RequestId Lifecycle**: Client tự tạo `requestId` cho phiên checkout và tái sử dụng khi retry cùng payload. Tránh trừ kho hai lần hay gửi Telegram trùng lặp khi rớt mạng.
+- **Ghi File Bền Vững (Atomic Write)**: Lưu đơn hàng ra file `orders.json` và cập nhật `menu.json` qua file tạm `.tmp` giúp giữ tính lặp lại (idempotency) sau khi restart server. (Lưu ý: Hoàn kho khi hủy đơn là feature tiếp theo).
 
 ---
 
@@ -39,7 +44,7 @@ food-order-bridge/
 │  │  ├─ main.css                 # Design tokens (Rule of 8, colors, CSS variables)
 │  │  ├─ components.css           # Components (Buttons, Modals, Skeleton, Badges, Steppers)
 │  │  ├─ storefront.css           # Sticky nav, Scrollspy, Mobile Bottom Drawer, Floating Cart Bar
-│  │  └─ admin.css                # Admin Dashboard tables, Forms, Toggle switches
+│  │  └─ admin.css                # Admin Dashboard tables, Forms, Toggle switches & Invoice Print CSS
 │  └─ js/
 │     ├─ common/
 │     │  ├─ api.js                # Fetch API client wrapper
@@ -51,8 +56,9 @@ food-order-bridge/
 │     │  └─ checkout.js           # Form đặt hàng, tạo UUID requestId, submit API
 │     └─ admin/
 │        ├─ item-manager.js       # CRUD món ăn & Cờ bật/tắt bán hôm nay
+│        ├─ invoice-renderer.js   # Module render HTML hóa đơn in chuẩn mực
 │        ├─ telegram-settings.js  # Cấu hình Token/Chat ID & Gửi tin thử
-│        └─ order-monitor.js      # Xem lịch sử đơn hàng
+│        └─ order-monitor.js      # Xem lịch sử đơn hàng & Xem trước/In hóa đơn
 ├─ src/
 │  ├─ server.js                   # Entry point Express server
 │  ├─ config.js                   # Cấu hình môi trường & file

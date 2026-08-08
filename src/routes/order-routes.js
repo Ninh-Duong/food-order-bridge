@@ -10,7 +10,10 @@ router.post('/', async (req, res) => {
     res.status(statusCode).json(result);
   } catch (err) {
     if (err.status) {
-      return res.status(err.status).json({ message: err.message });
+      const payload = { message: err.message };
+      if (err.code) payload.code = err.code;
+      if (err.items) payload.items = err.items;
+      return res.status(err.status).json(payload);
     }
     console.error('Unhandled Order Error:', err);
     res.status(500).json({ message: 'Lỗi máy chủ khi xử lý đơn hàng' });

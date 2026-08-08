@@ -72,6 +72,7 @@
                 <th>Hình ảnh</th>
                 <th>Tên món & Danh mục</th>
                 <th>Giá bán</th>
+                <th>Tồn kho</th>
                 <th>Bán hôm nay?</th>
                 <th>Trạng thái</th>
                 <th>Hành động</th>
@@ -176,6 +177,7 @@
                 <th>Tổng tiền</th>
                 <th>Bắn Telegram</th>
                 <th>Thời gian</th>
+                <th>Hành động</th>
               </tr>
             </thead>
             <tbody id="admin-orders-table-body">
@@ -193,6 +195,25 @@
     <div class="bottom-sheet" id="admin-modal-content" style="max-width: 500px;">
       <!-- Dynamic Form -->
     </div>
+  </div>
+
+  <!-- Invoice Preview Modal Overlay -->
+  <div class="invoice-preview-overlay" id="invoice-preview-overlay" hidden aria-hidden="true">
+    <section class="invoice-preview-dialog" role="dialog" aria-modal="true" aria-labelledby="invoice-preview-title">
+      <header class="invoice-preview-header no-print">
+        <h2 id="invoice-preview-title">Xem trước hóa đơn</h2>
+        <button type="button" class="invoice-preview-close" id="btn-close-invoice-preview" aria-label="Đóng bản xem trước">×</button>
+      </header>
+
+      <div class="invoice-preview-scroll">
+        <article class="printable-invoice" id="printable-invoice"></article>
+      </div>
+
+      <footer class="invoice-preview-actions no-print">
+        <button type="button" class="btn btn-secondary" id="btn-cancel-invoice-print">Đóng</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-invoice-print">🖨 In ngay</button>
+      </footer>
+    </section>
   </div>
 
   <script type="module">

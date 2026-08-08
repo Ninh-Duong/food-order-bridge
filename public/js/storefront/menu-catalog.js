@@ -1,5 +1,5 @@
 /**
- * Food Order Bridge - Menu Catalog, Sticky Scrollspy & Category Tabs
+ * Food Order Bridge - Menu Catalog, Sticky Scrollspy, Discount Badges & Stock Management
  */
 import { API } from '../common/api.js';
 import { formatVND, buildAltText, showToast, escapeHTML } from '../common/utils.js';
@@ -10,11 +10,16 @@ let menuItems = [];
 let categoriesList = [];
 let activeScrollspyObserver = null;
 
+function calculateSalePriceClient(price, discountPercent = 0) {
+  const numPrice = Number(price) || 0;
+  const numDiscount = Math.max(0, Math.min(100, Number(discountPercent) || 0));
+  return Math.round(numPrice * (100 - numDiscount) / 100);
+}
+
 export async function loadMenuCatalog() {
   const catalogContainer = document.getElementById('catalog-container');
   if (!catalogContainer) return;
 
-  // Render Skeleton Screens during initial fetch
   renderSkeleton(catalogContainer);
 
   try {
@@ -27,7 +32,8 @@ export async function loadMenuCatalog() {
     categoriesList = rawCategories.filter(c => c.active !== false);
 
     const rawItems = menuRes.items || [];
-    // Only active items whose category is active (or legacy fallback)
+    // Display items whose category is active (or legacy fallback)
+    // Note: Out-of-stock items (stockQuantity === 0) remain visible so customers see full menu!
     menuItems = rawItems.filter(item => {
       if (item.active === false) return false;
 
@@ -36,15 +42,29 @@ export async function loadMenuCatalog() {
         return Boolean(cat);
       } else if (item.category) {
         const cat = categoriesList.find(c => c.name === item.category);
-        // If legacy item category name is found in active categories or default fallback
         return cat ? cat.active !== false : true;
       }
       return true;
     });
 
+    // Reconcile cart in case items changed or became out of stock
+    cart.reconcileWithMenu(menuItems);
+
     renderCategories();
     renderGrid(menuItems);
     setupSearchFilter();
+
+    // Subscribe cart changes to update action buttons dynamically
+    cart.subscribe(() => {
+      menuItems.forEach(item => {
+        const actionBox = document.getElementById(`action-box-${item.id}`);
+        if (actionBox) {
+          const qty = cart.getItemQuantity(item.id);
+          actionBox.innerHTML = renderActionBtn(item, qty);
+        }
+      });
+    });
+
   } catch (error) {
     showToast('Không thể tải menu. Vui lòng thử lại sau.', 'error');
     catalogContainer.innerHTML = `<p style="text-align: center; color: var(--color-accent-spicy); padding: var(--space-8);">Lỗi tải dữ liệu thực đơn.</p>`;
@@ -68,7 +88,6 @@ function renderSkeleton(container) {
 }
 
 function getActiveCategoriesWithItems(items) {
-  // Determine which categories have active items
   const catMap = new Map();
 
   categoriesList.forEach(cat => {
@@ -92,7 +111,6 @@ function getActiveCategoriesWithItems(items) {
     }
   });
 
-  // Filter out categories with 0 items
   const result = Array.from(catMap.values()).filter(c => c.items.length > 0);
 
   if (uncategorizedItems.length > 0) {
@@ -184,26 +202,83 @@ function createCardHtml(item) {
   const safeDesc = escapeHTML(item.description || '');
   const altText = buildAltText(safeName, safeCategory);
 
+  const price = Number(item.price) || 0;
+  const discountPercent = item.discountPercent || 0;
+  const salePrice = item.salePrice !== undefined ? item.salePrice : calculateSalePriceClient(price, discountPercent);
+  const hasDiscount = discountPercent > 0 && price > salePrice;
+  const savings = price - salePrice;
+
+  const stock = item.stockQuantity ?? 0;
+  const isOutOfStock = stock <= 0;
+
+  // Stock indicator text
+  let stockText = '';
+  let stockStyle = '';
+  if (isOutOfStock) {
+    stockText = 'Hết hàng';
+    stockStyle = 'color: #ef4444; font-weight: 700;';
+  } else if (stock <= 3) {
+    stockText = `Chỉ còn ${stock} phần`;
+    stockStyle = 'color: #f59e0b; font-weight: 600;';
+  } else {
+    stockText = `Còn ${stock} phần`;
+    stockStyle = 'color: var(--color-text-muted); font-size: 11px;';
+  }
+
+  // Customization options hint tag
+  const activeOpts = Array.isArray(item.customizationOptions) ? item.customizationOptions.filter(o => o.active !== false) : [];
+  let customHintHtml = '';
+  if (activeOpts.length > 0) {
+    const names = activeOpts.slice(0, 3).map(o => escapeHTML(o.name));
+    const extraCount = activeOpts.length - names.length;
+    const label = `Tùy chọn: ${names.join(', ')}${extraCount > 0 ? ` +${extraCount}` : ''}`;
+    customHintHtml = `
+      <div class="custom-options-hint" onclick="window.triggerQuickView('${escapeHTML(item.id)}')" title="Bấm để chọn thành phần">
+        <span class="custom-hint-badge">⚙️ ${label}</span>
+      </div>
+    `;
+  }
+
   return `
-    <article class="food-card" data-item-id="${escapeHTML(item.id)}">
+    <article class="food-card ${isOutOfStock ? 'out-of-stock' : ''}" data-item-id="${escapeHTML(item.id)}">
       <div class="food-card-img-wrapper" onclick="window.triggerQuickView('${escapeHTML(item.id)}')">
         <img src="${item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80'}" 
              alt="${altText}" 
              class="food-card-img" 
              loading="lazy" />
+        
         <div class="food-card-badges">
+          ${hasDiscount ? `<span class="badge badge-discount">-${discountPercent}%</span>` : ''}
           ${item.isBestseller ? `<span class="badge badge-bestseller">Bán chạy</span>` : ''}
           ${item.isSpicy ? `<span class="badge badge-spicy">🌶 Spicy</span>` : ''}
         </div>
+
+        ${isOutOfStock ? `<div class="out-of-stock-overlay"><span>Hết hàng</span></div>` : ''}
       </div>
+
       <div class="food-card-body">
         <h3 class="food-card-title line-clamp-1" onclick="window.triggerQuickView('${escapeHTML(item.id)}')">${safeName}</h3>
         <p class="food-card-desc line-clamp-2">${safeDesc}</p>
+        
+        ${customHintHtml}
+
+        <div style="font-size: 11px; margin-top: 4px; margin-bottom: 4px; ${stockStyle}">
+          ${stockText}
+        </div>
+
         <div class="food-card-footer">
           <div class="price-box">
-            <span class="price-current">${formatVND(item.price)}</span>
-            ${item.originalPrice ? `<span class="price-original">${formatVND(item.originalPrice)}</span>` : ''}
+            ${hasDiscount ? `
+              <div class="price-sale-container">
+                <span class="price-current">${formatVND(salePrice)}</span>
+                <span class="price-original">${formatVND(price)}</span>
+              </div>
+              <div class="price-savings">Tiết kiệm ${formatVND(savings)}</div>
+            ` : `
+              <span class="price-current">${formatVND(price)}</span>
+            `}
           </div>
+
           <div class="action-box" id="action-box-${escapeHTML(item.id)}">
             ${renderActionBtn(item, qty)}
           </div>
@@ -215,15 +290,30 @@ function createCardHtml(item) {
 
 function renderActionBtn(item, qty) {
   const safeId = escapeHTML(item.id);
+  const stock = item.stockQuantity ?? 0;
+
+  if (stock <= 0) {
+    return `
+      <button class="btn-quick-add disabled" disabled aria-disabled="true" title="Món hiện đã hết hàng">
+        +
+      </button>
+    `;
+  }
+
   if (qty > 0) {
+    const isAtMaxStock = qty >= stock;
     return `
       <div class="stepper">
         <button class="stepper-btn" onclick="window.handleCartChange('${safeId}', -1)" aria-label="Giảm số lượng">-</button>
         <span class="stepper-val">${qty}</span>
-        <button class="stepper-btn" onclick="window.handleCartChange('${safeId}', 1)" aria-label="Tăng số lượng">+</button>
+        <button class="stepper-btn ${isAtMaxStock ? 'disabled' : ''}" 
+                onclick="window.handleCartChange('${safeId}', 1)" 
+                ${isAtMaxStock ? 'disabled' : ''} 
+                aria-label="Tăng số lượng">+</button>
       </div>
     `;
   }
+
   return `
     <button class="btn-quick-add" onclick="window.handleCartChange('${safeId}', 1)" aria-label="Thêm món ${escapeHTML(item.name)}">
       +
@@ -243,7 +333,7 @@ function bindCardEvents() {
 
     cart.addItem(item, delta);
     const newQty = cart.getItemQuantity(itemId);
-    
+
     const actionBox = document.getElementById(`action-box-${itemId}`);
     if (actionBox) {
       actionBox.innerHTML = renderActionBtn(item, newQty);

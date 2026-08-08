@@ -136,6 +136,12 @@
   letter-spacing: 0.5px;
 }
 
+.badge-discount {
+  background-color: var(--color-accent-spicy, #ef4444);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+}
+
 .badge-bestseller {
   background-color: #FEF3C7;
   color: #D97706;
@@ -322,3 +328,30 @@
   from { transform: translateY(-100%); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
+
+/* Customization Hint Tag on Product Card */
+.custom-options-hint {
+  display: inline-block;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.custom-hint-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background-color: var(--color-primary-light, #fff7ed);
+  color: var(--color-primary, #ff6b00);
+  border: 1px dashed var(--color-primary, #ff6b00);
+  border-radius: var(--radius-sm, 4px);
+  font-size: 11px;
+  font-weight: 600;
+  transition: var(--transition-fast);
+}
+
+.custom-options-hint:hover .custom-hint-badge {
+  background-color: var(--color-primary, #ff6b00);
+  color: #ffffff;
+}
+

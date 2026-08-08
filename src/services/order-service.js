@@ -1,7 +1,11 @@
 const { z } = require('zod');
+const mongoose = require('mongoose');
 const orderRepository = require('../repositories/order-repository');
+const menuRepository = require('../repositories/menu-repository');
 const menuService = require('./menu-service');
 const telegramService = require('./telegram-service');
+const { calculateSalePrice } = require('../utils/price-calculator');
+const { isDBConnected } = require('../db');
 
 const OrderSchema = z.object({
   requestId: z.string().min(1, 'requestId là bắt buộc'),
@@ -13,8 +17,9 @@ const OrderSchema = z.object({
   }),
   items: z.array(
     z.object({
-      productId: z.string().min(1),
-      quantity: z.number().int().positive('Số lượng phải lớn hơn 0')
+      productId: z.string().min(1, 'Mã sản phẩm không hợp lệ'),
+      quantity: z.number().int('Số lượng phải là số nguyên').positive('Số lượng phải lớn hơn 0').max(999, 'Số lượng không vượt quá 999'),
+      excludedOptionIds: z.array(z.string()).max(20, 'Tối đa 20 tùy chọn thành phần').optional().default([])
     })
   ).min(1, 'Đơn hàng phải chứa ít nhất 1 món')
 });
@@ -30,6 +35,15 @@ function generateOrderId() {
   return `FO-${year}${month}${day}-${seqStr}`;
 }
 
+// Simple Mutex queue for JSON fallback critical section
+let orderLockChain = Promise.resolve();
+
+function runWithLock(fn) {
+  const nextLock = orderLockChain.then(fn, fn);
+  orderLockChain = nextLock.catch(() => {});
+  return nextLock;
+}
+
 class OrderService {
   async processOrder(rawPayload) {
     // 1. Validate payload schema
@@ -39,9 +53,30 @@ class OrderService {
       throw { status: 422, message: `Dữ liệu không hợp lệ: ${errorMsg}` };
     }
 
-    const { requestId, customer, items } = parseResult.data;
+    const { requestId, customer, items: rawItems } = parseResult.data;
 
-    // 2. Check Idempotency via requestId
+    // 2. Aggregate duplicate (productId + sorted excludedOptionIds) in payload
+    const configMap = new Map();
+    for (const itemReq of rawItems) {
+      const pid = itemReq.productId.trim().toUpperCase();
+      const normExcluded = Array.from(
+        new Set((itemReq.excludedOptionIds || []).map(id => String(id).trim().toUpperCase()))
+      ).sort();
+      const sig = `${pid}::${normExcluded.join(',')}`;
+
+      if (configMap.has(sig)) {
+        configMap.get(sig).quantity += itemReq.quantity;
+      } else {
+        configMap.set(sig, {
+          productId: pid,
+          quantity: itemReq.quantity,
+          excludedOptionIds: normExcluded
+        });
+      }
+    }
+    const aggregatedItems = Array.from(configMap.values());
+
+    // 3. Quick Idempotency check before acquiring lock or transaction
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       console.log(`[Idempotency] Duplicate request found for requestId ${requestId}. Returning cached order ${existingOrder.id}`);
@@ -56,54 +91,345 @@ class OrderService {
       };
     }
 
-    // 3. Server-side price calculation
-    let calculatedTotal = 0;
-    const processedItems = [];
+    // 4. Branch logic based on MongoDB vs JSON file mode
+    if (isDBConnected()) {
+      return await this.processOrderMongoDB(requestId, customer, aggregatedItems);
+    } else {
+      return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems));
+    }
+  }
 
-    for (const itemReq of items) {
-      const menuItem = await menuService.getMenuItem(itemReq.productId);
-      if (!menuItem) {
-        throw { status: 422, message: `Món ăn với mã ${itemReq.productId} không tồn tại` };
-      }
-      if (menuItem.active === false) {
-        throw { status: 422, message: `Món ${menuItem.name} hiện đang tạm ngưng bán hôm nay` };
-      }
-
-      const itemTotal = menuItem.price * itemReq.quantity;
-      calculatedTotal += itemTotal;
-
-      processedItems.push({
-        productId: menuItem.id,
-        name: menuItem.name,
-        unitPrice: menuItem.price,
-        quantity: itemReq.quantity,
-        itemTotal: itemTotal
-      });
+  async processOrderMongoDB(requestId, customer, aggregatedItems) {
+    const existingOrder = await orderRepository.findByRequestId(requestId);
+    if (existingOrder) {
+      return {
+        statusCode: 200,
+        result: {
+          orderId: existingOrder.id,
+          status: existingOrder.orderStatus,
+          notificationStatus: existingOrder.notificationStatus,
+          total: existingOrder.totalAmount
+        }
+      };
     }
 
-    // 4. Generate order ID and save order as SAVED
-    const orderId = generateOrderId();
-    const newOrder = {
-      id: orderId,
-      requestId,
-      customer,
-      items: processedItems,
-      totalAmount: calculatedTotal,
-      orderStatus: 'CONFIRMED',
-      notificationStatus: 'PENDING',
-      telegramMessageId: null,
-      notificationAttempts: 0,
-      notificationError: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+    let session = null;
+    try {
+      session = await mongoose.startSession();
+      session.startTransaction();
+    } catch (sessionErr) {
+      session = null;
+    }
 
-    await orderRepository.save(newOrder);
+    try {
+      // Calculate total required quantity per productId
+      const totalProductQuantityMap = new Map();
+      for (const itemReq of aggregatedItems) {
+        const curr = totalProductQuantityMap.get(itemReq.productId) || 0;
+        totalProductQuantityMap.set(itemReq.productId, curr + itemReq.quantity);
+      }
 
-    // 5. Trigger Telegram Notification
+      // Check stock & item validity for each product
+      const insufficientItems = [];
+      const productMenuMap = new Map();
+
+      for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
+        const menuItem = await menuRepository.getById(productId);
+        if (!menuItem) {
+          throw { status: 422, message: `Món ăn với mã ${productId} không tồn tại` };
+        }
+        if (menuItem.active === false) {
+          throw { status: 422, message: `Món "${menuItem.name}" hiện đang tạm ngưng bán hôm nay` };
+        }
+
+        if (menuItem.stockQuantity < totalReqQty) {
+          insufficientItems.push({
+            productId: menuItem.id,
+            name: menuItem.name,
+            requestedQuantity: totalReqQty,
+            availableQuantity: Math.max(0, menuItem.stockQuantity)
+          });
+        }
+        productMenuMap.set(productId, menuItem);
+      }
+
+      if (insufficientItems.length > 0) {
+        if (session) {
+          await session.abortTransaction();
+          session.endSession();
+        }
+        const first = insufficientItems[0];
+        throw {
+          status: 409,
+          code: 'INSUFFICIENT_STOCK',
+          message: `Món "${first.name}" chỉ còn ${first.availableQuantity} phần.`,
+          items: insufficientItems
+        };
+      }
+
+      // Process items & build server customization snapshot
+      const processedItems = [];
+      let subtotalAmount = 0;
+      let totalAmount = 0;
+
+      for (const itemReq of aggregatedItems) {
+        const menuItem = productMenuMap.get(itemReq.productId);
+        const originalUnitPrice = menuItem.price;
+        const discountPercent = menuItem.discountPercent || 0;
+        const unitPrice = calculateSalePrice(originalUnitPrice, discountPercent);
+        const itemSubtotalBeforeDiscount = originalUnitPrice * itemReq.quantity;
+        const itemTotal = unitPrice * itemReq.quantity;
+        const discountAmount = itemSubtotalBeforeDiscount - itemTotal;
+
+        subtotalAmount += itemSubtotalBeforeDiscount;
+        totalAmount += itemTotal;
+
+        // Server-side options validation & snapshot creation
+        const activeOptions = Array.isArray(menuItem.customizationOptions)
+          ? menuItem.customizationOptions.filter(o => o.active !== false)
+          : [];
+        const activeOptMap = new Map(activeOptions.map(o => [o.id, o.name]));
+
+        const excludedOptionsSnapshot = [];
+        for (const exId of itemReq.excludedOptionIds) {
+          const optName = activeOptMap.get(exId);
+          if (!optName) {
+            throw { status: 422, message: `Tùy chọn thành phần "${exId}" không hợp lệ hoặc không áp dụng cho món "${menuItem.name}"` };
+          }
+          excludedOptionsSnapshot.push({ id: exId, name: optName });
+        }
+
+        const excludedSet = new Set(itemReq.excludedOptionIds);
+        const includedOptionsSnapshot = activeOptions
+          .filter(o => !excludedSet.has(o.id))
+          .map(o => ({ id: o.id, name: o.name }));
+
+        processedItems.push({
+          productId: menuItem.id,
+          name: menuItem.name,
+          originalUnitPrice,
+          discountPercent,
+          unitPrice,
+          quantity: itemReq.quantity,
+          discountAmount,
+          itemSubtotalBeforeDiscount,
+          itemTotal,
+          customization: {
+            excludedOptions: excludedOptionsSnapshot,
+            includedOptions: includedOptionsSnapshot
+          }
+        });
+      }
+
+      // Decrement stock for total quantity per product
+      for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
+        const menuItem = productMenuMap.get(productId);
+        if (session) {
+          const updatedDoc = await menuRepository.decrementStockInTransaction(productId, totalReqQty, session);
+          if (!updatedDoc) {
+            throw {
+              status: 409,
+              code: 'INSUFFICIENT_STOCK',
+              message: `Xung đột kho cho món "${menuItem.name}". Vui lòng thử lại.`,
+              items: [{ productId: menuItem.id, name: menuItem.name, requestedQuantity: totalReqQty, availableQuantity: menuItem.stockQuantity }]
+            };
+          }
+        } else {
+          menuItem.stockQuantity -= totalReqQty;
+          await menuRepository.saveOrUpdate(menuItem);
+        }
+      }
+
+      const totalDiscountAmount = subtotalAmount - totalAmount;
+      const orderId = generateOrderId();
+      const newOrder = {
+        id: orderId,
+        requestId,
+        customer,
+        items: processedItems,
+        subtotalAmount,
+        discountAmount: totalDiscountAmount,
+        totalAmount,
+        orderStatus: 'CONFIRMED',
+        notificationStatus: 'PENDING',
+        telegramMessageId: null,
+        notificationAttempts: 0,
+        notificationError: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await orderRepository.save(newOrder, session);
+
+      if (session) {
+        await session.commitTransaction();
+        session.endSession();
+      }
+
+      return await this.sendNotificationAndRespond(newOrder);
+
+    } catch (err) {
+      if (session) {
+        try {
+          await session.abortTransaction();
+          session.endSession();
+        } catch (e) {}
+      }
+      throw err;
+    }
+  }
+
+  async processOrderJSON(requestId, customer, aggregatedItems) {
+    const existingOrder = await orderRepository.findByRequestId(requestId);
+    if (existingOrder) {
+      return {
+        statusCode: 200,
+        result: {
+          orderId: existingOrder.id,
+          status: existingOrder.orderStatus,
+          notificationStatus: existingOrder.notificationStatus,
+          total: existingOrder.totalAmount
+        }
+      };
+    }
+
+    const allItems = menuRepository.getFromFile();
+
+    // Calculate total required quantity per productId
+    const totalProductQuantityMap = new Map();
+    for (const itemReq of aggregatedItems) {
+      const curr = totalProductQuantityMap.get(itemReq.productId) || 0;
+      totalProductQuantityMap.set(itemReq.productId, curr + itemReq.quantity);
+    }
+
+    const insufficientItems = [];
+    for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
+      const menuItem = allItems.find(i => i.id === productId);
+      if (!menuItem) {
+        throw { status: 422, message: `Món ăn với mã ${productId} không tồn tại` };
+      }
+      if (menuItem.active === false) {
+        throw { status: 422, message: `Món "${menuItem.name}" hiện đang tạm ngưng bán hôm nay` };
+      }
+
+      const stock = menuItem.stockQuantity ?? 0;
+      if (stock < totalReqQty) {
+        insufficientItems.push({
+          productId: menuItem.id,
+          name: menuItem.name,
+          requestedQuantity: totalReqQty,
+          availableQuantity: Math.max(0, stock)
+        });
+      }
+    }
+
+    if (insufficientItems.length > 0) {
+      const first = insufficientItems[0];
+      throw {
+        status: 409,
+        code: 'INSUFFICIENT_STOCK',
+        message: `Món "${first.name}" chỉ còn ${first.availableQuantity} phần.`,
+        items: insufficientItems
+      };
+    }
+
+    const menuBackup = JSON.parse(JSON.stringify(allItems));
+
+    try {
+      const processedItems = [];
+      let subtotalAmount = 0;
+      let totalAmount = 0;
+
+      for (const itemReq of aggregatedItems) {
+        const menuItem = allItems.find(i => i.id === itemReq.productId);
+        const originalUnitPrice = menuItem.price;
+        const discountPercent = menuItem.discountPercent || 0;
+        const unitPrice = calculateSalePrice(originalUnitPrice, discountPercent);
+        const itemSubtotalBeforeDiscount = originalUnitPrice * itemReq.quantity;
+        const itemTotal = unitPrice * itemReq.quantity;
+        const discountAmount = itemSubtotalBeforeDiscount - itemTotal;
+
+        subtotalAmount += itemSubtotalBeforeDiscount;
+        totalAmount += itemTotal;
+
+        // Options validation & snapshot creation
+        const activeOptions = Array.isArray(menuItem.customizationOptions)
+          ? menuItem.customizationOptions.filter(o => o.active !== false)
+          : [];
+        const activeOptMap = new Map(activeOptions.map(o => [o.id, o.name]));
+
+        const excludedOptionsSnapshot = [];
+        for (const exId of itemReq.excludedOptionIds) {
+          const optName = activeOptMap.get(exId);
+          if (!optName) {
+            throw { status: 422, message: `Tùy chọn thành phần "${exId}" không hợp lệ hoặc không áp dụng cho món "${menuItem.name}"` };
+          }
+          excludedOptionsSnapshot.push({ id: exId, name: optName });
+        }
+
+        const excludedSet = new Set(itemReq.excludedOptionIds);
+        const includedOptionsSnapshot = activeOptions
+          .filter(o => !excludedSet.has(o.id))
+          .map(o => ({ id: o.id, name: o.name }));
+
+        processedItems.push({
+          productId: menuItem.id,
+          name: menuItem.name,
+          originalUnitPrice,
+          discountPercent,
+          unitPrice,
+          quantity: itemReq.quantity,
+          discountAmount,
+          itemSubtotalBeforeDiscount,
+          itemTotal,
+          customization: {
+            excludedOptions: excludedOptionsSnapshot,
+            includedOptions: includedOptionsSnapshot
+          }
+        });
+      }
+
+      // Decrement stock for total product quantity
+      for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
+        const menuItem = allItems.find(i => i.id === productId);
+        menuItem.stockQuantity -= totalReqQty;
+      }
+
+      menuRepository.saveAll(allItems);
+
+      const totalDiscountAmount = subtotalAmount - totalAmount;
+      const orderId = generateOrderId();
+      const newOrder = {
+        id: orderId,
+        requestId,
+        customer,
+        items: processedItems,
+        subtotalAmount,
+        discountAmount: totalDiscountAmount,
+        totalAmount,
+        orderStatus: 'CONFIRMED',
+        notificationStatus: 'PENDING',
+        telegramMessageId: null,
+        notificationAttempts: 0,
+        notificationError: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      await orderRepository.save(newOrder);
+
+      return await this.sendNotificationAndRespond(newOrder);
+
+    } catch (err) {
+      menuRepository.saveAll(menuBackup);
+      throw err;
+    }
+  }
+
+  async sendNotificationAndRespond(newOrder) {
     try {
       const result = await telegramService.notifyNewOrder(newOrder);
-      await orderRepository.update(orderId, {
+      await orderRepository.update(newOrder.id, {
         notificationStatus: 'SENT',
         telegramMessageId: result.messageId,
         notificationAttempts: 1
@@ -115,12 +441,12 @@ class OrderService {
           orderId: newOrder.id,
           status: 'CONFIRMED',
           notificationStatus: 'SENT',
-          total: calculatedTotal
+          total: newOrder.totalAmount
         }
       };
     } catch (telegramErr) {
-      console.error(`[Telegram Error for Order ${orderId}]:`, telegramErr.message);
-      await orderRepository.update(orderId, {
+      console.error(`[Telegram Error for Order ${newOrder.id}]:`, telegramErr.message);
+      await orderRepository.update(newOrder.id, {
         notificationStatus: 'FAILED',
         notificationAttempts: 1,
         notificationError: telegramErr.message
@@ -132,7 +458,7 @@ class OrderService {
           orderId: newOrder.id,
           status: 'CONFIRMED',
           notificationStatus: 'FAILED',
-          total: calculatedTotal,
+          total: newOrder.totalAmount,
           message: 'Đơn hàng đã được ghi nhận. Cửa hàng sẽ kiểm tra và xác nhận sớm nhất.'
         }
       };
