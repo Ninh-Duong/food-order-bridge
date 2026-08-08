@@ -49,6 +49,7 @@
         <button class="admin-tab-btn active" data-target="tab-items">🍔 Quản lý Món ăn</button>
         <button class="admin-tab-btn" data-target="tab-categories">🗂 Quản lý Danh mục</button>
         <button class="admin-tab-btn" data-target="tab-orders">📋 Lịch sử Đơn hàng</button>
+        <button class="admin-tab-btn admin-only" data-target="tab-reports">📊 Báo cáo bán hàng</button>
         <button class="admin-tab-btn admin-only" data-target="tab-accounts">👥 Tài khoản nhân viên</button>
       </div>
     </div>
@@ -157,6 +158,7 @@
                 <th>Địa chỉ giao</th>
                 <th>Món đã đặt</th>
                 <th>Tổng tiền</th>
+                <th>Thanh toán</th>
                 <th>Bắn Telegram</th>
                 <th>Thời gian</th>
                 <th>Hành động</th>
@@ -175,6 +177,54 @@
           <div id="orders-pagination-btns" style="display: flex; gap: 6px; align-items: center;">
             <!-- Rendered dynamically via order-monitor.js -->
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: SALES REPORTS DASHBOARD (Admin Only) -->
+    <section id="tab-reports" class="admin-tab-content admin-only" style="display: none;">
+      <div class="admin-card">
+        <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; align-items: center;">
+          <div>
+            <h2 style="font-size: var(--font-size-lg); font-weight: 800; margin: 0;">📊 Báo cáo bán hàng</h2>
+            <div id="report-date-range-subtitle" style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 4px;">
+              Đang tải dữ liệu báo cáo...
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <div class="btn-group" role="group" aria-label="Bộ lọc kỳ báo cáo">
+              <button type="button" class="btn btn-secondary report-period-btn active" data-period="today">Hôm nay</button>
+              <button type="button" class="btn btn-secondary report-period-btn" data-period="week">Tuần này</button>
+              <button type="button" class="btn btn-secondary report-period-btn" data-period="month">Tháng này</button>
+            </div>
+            <button class="btn btn-primary" id="btn-export-pdf-report" style="display: inline-flex; align-items: center; gap: 6px;">
+              <span>⬇</span> Xuất PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- Summary Metrics Cards Grid -->
+        <div id="report-summary-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 16px 0;">
+          <!-- Rendered via report-dashboard.js -->
+        </div>
+
+        <!-- Product Breakdown Table -->
+        <div class="table-responsive" style="margin-top: 16px;">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Mã SP</th>
+                <th>Tên sản phẩm</th>
+                <th style="text-align: right;">Số lượng bán</th>
+                <th style="text-align: right;">Tổng giá gốc</th>
+                <th style="text-align: right;">Tổng giảm giá</th>
+                <th style="text-align: right;">Doanh thu thực tế</th>
+              </tr>
+            </thead>
+            <tbody id="report-product-table-body">
+              <!-- Rendered via report-dashboard.js -->
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -211,6 +261,7 @@
     import { initItemManager } from './js/admin/item-manager.js';
     import { initCategoryManager } from './js/admin/category-manager.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
+    import { initReportDashboard } from './js/admin/report-dashboard.js';
     import { initAuth } from './js/admin/auth.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -233,6 +284,10 @@
       initCategoryManager();
       initItemManager();
       initOrderMonitor();
+
+      if (user.role === 'admin') {
+        initReportDashboard();
+      }
     });
   </script>
 </body>

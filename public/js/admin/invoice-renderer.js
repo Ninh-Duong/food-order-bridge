@@ -11,6 +11,7 @@ import { formatVND, escapeHTML } from '../common/utils.js';
  */
 export function renderInvoiceHTML(order, settings = {}) {
   if (!order) return '<div class="invoice-empty">Không có dữ liệu đơn hàng.</div>';
+  if (!order.isPaid) return '<div class="invoice-empty" style="color: #ef4444; font-weight: 700; text-align: center; padding: 24px;">Đơn hàng chưa thanh toán, không thể in hóa đơn.</div>';
 
   const shopName = escapeHTML(settings.shopName || 'FOOD ORDER BRIDGE');
   const shopAddress = settings.shopAddress ? escapeHTML(settings.shopAddress) : '';
@@ -26,6 +27,14 @@ export function renderInvoiceHTML(order, settings = {}) {
     if (!isNaN(d.getTime())) {
       dateStr = d.toLocaleDateString('vi-VN');
       timeStr = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+
+  let paidTimeStr = '';
+  if (order.paidAt) {
+    const pd = new Date(order.paidAt);
+    if (!isNaN(pd.getTime())) {
+      paidTimeStr = `${pd.toLocaleDateString('vi-VN')} ${pd.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}`;
     }
   }
 
@@ -113,6 +122,9 @@ export function renderInvoiceHTML(order, settings = {}) {
         </div>
         <div class="invoice-meta-row">
           <span>Ngày: ${dateStr} ${timeStr ? `· ${timeStr}` : ''}</span>
+        </div>
+        <div class="invoice-meta-row" style="margin-top: 4px; font-weight: 700; color: #059669;">
+          <span>✓ ĐÃ THANH TOÁN ${paidTimeStr ? `(${paidTimeStr})` : ''}</span>
         </div>
       </header>
 

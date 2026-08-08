@@ -270,6 +270,9 @@ class OrderService {
         telegramMessageId: null,
         notificationAttempts: 0,
         notificationError: null,
+        isPaid: false,
+        paidAt: null,
+        paidBy: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -442,6 +445,9 @@ class OrderService {
         telegramMessageId: null,
         notificationAttempts: 0,
         notificationError: null,
+        isPaid: false,
+        paidAt: null,
+        paidBy: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -495,6 +501,40 @@ class OrderService {
     }
   }
 
+  async setPaymentStatus(orderId, isPaid, actor) {
+    if (typeof isPaid !== 'boolean') {
+      throw { status: 400, message: 'Trạng thái isPaid phải là kiểu boolean' };
+    }
+
+    const order = await orderRepository.findById(orderId);
+    if (!order) {
+      throw { status: 404, message: 'Không tìm thấy đơn hàng' };
+    }
+
+    if (order.isPaid === isPaid) {
+      return order;
+    }
+
+    const paymentData = isPaid
+      ? {
+          isPaid: true,
+          paidAt: new Date().toISOString(),
+          paidBy: {
+            userId: actor?.sub || actor?.userId || null,
+            username: actor?.username || null,
+            role: actor?.role || null
+          }
+        }
+      : {
+          isPaid: false,
+          paidAt: null,
+          paidBy: null
+        };
+
+    const updated = await orderRepository.updatePaymentStatus(orderId, paymentData);
+    return updated;
+  }
+
   async getOrderStatus(orderId) {
     const order = await orderRepository.findById(orderId);
     if (!order) return null;
@@ -503,6 +543,9 @@ class OrderService {
       orderStatus: order.orderStatus,
       notificationStatus: order.notificationStatus,
       total: order.totalAmount,
+      isPaid: order.isPaid === true,
+      paidAt: order.paidAt || null,
+      paidBy: order.paidBy || null,
       createdAt: order.createdAt
     };
   }

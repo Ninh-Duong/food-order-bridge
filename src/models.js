@@ -55,9 +55,18 @@ const orderSchema = new mongoose.Schema({
   telegramMessageId: { type: Number, default: null },
   notificationAttempts: { type: Number, default: 0 },
   notificationError: { type: String, default: null },
+  isPaid: { type: Boolean, default: false, index: true },
+  paidAt: { type: Date, default: null, index: true },
+  paidBy: {
+    userId: { type: String, default: null },
+    username: { type: String, default: null },
+    role: { type: String, enum: ['admin', 'staff'], default: null }
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
+
+orderSchema.index({ isPaid: 1, paidAt: 1 });
 
 const counterSchema = new mongoose.Schema({
   _id: { type: String, required: true },

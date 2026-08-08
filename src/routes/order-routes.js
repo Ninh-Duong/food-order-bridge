@@ -20,7 +20,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/orders - List all orders with pagination (Admin)
+// GET /api/orders - List all orders with pagination (Admin/Staff)
 router.get('/', requireAuth, async (req, res) => {
   try {
     const { page, limit } = req.query;
@@ -31,6 +31,23 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+// PUT /api/orders/:orderId/payment - Update payment status (Staff/Admin)
+router.put('/:orderId/payment', requireAuth, async (req, res) => {
+  try {
+    const { isPaid } = req.body;
+    if (typeof isPaid !== 'boolean') {
+      return res.status(400).json({ message: 'Trạng thái isPaid phải là kiểu boolean' });
+    }
+    const updatedOrder = await orderService.setPaymentStatus(req.params.orderId, isPaid, req.user);
+    res.json({ order: updatedOrder });
+  } catch (err) {
+    if (err.status) {
+      return res.status(err.status).json({ message: err.message });
+    }
+    console.error('Unhandled Payment Status Error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ khi cập nhật trạng thái thanh toán' });
+  }
+});
 
 // GET /api/orders/:orderId - Check order status
 router.get('/:orderId', async (req, res) => {

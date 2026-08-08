@@ -2,12 +2,14 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
 
 describe('Admin Invoice Renderer Tests', () => {
-  it('renderInvoiceHTML: Render đơn hàng chuẩn đầy đủ thông tin', async () => {
+  it('renderInvoiceHTML: Render đơn hàng chuẩn đầy đủ thông tin (đã thanh toán)', async () => {
     const { renderInvoiceHTML } = await import('../public/js/admin/invoice-renderer.js');
 
     const order = {
       id: 'FO-20260808-0001',
       createdAt: '2026-08-08T18:45:00.000Z',
+      isPaid: true,
+      paidAt: '2026-08-08T18:50:00.000Z',
       customer: {
         name: 'Nguyễn Văn A',
         phone: '0901234567',
@@ -53,6 +55,7 @@ describe('Admin Invoice Renderer Tests', () => {
     assert.ok(html.includes('Nguyễn Văn A'));
     assert.ok(html.includes('0901234567'));
     assert.ok(html.includes('12 Nguyễn Trãi, Quận 5'));
+    assert.ok(html.includes('ĐÃ THANH TOÁN'));
 
     // Món 1 có giảm giá và không lấy
     assert.ok(html.includes('Cơm gà'));
@@ -78,12 +81,26 @@ describe('Admin Invoice Renderer Tests', () => {
     assert.ok(html.includes('Cảm ơn quý khách'));
   });
 
+  it('renderInvoiceHTML: Không cho phép render hóa đơn in của đơn chưa thanh toán', async () => {
+    const { renderInvoiceHTML } = await import('../public/js/admin/invoice-renderer.js');
+
+    const unpaidOrder = {
+      id: 'FO-UNPAID-001',
+      isPaid: false,
+      totalAmount: 100000
+    };
+
+    const html = renderInvoiceHTML(unpaidOrder);
+    assert.ok(html.includes('Đơn hàng chưa thanh toán, không thể in hóa đơn'));
+  });
+
   it('renderInvoiceHTML: Không hiển thị dòng giảm giá nếu discountPercent = 0', async () => {
     const { renderInvoiceHTML } = await import('../public/js/admin/invoice-renderer.js');
 
     const order = {
       id: 'FO-20260808-0002',
       createdAt: new Date().toISOString(),
+      isPaid: true,
       customer: { name: 'Trần Văn B' },
       items: [
         {
@@ -115,6 +132,7 @@ describe('Admin Invoice Renderer Tests', () => {
     const order = {
       id: 'FO-20260808-0003',
       createdAt: new Date().toISOString(),
+      isPaid: true,
       customer: { name: 'Khách Quà Tặng' },
       items: [
         {
@@ -146,6 +164,7 @@ describe('Admin Invoice Renderer Tests', () => {
     const legacyOrder = {
       id: 'FO-LEGACY-001',
       createdAt: '2026-08-01T10:00:00.000Z',
+      isPaid: true,
       customerName: 'Khách Cũ',
       phone: '0911223344',
       address: '789 Nguyễn Huệ',
@@ -177,6 +196,7 @@ describe('Admin Invoice Renderer Tests', () => {
     const xssOrder = {
       id: 'FO-XSS-<script>',
       createdAt: new Date().toISOString(),
+      isPaid: true,
       customer: {
         name: '<script>alert("hack_name")</script>',
         phone: '0900000000',
@@ -216,7 +236,7 @@ describe('Admin Invoice Renderer Tests', () => {
     const emptyOrderHtml = renderInvoiceHTML(null);
     assert.ok(emptyOrderHtml.includes('Không có dữ liệu đơn hàng.'));
 
-    const noItemsOrderHtml = renderInvoiceHTML({ id: 'FO-EMPTY', items: [] });
+    const noItemsOrderHtml = renderInvoiceHTML({ id: 'FO-EMPTY', isPaid: true, items: [] });
     assert.ok(noItemsOrderHtml.includes('Không có dữ liệu món ăn.'));
   });
 });

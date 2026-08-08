@@ -135,6 +135,7 @@ function renderOrdersTable(orders) {
   tableBody.innerHTML = orders.map(order => {
     const discount = order.discountAmount || 0;
     const safeOrderId = escapeHTML(order.id);
+    const isPaid = order.isPaid === true;
 
     const itemsHtml = (order.items || []).map(i => {
       const hasDiscount = i.discountPercent > 0 && i.originalUnitPrice > i.unitPrice;
@@ -158,6 +159,26 @@ function renderOrdersTable(orders) {
       `;
     }).join('');
 
+    const paymentBtnHtml = isPaid ? `
+      <button type="button" class="btn btn-secondary btn-payment-toggle" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background: rgba(16, 185, 129, 0.15); color: #059669; border-color: rgba(16, 185, 129, 0.4); font-weight: 700;" data-action="toggle-payment" data-order-id="${safeOrderId}" data-current-paid="true" title="Bấm để chuyển về Chưa thanh toán">
+        ✓ Đã thanh toán
+      </button>
+    ` : `
+      <button type="button" class="btn btn-secondary btn-payment-toggle" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background: rgba(239, 68, 68, 0.1); color: #dc2626; border-color: rgba(239, 68, 68, 0.3); font-weight: 700;" data-action="toggle-payment" data-order-id="${safeOrderId}" data-current-paid="false" title="Bấm để xác nhận Đã thanh toán">
+        ○ Chưa thanh toán
+      </button>
+    `;
+
+    const printBtnHtml = isPaid ? `
+      <button type="button" class="btn btn-outline btn-print-invoice" style="min-height: 30px; padding: 2px 8px; font-size: 12px;" data-action="print-invoice" data-order-id="${safeOrderId}">
+        🖨 In hóa đơn
+      </button>
+    ` : `
+      <button type="button" class="btn btn-outline btn-print-invoice" style="min-height: 30px; padding: 2px 8px; font-size: 12px; opacity: 0.4; cursor: not-allowed;" disabled aria-disabled="true" title="Chỉ được in hóa đơn sau khi thanh toán" data-action="print-invoice" data-order-id="${safeOrderId}">
+        🖨 In hóa đơn
+      </button>
+    `;
+
     return `
       <tr>
         <td><strong style="color: var(--color-primary);">${safeOrderId}</strong></td>
@@ -178,15 +199,16 @@ function renderOrdersTable(orders) {
           ` : ''}
         </td>
         <td>
+          ${paymentBtnHtml}
+        </td>
+        <td>
           <span class="badge ${order.notificationStatus === 'SENT' ? 'badge-active' : 'badge-inactive'}">
             ${order.notificationStatus === 'SENT' ? '🟢 Telegram OK' : '🔴 Lỗi Telegram'}
           </span>
         </td>
         <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">${new Date(order.createdAt).toLocaleTimeString('vi-VN')}</td>
         <td>
-          <button type="button" class="btn btn-outline btn-print-invoice" style="min-height: 30px; padding: 2px 8px; font-size: 12px;" data-action="print-invoice" data-order-id="${safeOrderId}">
-            🖨 In hóa đơn
-          </button>
+          ${printBtnHtml}
         </td>
       </tr>
     `;
@@ -197,12 +219,50 @@ function bindOrderTableEvents() {
   const tableBody = document.getElementById('admin-orders-table-body');
   if (!tableBody) return;
 
-  tableBody.addEventListener('click', (event) => {
-    const button = event.target.closest('[data-action="print-invoice"]');
-    if (!button) return;
+  tableBody.addEventListener('click', async (event) => {
+    // Payment Toggle Handler
+    const paymentBtn = event.target.closest('[data-action="toggle-payment"]');
+    if (paymentBtn) {
+      const orderId = paymentBtn.dataset.orderId;
+      const currentPaid = paymentBtn.dataset.currentPaid === 'true';
+      const targetPaid = !currentPaid;
 
-    const orderId = button.dataset.orderId;
-    if (orderId) {
+      if (currentPaid) {
+        const confirmed = window.confirm(`Bỏ trạng thái thanh toán của đơn ${orderId}? Đơn này sẽ không còn được tính trong báo cáo.`);
+        if (!confirmed) return;
+      }
+
+      paymentBtn.disabled = true;
+      paymentBtn.textContent = '⏳ ...';
+
+      try {
+        const resData = await API.put(`/api/orders/${orderId}/payment`, { isPaid: targetPaid });
+        const updated = resData.order || resData;
+
+        const idx = adminOrdersList.findIndex(o => o.id === orderId);
+        if (idx !== -1) {
+          adminOrdersList[idx] = { ...adminOrdersList[idx], ...updated };
+        }
+
+        renderOrdersTable(adminOrdersList);
+        showToast(targetPaid ? 'Đã xác nhận thanh toán đơn hàng' : 'Đã chuyển đơn hàng về chưa thanh toán', 'success');
+      } catch (err) {
+        console.error('[Payment Toggle Error]:', err);
+        showToast(err.message || 'Lỗi cập nhật trạng thái thanh toán', 'error');
+        renderOrdersTable(adminOrdersList);
+      }
+      return;
+    }
+
+    // Invoice Print Handler
+    const printBtn = event.target.closest('[data-action="print-invoice"]');
+    if (printBtn) {
+      const orderId = printBtn.dataset.orderId;
+      const order = adminOrdersList.find(o => o.id === orderId);
+      if (!order || !order.isPaid) {
+        showToast('Đơn hàng chưa thanh toán nên chưa thể in hóa đơn', 'warning');
+        return;
+      }
       openInvoicePreview(orderId);
     }
   });
@@ -252,6 +312,11 @@ export function openInvoicePreview(orderId) {
     return;
   }
 
+  if (!order.isPaid) {
+    showToast('Đơn hàng chưa thanh toán nên chưa thể in hóa đơn', 'warning');
+    return;
+  }
+
   selectedInvoiceOrderId = orderId;
   lastFocusedElement = document.activeElement;
 
@@ -293,6 +358,15 @@ export function closeInvoicePreview() {
 
 export function printCurrentInvoice() {
   if (!selectedInvoiceOrderId || printInProgress) return;
+
+  const order = adminOrdersList.find(o => o.id === selectedInvoiceOrderId);
+  if (!order || !order.isPaid) {
+    showToast('Đơn hàng chưa thanh toán nên chưa thể in hóa đơn', 'warning');
+    closeInvoicePreview();
+    return;
+  }
+
+  printInProgress = true;
 
   printInProgress = true;
   document.body.classList.add('is-printing-invoice');

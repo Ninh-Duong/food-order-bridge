@@ -157,6 +157,9 @@ class OrderRepository {
           telegramMessageId: order.telegramMessageId || null,
           notificationAttempts: order.notificationAttempts || 0,
           notificationError: order.notificationError || null,
+          isPaid: order.isPaid === true,
+          paidAt: order.paidAt || null,
+          paidBy: order.paidBy || null,
           createdAt: order.createdAt || new Date(),
           updatedAt: new Date()
         };
@@ -168,12 +171,19 @@ class OrderRepository {
       }
     }
 
-    this.orders.set(order.id, order);
+    const orderToSave = {
+      ...order,
+      isPaid: order.isPaid === true,
+      paidAt: order.paidAt || null,
+      paidBy: order.paidBy || null
+    };
+
+    this.orders.set(order.id, orderToSave);
     if (order.requestId) {
       this.requests.set(order.requestId, order.id);
     }
     this.saveAllToFile();
-    return order;
+    return orderToSave;
   }
 
   async update(orderId, fields) {
@@ -201,64 +211,65 @@ class OrderRepository {
     return null;
   }
 
-  async getAll() {
+  async updatePaymentStatus(orderId, paymentData) {
+    let updatedOrder = null;
     if (isDBConnected()) {
       try {
-        const docs = await OrderModel.find().sort({ createdAt: -1 }).lean();
-        if (docs && docs.length > 0) {
-          return docs.map(d => this.formatDoc(d));
-        }
+        const doc = await OrderModel.findOneAndUpdate(
+          { id: orderId },
+          { $set: paymentData },
+          { returnDocument: 'after', new: true }
+        ).lean();
+        if (!doc) return null;
+        updatedOrder = this.formatDoc(doc);
       } catch (err) {
-        console.error('Error fetching all orders from MongoDB:', err.message);
-        throw err;
-      }
-    }
-    return Array.from(this.orders.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }
-
-  async getPaginated({ page = 1, limit = 10 }) {
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
-    const skip = (pageNum - 1) * limitNum;
-
-    if (isDBConnected()) {
-      try {
-        const [docs, totalOrders] = await Promise.all([
-          OrderModel.find().sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
-          OrderModel.countDocuments()
-        ]);
-        const totalPages = Math.ceil(totalOrders / limitNum) || 1;
-        return {
-          orders: (docs || []).map(d => this.formatDoc(d)),
-          pagination: {
-            page: pageNum,
-            limit: limitNum,
-            totalOrders,
-            totalPages
-          }
-        };
-      } catch (err) {
-        console.error('Error fetching paginated orders from MongoDB:', err.message);
+        console.error('Error updating payment status in MongoDB:', err.message);
         throw err;
       }
     }
 
-    const allOrders = Array.from(this.orders.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    const totalOrders = allOrders.length;
-    const totalPages = Math.ceil(totalOrders / limitNum) || 1;
-    const paginatedOrders = allOrders.slice(skip, skip + limitNum);
+    const existing = this.orders.get(orderId);
+    if (!updatedOrder && !existing) return null;
 
-    return {
-      orders: paginatedOrders,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        totalOrders,
-        totalPages
-      }
+    const memoryUpdated = {
+      ...(existing || updatedOrder),
+      ...paymentData,
+      updatedAt: new Date().toISOString()
     };
+    this.orders.set(orderId, memoryUpdated);
+    this.saveAllToFile();
+
+    return updatedOrder || memoryUpdated;
   }
 
+  async getPaidOrdersByRange({ from, to }) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isDBConnected()) {
+      try {
+        const docs = await OrderModel.find({
+          isPaid: true,
+          paidAt: { $gte: fromDate, $lt: toDate }
+        }).sort({ paidAt: 1 }).lean();
+        return (docs || []).map(d => this.formatDoc(d));
+      } catch (err) {
+        console.error('Error getting paid orders by range from MongoDB:', err.message);
+        throw err;
+      }
+    }
+
+    const paidOrders = [];
+    for (const order of this.orders.values()) {
+      if (order.isPaid === true && order.paidAt) {
+        const pDate = new Date(order.paidAt);
+        if (pDate >= fromDate && pDate < toDate) {
+          paidOrders.push(order);
+        }
+      }
+    }
+    return paidOrders.sort((a, b) => new Date(a.paidAt) - new Date(b.paidAt));
+  }
 
   formatDoc(doc) {
     return {
@@ -279,6 +290,9 @@ class OrderRepository {
       telegramMessageId: doc.telegramMessageId || null,
       notificationAttempts: doc.notificationAttempts || 0,
       notificationError: doc.notificationError || null,
+      isPaid: doc.isPaid === true,
+      paidAt: doc.paidAt || null,
+      paidBy: doc.paidBy || null,
       createdAt: doc.createdAt
     };
   }
