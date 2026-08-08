@@ -35,6 +35,12 @@ const menuItemSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+const paidBySchema = new mongoose.Schema({
+  userId: { type: String, default: null },
+  username: { type: String, default: null },
+  role: { type: String, enum: ['admin', 'staff'], default: null }
+}, { _id: false });
+
 const orderSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   requestId: { type: String, required: true, unique: true, index: true },
@@ -57,11 +63,7 @@ const orderSchema = new mongoose.Schema({
   notificationError: { type: String, default: null },
   isPaid: { type: Boolean, default: false, index: true },
   paidAt: { type: Date, default: null, index: true },
-  paidBy: {
-    userId: { type: String, default: null },
-    username: { type: String, default: null },
-    role: { type: String, enum: ['admin', 'staff'], default: null }
-  },
+  paidBy: { type: paidBySchema, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
@@ -91,7 +93,6 @@ const userSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
-// The service also checks this rule so it is enforced in file fallback mode.
 userSchema.index(
   { role: 1 },
   { unique: true, partialFilterExpression: { role: 'admin' }, name: 'single_admin_account' }

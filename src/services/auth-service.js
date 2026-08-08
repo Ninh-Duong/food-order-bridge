@@ -81,4 +81,4 @@ async function createStaff(rawUsername, password) {
   return userRepository.create({ id: crypto.randomUUID(), username, passwordHash: hashPassword(password), role: 'staff', active: true });
 }
 
-module.exports = { TOKEN_TTL_SECONDS, bootstrapAdmin, login, createStaff, parseToken, listStaff: userRepository.listStaff };
+module.exports = { TOKEN_TTL_SECONDS, bootstrapAdmin, login, createStaff, parseToken, issueToken, listStaff: userRepository.listStaff };

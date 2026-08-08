@@ -84,6 +84,65 @@ class OrderRepository {
     return this.orders.get(orderId) || null;
   }
 
+  async getPaginated({ page = 1, limit = 10 }) {
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    if (isDBConnected()) {
+      try {
+        const [docs, totalOrders] = await Promise.all([
+          OrderModel.find()
+            .sort({ createdAt: -1, _id: -1 })
+            .skip(skip)
+            .limit(limitNum)
+            .lean(),
+          OrderModel.countDocuments()
+        ]);
+
+        const orders = (docs || []).map(doc => this.formatDoc(doc));
+        const totalPages = Math.max(1, Math.ceil(totalOrders / limitNum));
+
+        return {
+          orders,
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            totalOrders,
+            totalPages
+          }
+        };
+      } catch (err) {
+        console.error('Error getting paginated orders from MongoDB:', err.message);
+        throw err;
+      }
+    }
+
+    const list = Array.from(this.orders.values());
+    list.sort((a, b) => {
+      const tA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const tB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      if (tB !== tA) return tB - tA;
+      const idA = String(a.id || '');
+      const idB = String(b.id || '');
+      return idB.localeCompare(idA);
+    });
+
+    const totalOrders = list.length;
+    const totalPages = Math.max(1, Math.ceil(totalOrders / limitNum));
+    const orders = list.slice(skip, skip + limitNum);
+
+    return {
+      orders,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalOrders,
+        totalPages
+      }
+    };
+  }
+
   async nextOrderId(dateKey, session = null) {
     const prefix = `FO-${dateKey}-`;
 
@@ -144,22 +203,22 @@ class OrderRepository {
         const docData = {
           id: order.id,
           requestId: order.requestId,
-          customerName: order.customer ? order.customer.name : order.customerName,
-          phone: order.customer ? order.customer.phone : order.phone,
-          address: order.customer ? order.customer.address : order.address,
-          note: order.customer ? order.customer.note : order.note || '',
+          customerName: order.customer ? order.customer.name : (order.customerName || ''),
+          phone: order.customer ? order.customer.phone : (order.phone || ''),
+          address: order.customer ? order.customer.address : (order.address || ''),
+          note: order.customer ? order.customer.note : (order.note ?? ''),
           items: order.items,
-          subtotalAmount: order.subtotalAmount || 0,
-          discountAmount: order.discountAmount || 0,
-          totalPrice: order.totalAmount || order.totalPrice,
+          subtotalAmount: order.subtotalAmount ?? 0,
+          discountAmount: order.discountAmount ?? 0,
+          totalPrice: order.totalAmount ?? order.totalPrice ?? 0,
           telegramSent: order.notificationStatus === 'SENT',
-          notificationStatus: order.notificationStatus || 'PENDING',
-          telegramMessageId: order.telegramMessageId || null,
-          notificationAttempts: order.notificationAttempts || 0,
-          notificationError: order.notificationError || null,
+          notificationStatus: order.notificationStatus ?? 'PENDING',
+          telegramMessageId: order.telegramMessageId ?? null,
+          notificationAttempts: order.notificationAttempts ?? 0,
+          notificationError: order.notificationError ?? null,
           isPaid: order.isPaid === true,
-          paidAt: order.paidAt || null,
-          paidBy: order.paidBy || null,
+          paidAt: order.paidAt ?? null,
+          paidBy: order.paidBy ?? null,
           createdAt: order.createdAt || new Date(),
           updatedAt: new Date()
         };
@@ -173,9 +232,12 @@ class OrderRepository {
 
     const orderToSave = {
       ...order,
+      subtotalAmount: order.subtotalAmount ?? 0,
+      discountAmount: order.discountAmount ?? 0,
+      totalAmount: order.totalAmount ?? order.totalPrice ?? 0,
       isPaid: order.isPaid === true,
-      paidAt: order.paidAt || null,
-      paidBy: order.paidBy || null
+      paidAt: order.paidAt ?? null,
+      paidBy: order.paidBy ?? null
     };
 
     this.orders.set(order.id, orderToSave);
@@ -272,28 +334,29 @@ class OrderRepository {
   }
 
   formatDoc(doc) {
+    if (!doc) return null;
     return {
       id: doc.id,
       requestId: doc.requestId,
       customer: {
-        name: doc.customerName,
-        phone: doc.phone,
-        address: doc.address,
-        note: doc.note
+        name: doc.customerName ?? (doc.customer ? doc.customer.name : '') ?? '',
+        phone: doc.phone ?? (doc.customer ? doc.customer.phone : '') ?? '',
+        address: doc.address ?? (doc.customer ? doc.customer.address : '') ?? '',
+        note: doc.note ?? (doc.customer ? doc.customer.note : '') ?? ''
       },
-      items: doc.items,
-      subtotalAmount: doc.subtotalAmount || 0,
-      discountAmount: doc.discountAmount || 0,
-      totalAmount: doc.totalPrice,
-      orderStatus: 'CONFIRMED',
-      notificationStatus: doc.notificationStatus || (doc.telegramSent ? 'SENT' : 'PENDING'),
-      telegramMessageId: doc.telegramMessageId || null,
-      notificationAttempts: doc.notificationAttempts || 0,
-      notificationError: doc.notificationError || null,
+      items: doc.items || [],
+      subtotalAmount: doc.subtotalAmount ?? 0,
+      discountAmount: doc.discountAmount ?? 0,
+      totalAmount: doc.totalPrice ?? doc.totalAmount ?? 0,
+      orderStatus: doc.orderStatus || 'CONFIRMED',
+      notificationStatus: doc.notificationStatus ?? (doc.telegramSent ? 'SENT' : 'PENDING'),
+      telegramMessageId: doc.telegramMessageId ?? null,
+      notificationAttempts: doc.notificationAttempts ?? 0,
+      notificationError: doc.notificationError ?? null,
       isPaid: doc.isPaid === true,
-      paidAt: doc.paidAt || null,
-      paidBy: doc.paidBy || null,
-      createdAt: doc.createdAt
+      paidAt: doc.paidAt ?? null,
+      paidBy: doc.paidBy ?? null,
+      createdAt: doc.createdAt ?? null
     };
   }
 
@@ -315,4 +378,3 @@ class OrderRepository {
 }
 
 module.exports = new OrderRepository();
-
