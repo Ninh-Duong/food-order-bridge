@@ -7,7 +7,7 @@
     "price": 50000,
     "originalPrice": 60000,
     "discountPercent": 20,
-    "stockQuantity": 5,
+    "stockQuantity": 50,
     "customizationOptions": [
       {
         "id": "HANH_PHI",
@@ -105,7 +105,7 @@
     "name": "Món Test Customization",
     "price": 60000,
     "discountPercent": 0,
-    "stockQuantity": 9,
+    "stockQuantity": 10,
     "customizationOptions": [
       {
         "id": "TOI_PHI",
