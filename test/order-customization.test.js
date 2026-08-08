@@ -1,9 +1,35 @@
-const { describe, it } = require('node:test');
+const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
+const path = require('path');
 const orderService = require('../src/services/order-service');
 const menuRepository = require('../src/repositories/menu-repository');
 
+const MENU_FILE = path.join(__dirname, '..', 'src', 'data', 'menu.json');
+const ORDERS_FILE = path.join(__dirname, '..', 'src', 'data', 'orders.json');
+
+let originalMenuBackup = null;
+let originalOrdersBackup = null;
+
 describe('Order Service Customization & Snapshot Tests', () => {
+  before(() => {
+    if (fs.existsSync(MENU_FILE)) {
+      originalMenuBackup = fs.readFileSync(MENU_FILE, 'utf8');
+    }
+    if (fs.existsSync(ORDERS_FILE)) {
+      originalOrdersBackup = fs.readFileSync(ORDERS_FILE, 'utf8');
+    }
+  });
+
+  after(() => {
+    if (originalMenuBackup !== null) {
+      fs.writeFileSync(MENU_FILE, originalMenuBackup, 'utf8');
+    }
+    if (originalOrdersBackup !== null) {
+      fs.writeFileSync(ORDERS_FILE, originalOrdersBackup, 'utf8');
+    }
+  });
+
   it('processOrder: Đặt món với excludedOptionIds hợp lệ và lưu snapshot chính xác', async () => {
     const requestId = `test-req-custom-${Date.now()}`;
     const payload = {

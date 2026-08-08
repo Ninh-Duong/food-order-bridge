@@ -15,6 +15,9 @@ const { requireAuth, requireAdmin } = require('./middleware/auth');
 
 const app = express();
 
+// Trust reverse proxy (e.g. Render, Heroku, Cloudflare) for accurate IP identification in express-rate-limit
+app.set('trust proxy', 1);
+
 // Security Body Limits (16-32KB max)
 app.use(express.json({ limit: '32kb' }));
 app.use(express.urlencoded({ extended: true, limit: '32kb' }));
