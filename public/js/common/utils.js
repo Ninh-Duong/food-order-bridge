@@ -42,3 +42,16 @@ export function showToast(message, type = 'info') {
 export function buildAltText(itemName, category) {
   return `${itemName} - Món ngon ${category || 'tại cửa hàng'}`;
 }
+
+/**
+ * Safe HTML Escaping for XSS Prevention
+ */
+export function escapeHTML(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}

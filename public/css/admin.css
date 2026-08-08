@@ -169,3 +169,336 @@ input:checked + .slider {
 input:checked + .slider::before {
   transform: translateX(22px);
 }
+
+/* Body Lock on Invoice Modal */
+body.invoice-modal-open {
+  overflow: hidden;
+}
+
+/* Invoice Preview Modal Overlay */
+.invoice-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.invoice-preview-overlay[hidden] {
+  display: none !important;
+}
+
+.invoice-preview-dialog {
+  width: min(100%, 480px);
+  max-height: 90vh;
+  background-color: var(--color-bg-surface, #ffffff);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.invoice-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  background-color: var(--color-bg-alt, #f8fafc);
+}
+
+.invoice-preview-header h2 {
+  font-size: var(--font-size-md, 1rem);
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text-main, #0f172a);
+}
+
+.invoice-preview-close {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--color-text-muted, #64748b);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-md, 6px);
+  transition: var(--transition-fast, all 0.15s ease);
+}
+
+.invoice-preview-close:hover {
+  background-color: var(--color-border, #e2e8f0);
+  color: var(--color-text-main, #0f172a);
+}
+
+.invoice-preview-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6);
+  background-color: #f1f5f9;
+}
+
+.invoice-preview-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  background-color: var(--color-bg-surface, #ffffff);
+}
+
+/* Printable Invoice Screen Layout */
+.printable-invoice {
+  background-color: #ffffff;
+  color: #000000;
+  padding: var(--space-6);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  width: min(100%, 80mm);
+  margin: 0 auto;
+}
+
+.invoice-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.invoice-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.invoice-shop-name {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 2px 0;
+  text-transform: uppercase;
+}
+
+.invoice-shop-meta {
+  font-size: 11px;
+  color: #333333;
+}
+
+.invoice-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 8px 0 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.invoice-meta-row {
+  font-size: 11px;
+  color: #333333;
+}
+
+.invoice-divider {
+  border-bottom: 1px dashed #000000;
+  margin: 8px 0;
+}
+
+.invoice-customer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+
+.invoice-cust-row {
+  display: flex;
+  gap: 6px;
+}
+
+.invoice-label {
+  color: #444444;
+  min-width: 80px;
+}
+
+.invoice-val {
+  word-break: break-word;
+}
+
+.invoice-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.invoice-item-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.invoice-item-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.invoice-item-title {
+  flex: 1;
+  display: flex;
+  gap: 4px;
+  word-break: break-word;
+}
+
+.invoice-item-name {
+  font-weight: 700;
+}
+
+.invoice-item-price-calc {
+  white-space: nowrap;
+  font-size: 11px;
+  color: #333333;
+}
+
+.invoice-item-total {
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.invoice-item-discount-line {
+  font-size: 11px;
+  color: #555555;
+  padding-left: 14px;
+}
+
+.invoice-item-exclusion-line {
+  font-size: 11px;
+  font-weight: 700;
+  color: #dc2626;
+  padding-left: 14px;
+}
+
+.invoice-totals {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.invoice-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.invoice-discount-row {
+  color: #dc2626;
+}
+
+.invoice-grand-total {
+  font-size: 14px;
+  font-weight: 800;
+  margin-top: 4px;
+}
+
+.invoice-note {
+  font-size: 12px;
+}
+
+.invoice-note-title {
+  font-weight: 700;
+}
+
+.invoice-note-content {
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.invoice-footer {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* Print View Rules for Invoice Printing (80mm & A4) */
+@media print {
+  @page {
+    margin: 4mm;
+  }
+
+  body.is-printing-invoice > * {
+    display: none !important;
+  }
+
+  body.is-printing-invoice .invoice-preview-overlay {
+    display: block !important;
+    position: static !important;
+    background: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  body.is-printing-invoice .invoice-preview-dialog {
+    display: block !important;
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    box-shadow: none !important;
+    border: 0 !important;
+    background: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.is-printing-invoice .invoice-preview-scroll {
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: none !important;
+  }
+
+  body.is-printing-invoice .no-print {
+    display: none !important;
+  }
+
+  body.is-printing-invoice .printable-invoice {
+    display: block !important;
+    width: min(100%, 80mm) !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
+
+  body:not(.is-printing-invoice) * {
+    visibility: hidden;
+  }
+
+  body:not(.is-printing-invoice) .kitchen-ticket-print-area,
+  body:not(.is-printing-invoice) .kitchen-ticket-print-area * {
+    visibility: visible;
+  }
+
+  body:not(.is-printing-invoice) .kitchen-ticket-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    padding: 10px;
+    background: #ffffff;
+    color: #000000;
+    font-family: monospace, system-ui, sans-serif;
+  }
+}
+
+

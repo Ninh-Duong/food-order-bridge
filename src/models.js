@@ -1,11 +1,32 @@
 const mongoose = require('mongoose');
 
+const categorySchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true, uppercase: true, trim: true },
+  name: { type: String, required: true, trim: true },
+  slug: { type: String, required: true, unique: true },
+  description: { type: String, default: '' },
+  sortOrder: { type: Number, default: 0 },
+  active: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
 const menuItemSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true, uppercase: true, trim: true },
   name: { type: String, required: true, trim: true },
+  categoryId: { type: String, trim: true, uppercase: true },
   category: { type: String, default: 'Món chính' },
   price: { type: Number, required: true, min: 0 },
   originalPrice: { type: Number },
+  discountPercent: { type: Number, required: true, min: 0, max: 100, default: 0 },
+  stockQuantity: { type: Number, required: true, min: 0, default: 0 },
+  customizationOptions: [{
+    id: { type: String, required: true, uppercase: true, trim: true },
+    name: { type: String, required: true, trim: true },
+    defaultIncluded: { type: Boolean, default: true },
+    active: { type: Boolean, default: true },
+    sortOrder: { type: Number, default: 0 }
+  }],
   image: { type: String, default: '' },
   description: { type: String, default: '' },
   isBestseller: { type: Boolean, default: false },
@@ -22,6 +43,8 @@ const orderSchema = new mongoose.Schema({
   address: { type: String, required: true },
   note: { type: String, default: '' },
   items: { type: Array, required: true },
+  subtotalAmount: { type: Number, default: 0 },
+  discountAmount: { type: Number, default: 0 },
   totalPrice: { type: Number, required: true },
   telegramSent: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
@@ -53,6 +76,7 @@ userSchema.index(
 );
 
 module.exports = {
+  CategoryModel: mongoose.model('Category', categorySchema),
   MenuItemModel: mongoose.model('MenuItem', menuItemSchema),
   OrderModel: mongoose.model('Order', orderSchema),
   SettingsModel: mongoose.model('Settings', settingsSchema),

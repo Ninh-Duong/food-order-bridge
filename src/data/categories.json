@@ -1,0 +1,42 @@
+[
+  {
+    "id": "COM_GA",
+    "name": "Cơm Gà",
+    "slug": "com-ga",
+    "description": "",
+    "sortOrder": 1,
+    "active": true,
+    "createdAt": "2026-08-07T19:13:13.466Z",
+    "updatedAt": "2026-08-07T19:13:13.466Z"
+  },
+  {
+    "id": "MON_NUOC",
+    "name": "Món nước",
+    "slug": "mon-nuoc",
+    "description": "",
+    "sortOrder": 2,
+    "active": true,
+    "createdAt": "2026-08-07T19:13:13.466Z",
+    "updatedAt": "2026-08-07T19:13:13.466Z"
+  },
+  {
+    "id": "MON_CHINH",
+    "name": "Món chính",
+    "slug": "mon-chinh",
+    "description": "",
+    "sortOrder": 3,
+    "active": true,
+    "createdAt": "2026-08-07T19:13:13.466Z",
+    "updatedAt": "2026-08-07T19:13:13.466Z"
+  },
+  {
+    "id": "DO_UONG",
+    "name": "Đồ uống",
+    "slug": "do-uong",
+    "description": "",
+    "sortOrder": 4,
+    "active": true,
+    "createdAt": "2026-08-07T19:13:13.466Z",
+    "updatedAt": "2026-08-07T19:13:13.466Z"
+  }
+]
