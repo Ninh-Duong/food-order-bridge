@@ -25,7 +25,7 @@ const OrderSchema = z.object({
   ).min(1, 'Đơn hàng phải chứa ít nhất 1 món')
 });
 
-async function generateOrderId() {
+async function generateOrderId(session = null) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: config.ORDER_TIMEZONE,
     year: 'numeric',
@@ -33,7 +33,7 @@ async function generateOrderId() {
     day: '2-digit'
   }).formatToParts(new Date());
   const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
-  return orderRepository.nextOrderId(`${values.year}${values.month}${values.day}`);
+  return orderRepository.nextOrderId(`${values.year}${values.month}${values.day}`, session);
 }
 
 // Simple Mutex queue for JSON fallback critical section
@@ -100,7 +100,7 @@ class OrderService {
     }
   }
 
-  async processOrderMongoDB(requestId, customer, aggregatedItems) {
+  async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true) {
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -115,11 +115,13 @@ class OrderService {
     }
 
     let session = null;
-    try {
-      session = await mongoose.startSession();
-      session.startTransaction();
-    } catch (sessionErr) {
-      session = null;
+    if (allowTransaction) {
+      try {
+        session = await mongoose.startSession();
+        session.startTransaction();
+      } catch (sessionErr) {
+        session = null;
+      }
     }
 
     try {
@@ -223,6 +225,7 @@ class OrderService {
       }
 
       // Decrement stock for total quantity per product
+      const decrementedProducts = [];
       for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
         const menuItem = productMenuMap.get(productId);
         if (session) {
@@ -236,13 +239,24 @@ class OrderService {
             };
           }
         } else {
-          menuItem.stockQuantity -= totalReqQty;
-          await menuRepository.saveOrUpdate(menuItem);
+          const updatedDoc = await menuRepository.decrementStockAtomic(productId, totalReqQty);
+          if (!updatedDoc) {
+            for (const dec of decrementedProducts) {
+              await menuRepository.incrementStockAtomic(dec.productId, dec.quantity);
+            }
+            throw {
+              status: 409,
+              code: 'INSUFFICIENT_STOCK',
+              message: `Món "${menuItem.name}" không đủ số lượng tồn kho. Vui lòng thử lại.`,
+              items: [{ productId: menuItem.id, name: menuItem.name, requestedQuantity: totalReqQty, availableQuantity: menuItem.stockQuantity }]
+            };
+          }
+          decrementedProducts.push({ productId, quantity: totalReqQty });
         }
       }
 
       const totalDiscountAmount = subtotalAmount - totalAmount;
-      const orderId = await generateOrderId();
+      const orderId = await generateOrderId(session);
       const newOrder = {
         id: orderId,
         requestId,
@@ -276,6 +290,21 @@ class OrderService {
           session.endSession();
         } catch (e) {}
       }
+
+      const isTxNotSupported = err && (
+        err.code === 20 ||
+        (err.message && (
+          err.message.includes('Transaction numbers are only allowed') ||
+          err.message.includes('Transactions are not supported') ||
+          err.message.includes('replica set')
+        ))
+      );
+
+      if (isTxNotSupported && allowTransaction) {
+        console.warn('⚠️ MongoDB deployment does not support transactions. Falling back to non-transactional atomic operations.');
+        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, false);
+      }
+
       throw err;
     }
   }

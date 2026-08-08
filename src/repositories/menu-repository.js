@@ -234,6 +234,57 @@ class MenuRepository {
     return updated ? this.cleanItem(updated) : null;
   }
 
+  async decrementStockAtomic(productId, requestedQuantity) {
+    if (isDBConnected()) {
+      try {
+        const updated = await MenuItemModel.findOneAndUpdate(
+          {
+            id: productId,
+            active: { $ne: false },
+            stockQuantity: { $gte: requestedQuantity }
+          },
+          {
+            $inc: { stockQuantity: -requestedQuantity },
+            $set: { updatedAt: new Date() }
+          },
+          { returnDocument: 'after' }
+        ).lean();
+        return updated ? this.cleanItem(updated) : null;
+      } catch (err) {
+        console.error('Error decrementing stock in MongoDB:', err.message);
+        throw err;
+      }
+    }
+    const items = this.getFromFile();
+    const item = items.find(i => i.id === productId);
+    if (item && item.active !== false && item.stockQuantity >= requestedQuantity) {
+      item.stockQuantity -= requestedQuantity;
+      this.saveAll(items);
+      return item;
+    }
+    return null;
+  }
+
+  async incrementStockAtomic(productId, quantity) {
+    if (isDBConnected()) {
+      try {
+        await MenuItemModel.findOneAndUpdate(
+          { id: productId },
+          { $inc: { stockQuantity: quantity }, $set: { updatedAt: new Date() } }
+        );
+      } catch (err) {
+        console.error('Error incrementing stock rollback in MongoDB:', err.message);
+      }
+      return;
+    }
+    const items = this.getFromFile();
+    const item = items.find(i => i.id === productId);
+    if (item) {
+      item.stockQuantity += quantity;
+      this.saveAll(items);
+    }
+  }
+
   async resetAndSeed() {
     const defaultItems = this.getFromFile();
     if (isDBConnected()) {

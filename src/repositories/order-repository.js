@@ -84,34 +84,49 @@ class OrderRepository {
     return this.orders.get(orderId) || null;
   }
 
-  async nextOrderId(dateKey) {
+  async nextOrderId(dateKey, session = null) {
     const prefix = `FO-${dateKey}-`;
 
     if (isDBConnected()) {
+      const queryOptions = session ? { session } : {};
+
       const latest = await OrderModel.findOne({
         id: { $regex: `^${prefix}\\d+$` }
-      }).sort({ id: -1 }).select({ id: 1, _id: 0 }).lean();
+      }, null, queryOptions).sort({ id: -1 }).select({ id: 1, _id: 0 }).lean();
 
       const latestSequence = latest
         ? Number.parseInt(latest.id.slice(prefix.length), 10) || 0
         : 0;
 
-      const counter = await CounterModel.findOneAndUpdate(
-        { _id: `order:${dateKey}` },
-        [{
-          $set: {
-            seq: {
-              $add: [
-                { $max: [{ $ifNull: ['$seq', 0] }, latestSequence] },
-                1
-              ]
+      try {
+        const counter = await CounterModel.findOneAndUpdate(
+          { _id: `order:${dateKey}` },
+          [{
+            $set: {
+              seq: {
+                $add: [
+                  { $max: [{ $ifNull: ['$seq', 0] }, latestSequence] },
+                  1
+                ]
+              }
             }
-          }
-        }],
-        { upsert: true, returnDocument: 'after' }
-      ).lean();
+          }],
+          { upsert: true, returnDocument: 'after', ...queryOptions }
+        ).lean();
 
-      return `${prefix}${String(counter.seq).padStart(4, '0')}`;
+        if (counter && counter.seq) {
+          return `${prefix}${String(counter.seq).padStart(4, '0')}`;
+        }
+      } catch (counterErr) {
+        console.warn('⚠️ CounterModel pipeline findOneAndUpdate failed, falling back to $inc:', counterErr.message);
+        const counter = await CounterModel.findOneAndUpdate(
+          { _id: `order:${dateKey}` },
+          { $inc: { seq: 1 } },
+          { upsert: true, returnDocument: 'after', ...queryOptions }
+        ).lean();
+        const seqVal = Math.max(counter ? counter.seq : 1, latestSequence + 1);
+        return `${prefix}${String(seqVal).padStart(4, '0')}`;
+      }
     }
 
     let latestSequence = 0;
