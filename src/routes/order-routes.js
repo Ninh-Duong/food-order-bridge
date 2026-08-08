@@ -20,15 +20,17 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/orders - List all orders (Admin)
+// GET /api/orders - List all orders with pagination (Admin)
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const orders = await orderService.getAllOrders();
-    res.json({ orders });
+    const { page, limit } = req.query;
+    const data = await orderService.getAllOrders({ page, limit });
+    res.json(data);
   } catch (err) {
     res.status(500).json({ message: 'Lỗi lấy danh sách đơn hàng' });
   }
 });
+
 
 // GET /api/orders/:orderId - Check order status
 router.get('/:orderId', async (req, res) => {

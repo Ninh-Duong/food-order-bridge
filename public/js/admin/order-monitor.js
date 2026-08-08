@@ -10,12 +10,26 @@ let selectedInvoiceOrderId = null;
 let printInProgress = false;
 let lastFocusedElement = null;
 
+let currentPage = 1;
+let pageSize = 10;
+let paginationState = { page: 1, limit: 10, totalOrders: 0, totalPages: 1 };
+
 export async function initOrderMonitor() {
-  await fetchOrders();
+  await fetchOrders(1, pageSize);
 
   const refreshBtn = document.getElementById('btn-refresh-orders');
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', fetchOrders);
+    refreshBtn.addEventListener('click', () => fetchOrders(currentPage, pageSize));
+  }
+
+  const pageSizeSelect = document.getElementById('orders-page-size');
+  if (pageSizeSelect) {
+    pageSizeSelect.value = String(pageSize);
+    pageSizeSelect.addEventListener('change', (e) => {
+      pageSize = parseInt(e.target.value, 10) || 10;
+      currentPage = 1;
+      fetchOrders(1, pageSize);
+    });
   }
 
   bindOrderTableEvents();
@@ -23,18 +37,91 @@ export async function initOrderMonitor() {
   bindAfterPrintEvent();
 }
 
-async function fetchOrders() {
+async function fetchOrders(page = currentPage, limit = pageSize) {
   const tableBody = document.getElementById('admin-orders-table-body');
   if (!tableBody) return;
 
   try {
-    const data = await API.get('/api/orders');
+    const data = await API.get(`/api/orders?page=${page}&limit=${limit}`);
     adminOrdersList = data.orders || [];
+    if (data.pagination) {
+      paginationState = data.pagination;
+      currentPage = data.pagination.page;
+      pageSize = data.pagination.limit;
+    }
     renderOrdersTable(adminOrdersList);
+    renderPaginationControls();
   } catch (error) {
     showToast('Lỗi tải danh sách đơn hàng', 'error');
   }
 }
+
+function renderPaginationControls() {
+  const infoEl = document.getElementById('orders-pagination-info');
+  const btnsEl = document.getElementById('orders-pagination-btns');
+  if (!infoEl || !btnsEl) return;
+
+  const { page, limit, totalOrders, totalPages } = paginationState;
+
+  if (totalOrders === 0) {
+    infoEl.textContent = 'Chưa có đơn hàng nào';
+    btnsEl.innerHTML = '';
+    return;
+  }
+
+  const startRecord = (page - 1) * limit + 1;
+  const endRecord = Math.min(page * limit, totalOrders);
+
+  infoEl.innerHTML = `Hiển thị <strong>${startRecord} - ${endRecord}</strong> / <strong>${totalOrders}</strong> đơn hàng (Trang ${page}/${totalPages})`;
+
+  let btnsHtml = `
+    <button class="btn btn-secondary" style="min-height: 30px; padding: 2px 10px; font-size: 12px;" id="btn-prev-page" ${page <= 1 ? 'disabled' : ''}>
+      ◀ Trước
+    </button>
+  `;
+
+  const maxButtons = 5;
+  let startPage = Math.max(1, page - Math.floor(maxButtons / 2));
+  let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+  if (endPage - startPage + 1 < maxButtons) {
+    startPage = Math.max(1, endPage - maxButtons + 1);
+  }
+
+  for (let p = startPage; p <= endPage; p++) {
+    const isCurrent = p === page;
+    btnsHtml += `
+      <button class="btn ${isCurrent ? 'btn-primary' : 'btn-secondary'}" style="min-height: 30px; min-width: 30px; padding: 0 4px; font-size: 12px; font-weight: 700;" data-page="${p}">
+        ${p}
+      </button>
+    `;
+  }
+
+  btnsHtml += `
+    <button class="btn btn-secondary" style="min-height: 30px; padding: 2px 10px; font-size: 12px;" id="btn-next-page" ${page >= totalPages ? 'disabled' : ''}>
+      Sau ▶
+    </button>
+  `;
+
+  btnsEl.innerHTML = btnsHtml;
+
+  const prevBtn = document.getElementById('btn-prev-page');
+  if (prevBtn) {
+    prevBtn.onclick = () => fetchOrders(page - 1, pageSize);
+  }
+
+  const nextBtn = document.getElementById('btn-next-page');
+  if (nextBtn) {
+    nextBtn.onclick = () => fetchOrders(page + 1, pageSize);
+  }
+
+  btnsEl.querySelectorAll('[data-page]').forEach(btn => {
+    btn.onclick = () => {
+      const p = parseInt(btn.dataset.page, 10);
+      if (p !== page) fetchOrders(p, pageSize);
+    };
+  });
+}
+
 
 function renderOrdersTable(orders) {
   const tableBody = document.getElementById('admin-orders-table-body');

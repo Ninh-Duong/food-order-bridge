@@ -3,40 +3,32 @@
     "id": "COM_GA",
     "name": "Cơm Gà",
     "slug": "com-ga",
-    "description": "",
+    "description": "Các món cơm gà thơm ngon giòn rụm",
     "sortOrder": 1,
-    "active": true,
-    "createdAt": "2026-08-07T19:13:13.466Z",
-    "updatedAt": "2026-08-07T19:13:13.466Z"
+    "active": true
   },
   {
     "id": "MON_NUOC",
     "name": "Món nước",
     "slug": "mon-nuoc",
-    "description": "",
+    "description": "Các món bún phở nước dùng hầm xương đậm đà",
     "sortOrder": 2,
-    "active": true,
-    "createdAt": "2026-08-07T19:13:13.466Z",
-    "updatedAt": "2026-08-07T19:13:13.466Z"
+    "active": true
   },
   {
     "id": "MON_CHINH",
     "name": "Món chính",
     "slug": "mon-chinh",
-    "description": "",
+    "description": "Các món ăn chính đa dạng",
     "sortOrder": 3,
-    "active": true,
-    "createdAt": "2026-08-07T19:13:13.466Z",
-    "updatedAt": "2026-08-07T19:13:13.466Z"
+    "active": true
   },
   {
     "id": "DO_UONG",
     "name": "Đồ uống",
     "slug": "do-uong",
-    "description": "",
+    "description": "Nước giải khát, trà và cà phê",
     "sortOrder": 4,
-    "active": true,
-    "createdAt": "2026-08-07T19:13:13.466Z",
-    "updatedAt": "2026-08-07T19:13:13.466Z"
+    "active": true
   }
 ]

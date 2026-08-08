@@ -40,7 +40,30 @@ export async function initItemManager() {
   if (addBtn) {
     addBtn.addEventListener('click', () => openItemModal());
   }
+
+  const resetBtn = document.getElementById('btn-reset-data');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', async () => {
+      const confirmReset = confirm('Bạn có chắc chắn muốn khôi phục toàn bộ Thực đơn & Danh mục về bộ dữ liệu mẫu chuẩn không?\n\n(Lưu ý: Các món ăn/danh mục thử nghiệm không chuẩn sẽ bị xóa)');
+      if (!confirmReset) return;
+
+      const clearOrders = confirm('Bạn có muốn xóa luôn lịch sử Đơn hàng thử nghiệm hiện tại không?');
+
+      try {
+        const res = await API.post('/api/admin/reset-data', { clearOrders });
+        showToast(res.message || 'Đã reset dữ liệu thành công!', 'success');
+        await Promise.all([
+          fetchAdminMenu(),
+          fetchCategories()
+        ]);
+        document.dispatchEvent(new CustomEvent('categoriesUpdated'));
+      } catch (err) {
+        showToast(err.message || 'Lỗi khi reset dữ liệu', 'error');
+      }
+    });
+  }
 }
+
 
 async function fetchCategories() {
   try {

@@ -201,6 +201,50 @@ class OrderRepository {
     return Array.from(this.orders.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }
 
+  async getPaginated({ page = 1, limit = 10 }) {
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+    const skip = (pageNum - 1) * limitNum;
+
+    if (isDBConnected()) {
+      try {
+        const [docs, totalOrders] = await Promise.all([
+          OrderModel.find().sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean(),
+          OrderModel.countDocuments()
+        ]);
+        const totalPages = Math.ceil(totalOrders / limitNum) || 1;
+        return {
+          orders: (docs || []).map(d => this.formatDoc(d)),
+          pagination: {
+            page: pageNum,
+            limit: limitNum,
+            totalOrders,
+            totalPages
+          }
+        };
+      } catch (err) {
+        console.error('Error fetching paginated orders from MongoDB:', err.message);
+        throw err;
+      }
+    }
+
+    const allOrders = Array.from(this.orders.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const totalOrders = allOrders.length;
+    const totalPages = Math.ceil(totalOrders / limitNum) || 1;
+    const paginatedOrders = allOrders.slice(skip, skip + limitNum);
+
+    return {
+      orders: paginatedOrders,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalOrders,
+        totalPages
+      }
+    };
+  }
+
+
   formatDoc(doc) {
     return {
       id: doc.id,
@@ -223,6 +267,23 @@ class OrderRepository {
       createdAt: doc.createdAt
     };
   }
+
+  async clearAll() {
+    if (isDBConnected()) {
+      try {
+        await OrderModel.deleteMany({});
+        await CounterModel.deleteMany({});
+      } catch (err) {
+        console.error('Error clearing orders in MongoDB:', err.message);
+        throw err;
+      }
+    }
+    this.orders.clear();
+    this.requests.clear();
+    this.saveAllToFile();
+    return true;
+  }
 }
 
 module.exports = new OrderRepository();
+

@@ -38,7 +38,8 @@ export async function loadMenuCatalog() {
       if (item.active === false) return false;
 
       if (item.categoryId) {
-        const cat = categoriesList.find(c => c.id === item.categoryId);
+        const upperId = String(item.categoryId).trim().toUpperCase();
+        const cat = categoriesList.find(c => String(c.id).trim().toUpperCase() === upperId || c.name === item.category);
         return Boolean(cat);
       } else if (item.category) {
         const cat = categoriesList.find(c => c.name === item.category);
@@ -98,8 +99,9 @@ function getActiveCategoriesWithItems(items) {
 
   items.forEach(item => {
     let catObj = null;
-    if (item.categoryId && catMap.has(item.categoryId)) {
-      catObj = catMap.get(item.categoryId);
+    if (item.categoryId) {
+      const upperId = String(item.categoryId).trim().toUpperCase();
+      catObj = Array.from(catMap.values()).find(c => String(c.id).trim().toUpperCase() === upperId || c.name === item.category);
     } else if (item.category) {
       catObj = Array.from(catMap.values()).find(c => c.name === item.category);
     }
@@ -110,6 +112,7 @@ function getActiveCategoriesWithItems(items) {
       uncategorizedItems.push(item);
     }
   });
+
 
   const result = Array.from(catMap.values()).filter(c => c.items.length > 0);
 

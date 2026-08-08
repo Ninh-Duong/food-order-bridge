@@ -203,6 +203,26 @@ class CategoryRepository {
     }
     return null;
   }
+
+  async resetAndSeed() {
+    const defaultCategories = this.getFromFile();
+    if (isDBConnected()) {
+      try {
+        await CategoryModel.deleteMany({});
+        if (defaultCategories.length > 0) {
+          console.log('🌱 Re-seeding clean categories to MongoDB...');
+          await CategoryModel.insertMany(defaultCategories);
+        }
+      } catch (err) {
+        console.error('Error resetting categories in MongoDB:', err.message);
+        throw err;
+      }
+    } else {
+      this.saveAllToFile(defaultCategories);
+    }
+    return defaultCategories;
+  }
 }
 
 module.exports = new CategoryRepository();
+
