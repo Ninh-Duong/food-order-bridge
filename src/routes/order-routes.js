@@ -27,6 +27,7 @@ router.get('/', requireAuth, async (req, res) => {
     const data = await orderService.getAllOrders({ page, limit });
     res.json(data);
   } catch (err) {
+    console.error('Unhandled Get Orders Error:', err);
     res.status(500).json({ message: 'Lỗi lấy danh sách đơn hàng' });
   }
 });

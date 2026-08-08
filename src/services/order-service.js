@@ -551,8 +551,17 @@ class OrderService {
   }
 
   async getAllOrders(options = {}) {
-    const page = options.page ? parseInt(options.page, 10) : 1;
-    const limit = options.limit ? parseInt(options.limit, 10) : 10;
+    const parsedPage = Number.parseInt(options.page, 10);
+    const parsedLimit = Number.parseInt(options.limit, 10);
+
+    const page = Number.isInteger(parsedPage) && parsedPage > 0
+      ? parsedPage
+      : 1;
+
+    const limit = Number.isInteger(parsedLimit) && parsedLimit > 0
+      ? Math.min(parsedLimit, 100)
+      : 10;
+
     return await orderRepository.getPaginated({ page, limit });
   }
 }
