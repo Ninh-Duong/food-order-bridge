@@ -59,6 +59,11 @@ const orderSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+const counterSchema = new mongoose.Schema({
+  _id: { type: String, required: true },
+  seq: { type: Number, required: true, default: 0 }
+}, { versionKey: false });
+
 const settingsSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true, default: 'global_settings' },
   telegramBotToken: { type: String, default: '' },
@@ -87,6 +92,7 @@ module.exports = {
   CategoryModel: mongoose.model('Category', categorySchema),
   MenuItemModel: mongoose.model('MenuItem', menuItemSchema),
   OrderModel: mongoose.model('Order', orderSchema),
+  CounterModel: mongoose.model('Counter', counterSchema),
   SettingsModel: mongoose.model('Settings', settingsSchema),
   UserModel: mongoose.model('User', userSchema)
 };

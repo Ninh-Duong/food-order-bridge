@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { isDBConnected } = require('../db');
-const { OrderModel } = require('../models');
+const { OrderModel, CounterModel } = require('../models');
 
 const ORDERS_FILE = path.join(__dirname, '..', 'data', 'orders.json');
 
@@ -82,6 +82,45 @@ class OrderRepository {
       }
     }
     return this.orders.get(orderId) || null;
+  }
+
+  async nextOrderId(dateKey) {
+    const prefix = `FO-${dateKey}-`;
+
+    if (isDBConnected()) {
+      const latest = await OrderModel.findOne({
+        id: { $regex: `^${prefix}\\d+$` }
+      }).sort({ id: -1 }).select({ id: 1, _id: 0 }).lean();
+
+      const latestSequence = latest
+        ? Number.parseInt(latest.id.slice(prefix.length), 10) || 0
+        : 0;
+
+      const counter = await CounterModel.findOneAndUpdate(
+        { _id: `order:${dateKey}` },
+        [{
+          $set: {
+            seq: {
+              $add: [
+                { $max: [{ $ifNull: ['$seq', 0] }, latestSequence] },
+                1
+              ]
+            }
+          }
+        }],
+        { upsert: true, returnDocument: 'after' }
+      ).lean();
+
+      return `${prefix}${String(counter.seq).padStart(4, '0')}`;
+    }
+
+    let latestSequence = 0;
+    for (const id of this.orders.keys()) {
+      if (!id.startsWith(prefix)) continue;
+      const value = Number.parseInt(id.slice(prefix.length), 10);
+      if (Number.isInteger(value) && value > latestSequence) latestSequence = value;
+    }
+    return `${prefix}${String(latestSequence + 1).padStart(4, '0')}`;
   }
 
   async save(order, session) {

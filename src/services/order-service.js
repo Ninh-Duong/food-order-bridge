@@ -6,6 +6,7 @@ const menuService = require('./menu-service');
 const telegramService = require('./telegram-service');
 const { calculateSalePrice } = require('../utils/price-calculator');
 const { isDBConnected } = require('../db');
+const config = require('../config');
 
 const OrderSchema = z.object({
   requestId: z.string().min(1, 'requestId là bắt buộc'),
@@ -24,15 +25,15 @@ const OrderSchema = z.object({
   ).min(1, 'Đơn hàng phải chứa ít nhất 1 món')
 });
 
-let sequence = 1;
-
-function generateOrderId() {
-  const dateObj = new Date();
-  const year = dateObj.getFullYear();
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const seqStr = String(sequence++).padStart(4, '0');
-  return `FO-${year}${month}${day}-${seqStr}`;
+async function generateOrderId() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: config.ORDER_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return orderRepository.nextOrderId(`${values.year}${values.month}${values.day}`);
 }
 
 // Simple Mutex queue for JSON fallback critical section
@@ -241,7 +242,7 @@ class OrderService {
       }
 
       const totalDiscountAmount = subtotalAmount - totalAmount;
-      const orderId = generateOrderId();
+      const orderId = await generateOrderId();
       const newOrder = {
         id: orderId,
         requestId,
@@ -398,7 +399,7 @@ class OrderService {
       menuRepository.saveAll(allItems);
 
       const totalDiscountAmount = subtotalAmount - totalAmount;
-      const orderId = generateOrderId();
+      const orderId = await generateOrderId();
       const newOrder = {
         id: orderId,
         requestId,
