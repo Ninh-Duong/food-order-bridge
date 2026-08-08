@@ -159,7 +159,7 @@ class CategoryRepository {
         const updated = await CategoryModel.findOneAndUpdate(
           { id: upperId },
           { $set: updatePayload },
-          { new: true, runValidators: true }
+          { returnDocument: 'after', runValidators: true }
         ).lean();
         if (updated) return this.cleanCategory(updated);
       } catch (err) {
@@ -185,7 +185,7 @@ class CategoryRepository {
         const updated = await CategoryModel.findOneAndUpdate(
           { id: upperId },
           { $set: { active: activeState, updatedAt: now } },
-          { new: true }
+          { returnDocument: 'after' }
         ).lean();
         if (updated) return this.cleanCategory(updated);
       } catch (err) {

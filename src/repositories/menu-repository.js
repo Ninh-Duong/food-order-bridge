@@ -104,7 +104,7 @@ class MenuRepository {
         const updated = await MenuItemModel.findOneAndUpdate(
           { id: cleanedData.id },
           { $set: cleanedData },
-          { upsert: true, new: true, runValidators: true }
+          { upsert: true, returnDocument: 'after', runValidators: true }
         ).lean();
         return this.cleanItem(updated);
       } catch (err) {
@@ -129,7 +129,7 @@ class MenuRepository {
         const updated = await MenuItemModel.findOneAndUpdate(
           { id },
           { $set: { active: activeState } },
-          { new: true }
+          { returnDocument: 'after' }
         ).lean();
         if (updated) return this.cleanItem(updated);
         return null;
@@ -226,7 +226,7 @@ class MenuRepository {
         $set: { updatedAt: new Date() }
       },
       {
-        new: true,
+        returnDocument: 'after',
         session
       }
     ).lean();
