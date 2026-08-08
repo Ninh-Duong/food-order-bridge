@@ -10,6 +10,7 @@ const orderRoutes = require('./routes/order-routes');
 const settingsRoutes = require('./routes/settings-routes');
 const healthRoutes = require('./routes/health-routes');
 const authRoutes = require('./routes/auth-routes');
+const adminRoutes = require('./routes/admin-routes');
 const authService = require('./services/auth-service');
 const { requireAuth, requireAdmin } = require('./middleware/auth');
 
@@ -35,7 +36,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // API Routes
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api/categories', (req, res, next) => {
+
   if (req.method === 'GET') return next();
   return requireAuth(req, res, next);
 }, categoryRoutes);

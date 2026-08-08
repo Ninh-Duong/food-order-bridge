@@ -478,9 +478,12 @@ class OrderService {
     };
   }
 
-  async getAllOrders() {
-    return await orderRepository.getAll();
+  async getAllOrders(options = {}) {
+    const page = options.page ? parseInt(options.page, 10) : 1;
+    const limit = options.limit ? parseInt(options.limit, 10) : 10;
+    return await orderRepository.getPaginated({ page, limit });
   }
 }
 
 module.exports = new OrderService();
+

@@ -233,6 +233,26 @@ class MenuRepository {
 
     return updated ? this.cleanItem(updated) : null;
   }
+
+  async resetAndSeed() {
+    const defaultItems = this.getFromFile();
+    if (isDBConnected()) {
+      try {
+        await MenuItemModel.deleteMany({});
+        if (defaultItems.length > 0) {
+          console.log('🌱 Re-seeding clean menu items to MongoDB...');
+          await MenuItemModel.insertMany(defaultItems);
+        }
+      } catch (err) {
+        console.error('Error resetting menu items in MongoDB:', err.message);
+        throw err;
+      }
+    } else {
+      this.saveAll(defaultItems);
+    }
+    return defaultItems;
+  }
 }
 
 module.exports = new MenuRepository();
+

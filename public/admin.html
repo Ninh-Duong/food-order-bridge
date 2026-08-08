@@ -63,8 +63,14 @@
       <div class="admin-card">
         <div class="admin-card-header">
           <h2 style="font-size: var(--font-size-lg); font-weight: 800;">Danh sách món ăn hiện tại</h2>
-          <button class="btn btn-primary" id="btn-open-add-item">+ Thêm món mới</button>
+          <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
+            <button class="btn btn-secondary admin-only" id="btn-reset-data" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" title="Khôi phục thực đơn & danh mục về bộ dữ liệu chuẩn">
+              ♻️ Reset Dữ Liệu Chuẩn
+            </button>
+            <button class="btn btn-primary" id="btn-open-add-item">+ Thêm món mới</button>
+          </div>
         </div>
+
         <div class="table-responsive">
           <table class="admin-table">
             <thead>
@@ -164,7 +170,15 @@
       <div class="admin-card">
         <div class="admin-card-header">
           <h2 style="font-size: var(--font-size-lg); font-weight: 800;">Lịch sử đơn hàng ghi nhận</h2>
-          <button class="btn btn-secondary" id="btn-refresh-orders">🔄 Tải lại danh sách</button>
+          <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+            <label for="orders-page-size" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Hiển thị:</label>
+            <select id="orders-page-size" class="form-control" style="width: auto; padding: 4px 8px; font-size: var(--font-size-xs); font-weight: 600;">
+              <option value="10" selected>10 đơn / trang</option>
+              <option value="20">20 đơn / trang</option>
+              <option value="50">50 đơn / trang</option>
+            </select>
+            <button class="btn btn-secondary" id="btn-refresh-orders">🔄 Tải lại</button>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="admin-table">
@@ -185,8 +199,18 @@
             </tbody>
           </table>
         </div>
+        <!-- Pagination Controls -->
+        <div id="orders-pagination-box" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-top: 1px solid var(--color-border); font-size: var(--font-size-sm); flex-wrap: wrap; gap: 8px;">
+          <div id="orders-pagination-info" style="color: var(--color-text-muted);">
+            Đang tải dữ liệu...
+          </div>
+          <div id="orders-pagination-btns" style="display: flex; gap: 6px; align-items: center;">
+            <!-- Rendered dynamically via order-monitor.js -->
+          </div>
+        </div>
       </div>
     </section>
+
 
   </main>
 
