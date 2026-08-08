@@ -48,7 +48,6 @@
       <div class="admin-nav-tabs">
         <button class="admin-tab-btn active" data-target="tab-items">🍔 Quản lý Món ăn</button>
         <button class="admin-tab-btn" data-target="tab-categories">🗂 Quản lý Danh mục</button>
-        <button class="admin-tab-btn admin-only" data-target="tab-telegram">🤖 Cấu hình Telegram Bot</button>
         <button class="admin-tab-btn" data-target="tab-orders">📋 Lịch sử Đơn hàng</button>
         <button class="admin-tab-btn admin-only" data-target="tab-accounts">👥 Tài khoản nhân viên</button>
       </div>
@@ -134,37 +133,6 @@
       </div>
     </section>
 
-    <!-- TAB 2: TELEGRAM BOT CONFIGURATION -->
-    <section id="tab-telegram" class="admin-tab-content admin-only" style="display: none;">
-      <div class="admin-card" style="max-width: 700px; margin: 0 auto;">
-        <div class="admin-card-header">
-          <h2 style="font-size: var(--font-size-lg); font-weight: 800;">🤖 Cấu hình Telegram Bot API</h2>
-        </div>
-        <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-bottom: var(--space-4);">
-          Chỉ cần tạo Bot qua <strong>@BotFather</strong>, tạo Nhóm Telegram riêng tư, thêm Bot vào nhóm và điền Token cùng Chat ID dưới đây. Backend sẽ tự động xử lý gửi tin nhắn đơn hàng.
-        </p>
-        
-        <form id="telegram-settings-form">
-          <div class="form-group">
-            <label class="form-label" for="telegram-token-input">TELEGRAM_BOT_TOKEN *</label>
-            <input type="password" id="telegram-token-input" class="form-control" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" required />
-            <small style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Lấy từ @BotFather khi khởi tạo bot.</small>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" for="telegram-chat-id-input">TELEGRAM_CHAT_ID *</label>
-            <input type="text" id="telegram-chat-id-input" class="form-control" placeholder="-1001234567890" required />
-            <small style="font-size: var(--font-size-xs); color: var(--color-text-muted);">ID của nhóm Telegram nhận đơn hàng (thường bắt đầu bằng -100...)</small>
-          </div>
-
-          <div style="display: flex; gap: var(--space-4); margin-top: var(--space-6);">
-            <button type="submit" class="btn btn-primary" style="flex: 1;">💾 Lưu cấu hình</button>
-            <button type="button" class="btn btn-secondary" id="btn-test-telegram" style="flex: 1;">📲 Gửi tin nhắn thử (Test Telegram)</button>
-          </div>
-        </form>
-      </div>
-    </section>
-
     <!-- TAB 3: ORDERS HISTORY MONITOR -->
     <section id="tab-orders" class="admin-tab-content" style="display: none;">
       <div class="admin-card">
@@ -211,7 +179,6 @@
       </div>
     </section>
 
-
   </main>
 
   <!-- Item Edit Modal Overlay -->
@@ -243,7 +210,6 @@
   <script type="module">
     import { initItemManager } from './js/admin/item-manager.js';
     import { initCategoryManager } from './js/admin/category-manager.js';
-    import { initTelegramSettings } from './js/admin/telegram-settings.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
     import { initAuth } from './js/admin/auth.js';
 
@@ -266,7 +232,6 @@
 
       initCategoryManager();
       initItemManager();
-      if (user.role === 'admin') initTelegramSettings();
       initOrderMonitor();
     });
   </script>
