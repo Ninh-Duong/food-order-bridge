@@ -47,6 +47,14 @@ const orderSchema = new mongoose.Schema({
   discountAmount: { type: Number, default: 0 },
   totalPrice: { type: Number, required: true },
   telegramSent: { type: Boolean, default: false },
+  notificationStatus: {
+    type: String,
+    enum: ['PENDING', 'SENT', 'FAILED'],
+    default: 'PENDING'
+  },
+  telegramMessageId: { type: Number, default: null },
+  notificationAttempts: { type: Number, default: 0 },
+  notificationError: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
