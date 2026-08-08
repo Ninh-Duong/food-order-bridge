@@ -9,7 +9,9 @@ export const API = {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || `API Error: ${response.status}`);
+        const err = new Error(data.message || `API Error: ${response.status}`);
+        err.status = response.status;
+        throw err;
       }
       return data;
     } catch (error) {
@@ -30,7 +32,9 @@ export const API = {
       });
       const data = await response.json();
       if (!response.ok && response.status !== 202) {
-        throw new Error(data.message || `API Error: ${response.status}`);
+        const err = new Error(data.message || `API Error: ${response.status}`);
+        err.status = response.status;
+        throw err;
       }
       return { status: response.status, data };
     } catch (error) {
@@ -51,7 +55,9 @@ export const API = {
       });
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.message || `API Error: ${response.status}`);
+        const err = new Error(data.message || `API Error: ${response.status}`);
+        err.status = response.status;
+        throw err;
       }
       return data;
     } catch (error) {

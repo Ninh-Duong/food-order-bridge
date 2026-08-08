@@ -1,215 +1,36 @@
 [
   {
-    "id": "FO-20260808-0001",
-    "requestId": "bea26881-8c8d-4b26-a690-cd87cd65d27b",
-    "customer": {
-      "name": "ádasda",
-      "phone": "1231231232",
-      "address": "âsdasda",
-      "note": ""
-    },
+    "id": "FO-REP-03",
+    "requestId": "req-rep-03",
+    "isPaid": true,
+    "paidAt": "2026-08-09T12:00:00+07:00",
     "items": [
       {
         "productId": "COM_GA",
         "name": "Cơm Gà Sốt Xối Mỡ",
-        "originalUnitPrice": 50000,
-        "discountPercent": 20,
-        "unitPrice": 40000,
-        "quantity": 1,
-        "discountAmount": 10000,
-        "itemSubtotalBeforeDiscount": 50000,
-        "itemTotal": 40000,
-        "customization": {
-          "excludedOptions": [
-            {
-              "id": "HANH_PHI",
-              "name": "Hành phi"
-            },
-            {
-              "id": "TOI_PHI",
-              "name": "Tỏi phi"
-            }
-          ],
-          "includedOptions": [
-            {
-              "id": "NUOC_TUONG",
-              "name": "Nước tương"
-            },
-            {
-              "id": "DUA_LEO",
-              "name": "Dưa leo"
-            }
-          ]
-        }
+        "quantity": 2,
+        "originalUnitPrice": 60000,
+        "unitPrice": 50000,
+        "discountPercent": 16.67,
+        "itemSubtotalBeforeDiscount": 120000,
+        "discountAmount": 20000,
+        "itemTotal": 100000
       },
       {
-        "productId": "TEST_CUSTOM_ITEM",
-        "name": "Món Test Customization",
-        "originalUnitPrice": 60000,
+        "productId": "TRA_DAO",
+        "name": "Trà Đào Cam Sả",
+        "quantity": 1,
+        "originalUnitPrice": 30000,
+        "unitPrice": 30000,
         "discountPercent": 0,
-        "unitPrice": 60000,
-        "quantity": 1,
+        "itemSubtotalBeforeDiscount": 30000,
         "discountAmount": 0,
-        "itemSubtotalBeforeDiscount": 60000,
-        "itemTotal": 60000,
-        "customization": {
-          "excludedOptions": [],
-          "includedOptions": [
-            {
-              "id": "TOI_PHI",
-              "name": "Tỏi phi"
-            },
-            {
-              "id": "HANH_PHI",
-              "name": "Hành phi"
-            }
-          ]
-        }
-      }
-    ],
-    "subtotalAmount": 110000,
-    "discountAmount": 10000,
-    "totalAmount": 100000,
-    "orderStatus": "CONFIRMED",
-    "notificationStatus": "SENT",
-    "telegramMessageId": 29,
-    "notificationAttempts": 1,
-    "notificationError": null,
-    "createdAt": "2026-08-08T07:13:17.238Z",
-    "updatedAt": "2026-08-08T07:13:19.675Z"
-  },
-  {
-    "id": "FO-20260808-0002",
-    "requestId": "fd30facb-c928-4b9b-a72a-2085e4111fa3",
-    "customer": {
-      "name": "ádasda",
-      "phone": "1231231232",
-      "address": "1asdasdas",
-      "note": ""
-    },
-    "items": [
-      {
-        "productId": "TEST_CUSTOM_ITEM",
-        "name": "Món Test Customization",
-        "originalUnitPrice": 60000,
-        "discountPercent": 0,
-        "unitPrice": 60000,
-        "quantity": 1,
-        "discountAmount": 0,
-        "itemSubtotalBeforeDiscount": 60000,
-        "itemTotal": 60000,
-        "customization": {
-          "excludedOptions": [
-            {
-              "id": "TOI_PHI",
-              "name": "Tỏi phi"
-            }
-          ],
-          "includedOptions": [
-            {
-              "id": "HANH_PHI",
-              "name": "Hành phi"
-            }
-          ]
-        }
-      },
-      {
-        "productId": "COM_GA",
-        "name": "Cơm Gà Sốt Xối Mỡ",
-        "originalUnitPrice": 50000,
-        "discountPercent": 20,
-        "unitPrice": 40000,
-        "quantity": 1,
-        "discountAmount": 10000,
-        "itemSubtotalBeforeDiscount": 50000,
-        "itemTotal": 40000,
-        "customization": {
-          "excludedOptions": [],
-          "includedOptions": [
-            {
-              "id": "HANH_PHI",
-              "name": "Hành phi"
-            },
-            {
-              "id": "TOI_PHI",
-              "name": "Tỏi phi"
-            },
-            {
-              "id": "NUOC_TUONG",
-              "name": "Nước tương"
-            },
-            {
-              "id": "DUA_LEO",
-              "name": "Dưa leo"
-            }
-          ]
-        }
-      }
-    ],
-    "subtotalAmount": 110000,
-    "discountAmount": 10000,
-    "totalAmount": 100000,
-    "orderStatus": "CONFIRMED",
-    "notificationStatus": "SENT",
-    "telegramMessageId": 48,
-    "notificationAttempts": 1,
-    "notificationError": null,
-    "createdAt": "2026-08-08T07:23:38.002Z",
-    "updatedAt": "2026-08-08T07:23:38.935Z"
-  },
-  {
-    "id": "FO-20260808-0003",
-    "requestId": "test-req-merge-1786172854141",
-    "customer": {
-      "name": "Lê Văn Test",
-      "phone": "0912345678",
-      "address": "789 Đường Test",
-      "note": ""
-    },
-    "items": [
-      {
-        "productId": "COM_GA",
-        "name": "Cơm Gà Sốt Xối Mỡ",
-        "originalUnitPrice": 50000,
-        "discountPercent": 20,
-        "unitPrice": 40000,
-        "quantity": 3,
-        "discountAmount": 30000,
-        "itemSubtotalBeforeDiscount": 150000,
-        "itemTotal": 120000,
-        "customization": {
-          "excludedOptions": [
-            {
-              "id": "HANH_PHI",
-              "name": "Hành phi"
-            }
-          ],
-          "includedOptions": [
-            {
-              "id": "TOI_PHI",
-              "name": "Tỏi phi"
-            },
-            {
-              "id": "NUOC_TUONG",
-              "name": "Nước tương"
-            },
-            {
-              "id": "DUA_LEO",
-              "name": "Dưa leo"
-            }
-          ]
-        }
+        "itemTotal": 30000
       }
     ],
     "subtotalAmount": 150000,
-    "discountAmount": 30000,
-    "totalAmount": 120000,
-    "orderStatus": "CONFIRMED",
-    "notificationStatus": "SENT",
-    "telegramMessageId": 11,
-    "notificationAttempts": 1,
-    "notificationError": null,
-    "createdAt": "2026-08-08T07:07:34.142Z",
-    "updatedAt": "2026-08-08T07:07:34.516Z"
+    "discountAmount": 20000,
+    "totalAmount": 130000,
+    "paidBy": null
   }
 ]
