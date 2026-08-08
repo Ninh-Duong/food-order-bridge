@@ -99,6 +99,10 @@ class OrderRepository {
           discountAmount: order.discountAmount || 0,
           totalPrice: order.totalAmount || order.totalPrice,
           telegramSent: order.notificationStatus === 'SENT',
+          notificationStatus: order.notificationStatus || 'PENDING',
+          telegramMessageId: order.telegramMessageId || null,
+          notificationAttempts: order.notificationAttempts || 0,
+          notificationError: order.notificationError || null,
           createdAt: order.createdAt || new Date(),
           updatedAt: new Date()
         };
@@ -121,7 +125,13 @@ class OrderRepository {
   async update(orderId, fields) {
     if (isDBConnected()) {
       try {
-        await OrderModel.findOneAndUpdate({ id: orderId }, { $set: fields });
+        const mongoFields = { ...fields };
+        if (fields.notificationStatus === 'SENT') {
+          mongoFields.telegramSent = true;
+        } else if (fields.notificationStatus === 'FAILED') {
+          mongoFields.telegramSent = false;
+        }
+        await OrderModel.findOneAndUpdate({ id: orderId }, { $set: mongoFields });
       } catch (err) {
         console.error('Error updating order in MongoDB:', err.message);
         throw err;
@@ -167,7 +177,10 @@ class OrderRepository {
       discountAmount: doc.discountAmount || 0,
       totalAmount: doc.totalPrice,
       orderStatus: 'CONFIRMED',
-      notificationStatus: doc.telegramSent ? 'SENT' : (doc.notificationStatus || 'PENDING'),
+      notificationStatus: doc.notificationStatus || (doc.telegramSent ? 'SENT' : 'PENDING'),
+      telegramMessageId: doc.telegramMessageId || null,
+      notificationAttempts: doc.notificationAttempts || 0,
+      notificationError: doc.notificationError || null,
       createdAt: doc.createdAt
     };
   }
