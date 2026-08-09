@@ -245,6 +245,9 @@ function bindOrderTableEvents() {
         }
 
         renderOrdersTable(adminOrdersList);
+        document.dispatchEvent(new CustomEvent('paymentStatusUpdated', {
+          detail: { orderId, isPaid: targetPaid }
+        }));
         showToast(targetPaid ? 'Đã xác nhận thanh toán đơn hàng' : 'Đã chuyển đơn hàng về chưa thanh toán', 'success');
       } catch (err) {
         console.error('[Payment Toggle Error]:', err);

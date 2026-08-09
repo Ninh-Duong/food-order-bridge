@@ -10,7 +10,12 @@ let isExportingPdf = false;
 export function initReportDashboard() {
   bindPeriodEvents();
   bindPdfExportEvent();
-  fetchReportData(currentPeriod);
+  document.addEventListener('paymentStatusUpdated', refreshReportDashboard);
+  refreshReportDashboard();
+}
+
+export function refreshReportDashboard() {
+  return fetchReportData(currentPeriod);
 }
 
 function bindPeriodEvents() {

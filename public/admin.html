@@ -261,7 +261,7 @@
     import { initItemManager } from './js/admin/item-manager.js';
     import { initCategoryManager } from './js/admin/category-manager.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
-    import { initReportDashboard } from './js/admin/report-dashboard.js';
+    import { initReportDashboard, refreshReportDashboard } from './js/admin/report-dashboard.js';
     import { initAuth } from './js/admin/auth.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -278,6 +278,12 @@
           document.querySelectorAll('.admin-tab-content').forEach(content => {
             content.style.display = content.id === target ? 'block' : 'none';
           });
+
+          // Báo cáo có thể đã cũ sau khi trạng thái thanh toán thay đổi.
+          // Luôn lấy dữ liệu mới nhất mỗi lần quản trị viên mở tab báo cáo.
+          if (target === 'tab-reports') {
+            refreshReportDashboard();
+          }
         });
       });
 
