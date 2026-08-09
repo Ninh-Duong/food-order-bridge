@@ -14,21 +14,13 @@ async function fetchWithTimeout(url, options, timeoutMs = TIMEOUT_MS) {
   }
 }
 
-async function sendTelegramMessage(text) {
+async function callTelegramApi(endpoint, body) {
   const token = config.getTelegramToken();
-  const chatId = config.getTelegramChatId();
-
-  if (!token || !chatId) {
-    throw new Error('Telegram Bot Token hoặc Chat ID chưa được cấu hình.');
+  if (!token) {
+    throw new Error('Telegram Bot Token chưa được cấu hình.');
   }
 
-  const url = `https://api.telegram.org/bot${token}/sendMessage`;
-  const payload = {
-    chat_id: chatId,
-    text: text
-    // parse_mode is intentionally omitted for stability with raw user names/notes
-  };
-
+  const url = `https://api.telegram.org/bot${token}/${endpoint}`;
   let attempt = 0;
   let delay = 1000;
 
@@ -38,24 +30,20 @@ async function sendTelegramMessage(text) {
       const response = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(body)
       });
 
       const data = await response.json();
 
       if (response.ok && data.ok) {
-        return {
-          ok: true,
-          messageId: data.result.message_id
-        };
+        return data.result;
       }
 
       const status = response.status;
       const description = data.description || 'Unknown Telegram Error';
 
-      // 400, 401, 403 non-retryable errors
       if (status === 400 || status === 401 || status === 403) {
-        throw new Error(`Telegram API Non-retryable Error (${status}): ${description}`);
+        throw new Error(`Telegram API Error (${status}): ${description}`);
       }
 
       if (status === 429) {
@@ -65,7 +53,7 @@ async function sendTelegramMessage(text) {
       } else if (attempt <= MAX_RETRIES) {
         console.warn(`[Telegram Retrying Attempt ${attempt}/${MAX_RETRIES}] waiting ${delay}ms...`);
         await new Promise(r => setTimeout(r, delay));
-        delay = 3000; // 2nd retry wait 3s
+        delay = 3000;
       } else {
         throw new Error(`Telegram API Failure after retries (${status}): ${description}`);
       }
@@ -80,7 +68,7 @@ async function sendTelegramMessage(text) {
         throw new Error(`Telegram Request Timeout after ${TIMEOUT_MS}ms`);
       }
 
-      if (attempt > MAX_RETRIES || err.message.includes('Non-retryable')) {
+      if (attempt > MAX_RETRIES || err.message.includes('Telegram API Error')) {
         throw err;
       }
       await new Promise(r => setTimeout(r, delay));
@@ -88,9 +76,121 @@ async function sendTelegramMessage(text) {
     }
   }
 
-  throw new Error('Telegram notification failed.');
+  throw new Error(`Telegram request to ${endpoint} failed.`);
+}
+
+function splitTelegramMessage(text, maxLength = 4000) {
+  if (!text || text.length <= maxLength) {
+    return [text];
+  }
+
+  const chunks = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLength) {
+      chunks.push(remaining);
+      break;
+    }
+
+    let splitIndex = remaining.lastIndexOf('\n', maxLength);
+    if (splitIndex === -1 || splitIndex < maxLength / 2) {
+      splitIndex = maxLength;
+    }
+
+    chunks.push(remaining.substring(0, splitIndex));
+    remaining = remaining.substring(splitIndex).trimStart();
+  }
+
+  return chunks;
+}
+
+async function sendTelegramMessage(payloadOrText) {
+  let targetChatId = config.getTelegramChatId();
+  let text = '';
+  let parseMode;
+  let replyMarkup;
+
+  if (typeof payloadOrText === 'string') {
+    text = payloadOrText;
+  } else if (payloadOrText && typeof payloadOrText === 'object') {
+    targetChatId = payloadOrText.chatId || payloadOrText.chat_id || targetChatId;
+    text = payloadOrText.text || '';
+    parseMode = payloadOrText.parseMode || payloadOrText.parse_mode;
+    replyMarkup = payloadOrText.replyMarkup || payloadOrText.reply_markup;
+  }
+
+  if (!targetChatId) {
+    throw new Error('Telegram Chat ID chưa được cấu hình.');
+  }
+
+  const chunks = splitTelegramMessage(text);
+  let lastResult = null;
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunkText = chunks[i];
+    const isLast = i === chunks.length - 1;
+    const body = {
+      chat_id: targetChatId,
+      text: chunkText
+    };
+
+    if (parseMode) body.parse_mode = parseMode;
+    if (isLast && replyMarkup) body.reply_markup = replyMarkup;
+
+    const result = await callTelegramApi('sendMessage', body);
+    lastResult = {
+      ok: true,
+      messageId: result.message_id
+    };
+  }
+
+  return lastResult;
+}
+
+async function answerCallbackQuery(options) {
+  const body = {
+    callback_query_id: typeof options === 'string' ? options : options.callbackQueryId,
+    text: typeof options === 'object' ? options.text : undefined,
+    show_alert: typeof options === 'object' ? options.showAlert : undefined
+  };
+  return callTelegramApi('answerCallbackQuery', body);
+}
+
+async function editMessageText(options) {
+  const body = {
+    chat_id: options.chatId,
+    message_id: options.messageId,
+    text: options.text
+  };
+  if (options.parseMode) body.parse_mode = options.parseMode;
+  if (options.replyMarkup) body.reply_markup = options.replyMarkup;
+
+  const result = await callTelegramApi('editMessageText', body);
+  return { ok: true, messageId: result.message_id };
+}
+
+async function setWebhook(webhookUrl, secretToken) {
+  const body = { url: webhookUrl };
+  if (secretToken) body.secret_token = secretToken;
+  return callTelegramApi('setWebhook', body);
+}
+
+async function deleteWebhook() {
+  return callTelegramApi('deleteWebhook', {});
+}
+
+async function getWebhookInfo() {
+  return callTelegramApi('getWebhookInfo', {});
 }
 
 module.exports = {
-  sendTelegramMessage
+  sendTelegramMessage,
+  answerCallbackQuery,
+  editMessageText,
+  setWebhook,
+  deleteWebhook,
+  getWebhookInfo,
+  splitTelegramMessage
 };
+
