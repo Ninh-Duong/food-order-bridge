@@ -31,6 +31,7 @@
     "subtotalAmount": 150000,
     "discountAmount": 20000,
     "totalAmount": 130000,
+    "fulfillmentType": "DELIVERY",
     "paidBy": null
   }
 ]

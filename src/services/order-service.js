@@ -10,10 +10,13 @@ const config = require('../config');
 
 const OrderSchema = z.object({
   requestId: z.string().min(1, 'requestId là bắt buộc'),
+  fulfillmentType: z.enum(['DELIVERY', 'DINE_IN']).default('DELIVERY'),
   customer: z.object({
     name: z.string().min(1, 'Tên khách hàng là bắt buộc'),
-    phone: z.string().min(8, 'Số điện thoại không hợp lệ'),
-    address: z.string().min(1, 'Địa chỉ giao hàng là bắt buộc'),
+    phone: z.string()
+      .transform(val => (typeof val === 'string' ? val.replace(/[\s.-]/g, '') : val))
+      .refine(val => /^0\d{9}$/.test(val), { message: 'Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0' }),
+    address: z.string().optional().default(''),
     note: z.string().optional().default('')
   }),
   items: z.array(
@@ -23,6 +26,21 @@ const OrderSchema = z.object({
       excludedOptionIds: z.array(z.string()).max(20, 'Tối đa 20 tùy chọn thành phần').optional().default([])
     })
   ).min(1, 'Đơn hàng phải chứa ít nhất 1 món')
+}).superRefine((data, ctx) => {
+  if (data.fulfillmentType === 'DELIVERY') {
+    const trimmedAddress = (data.customer.address || '').trim();
+    if (trimmedAddress.length < 5) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Vui lòng nhập địa chỉ giao hàng cụ thể',
+        path: ['customer', 'address']
+      });
+    } else {
+      data.customer.address = trimmedAddress;
+    }
+  } else if (data.fulfillmentType === 'DINE_IN') {
+    data.customer.address = '';
+  }
 });
 
 async function generateOrderId(session = null) {
@@ -54,7 +72,7 @@ class OrderService {
       throw { status: 422, message: `Dữ liệu không hợp lệ: ${errorMsg}` };
     }
 
-    const { requestId, customer, items: rawItems } = parseResult.data;
+    const { requestId, fulfillmentType, customer, items: rawItems } = parseResult.data;
 
     // 2. Aggregate duplicate (productId + sorted excludedOptionIds) in payload
     const configMap = new Map();
@@ -87,6 +105,8 @@ class OrderService {
           orderId: existingOrder.id,
           status: existingOrder.orderStatus,
           notificationStatus: existingOrder.notificationStatus,
+          fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
+          createdAt: existingOrder.createdAt,
           total: existingOrder.totalAmount
         }
       };
@@ -94,13 +114,13 @@ class OrderService {
 
     // 4. Branch logic based on MongoDB vs JSON file mode
     if (isDBConnected()) {
-      return await this.processOrderMongoDB(requestId, customer, aggregatedItems);
+      return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType);
     } else {
-      return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems));
+      return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType));
     }
   }
 
-  async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true) {
+  async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true, fulfillmentType = 'DELIVERY') {
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -109,6 +129,8 @@ class OrderService {
           orderId: existingOrder.id,
           status: existingOrder.orderStatus,
           notificationStatus: existingOrder.notificationStatus,
+          fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
+          createdAt: existingOrder.createdAt,
           total: existingOrder.totalAmount
         }
       };
@@ -260,6 +282,7 @@ class OrderService {
       const newOrder = {
         id: orderId,
         requestId,
+        fulfillmentType,
         customer,
         items: processedItems,
         subtotalAmount,
@@ -305,14 +328,14 @@ class OrderService {
 
       if (isTxNotSupported && allowTransaction) {
         console.warn('⚠️ MongoDB deployment does not support transactions. Falling back to non-transactional atomic operations.');
-        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, false);
+        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, false, fulfillmentType);
       }
 
       throw err;
     }
   }
 
-  async processOrderJSON(requestId, customer, aggregatedItems) {
+  async processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType = 'DELIVERY') {
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -321,6 +344,8 @@ class OrderService {
           orderId: existingOrder.id,
           status: existingOrder.orderStatus,
           notificationStatus: existingOrder.notificationStatus,
+          fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
+          createdAt: existingOrder.createdAt,
           total: existingOrder.totalAmount
         }
       };
@@ -435,6 +460,7 @@ class OrderService {
       const newOrder = {
         id: orderId,
         requestId,
+        fulfillmentType,
         customer,
         items: processedItems,
         subtotalAmount,
@@ -477,6 +503,8 @@ class OrderService {
           orderId: newOrder.id,
           status: 'CONFIRMED',
           notificationStatus: 'SENT',
+          fulfillmentType: newOrder.fulfillmentType,
+          createdAt: newOrder.createdAt,
           total: newOrder.totalAmount
         }
       };
@@ -494,6 +522,8 @@ class OrderService {
           orderId: newOrder.id,
           status: 'CONFIRMED',
           notificationStatus: 'FAILED',
+          fulfillmentType: newOrder.fulfillmentType,
+          createdAt: newOrder.createdAt,
           total: newOrder.totalAmount,
           message: 'Đơn hàng đã được ghi nhận. Cửa hàng sẽ kiểm tra và xác nhận sớm nhất.'
         }
@@ -542,6 +572,7 @@ class OrderService {
       orderId: order.id,
       orderStatus: order.orderStatus,
       notificationStatus: order.notificationStatus,
+      fulfillmentType: order.fulfillmentType || 'DELIVERY',
       total: order.totalAmount,
       isPaid: order.isPaid === true,
       paidAt: order.paidAt || null,

@@ -113,7 +113,7 @@ flowchart TB
 - **Schema & Data Models**:
   - `Category`: `{ id: String (PK), name: String, slug: String, description: String, sortOrder: Number, active: Boolean, createdAt: Date, updatedAt: Date }`
   - `MenuItem`: `{ id: String (PK), name: String, categoryId: String (FK), category: String (Snapshot), price: Number, discountPercent: Number, stockQuantity: Number, customizationOptions: Array [{ id, name, defaultIncluded, active, sortOrder }], image: String, description: String, active: Boolean, updatedAt: Date }`
-  - `Order`: `{ id: String (PK), requestId: String (Index Unique), customerName: String, phone: String, address: String, note: String, items: Array [{ productId, name, originalUnitPrice, discountPercent, unitPrice, quantity, customization: { excludedOptions: [{ id, name }], includedOptions: [{ id, name }] } }], totalPrice: Number, telegramSent: Boolean, createdAt: Date }`
+  - `Order`: `{ id: String (PK), requestId: String (Index Unique), fulfillmentType: String ('DELIVERY' | 'DINE_IN'), customerName: String, phone: String, address: String, note: String, items: Array [{ productId, name, originalUnitPrice, discountPercent, unitPrice, quantity, customization: { excludedOptions: [{ id, name }], includedOptions: [{ id, name }] } }], totalPrice: Number, telegramSent: Boolean, createdAt: Date }`
   - `Settings`: `{ key: String, telegramBotToken: String, telegramChatId: String, shopName: String, timezone: String }`
   - `User`: `{ username: String, passwordHash: String, role: String, active: Boolean }`
 

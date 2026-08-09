@@ -62,13 +62,14 @@ describe('OrderRepository Telegram & Attribute Mapping Tests', () => {
     assert.equal(formatted.paidBy, null);
   });
 
-  it('xử lý an toàn đơn legacy thiếu thông tin customerName / phone / items', () => {
+  it('xử lý an toàn đơn legacy thiếu thông tin customerName / phone / items và fallback fulfillmentType thành DELIVERY', () => {
     const formatted = orderRepository.formatDoc({
       id: 'FO-TEST-LEGACY',
       totalPrice: 50000
     });
 
     assert.equal(formatted.id, 'FO-TEST-LEGACY');
+    assert.equal(formatted.fulfillmentType, 'DELIVERY');
     assert.equal(formatted.customer.name, '');
     assert.equal(formatted.customer.phone, '');
     assert.equal(formatted.customer.address, '');
@@ -76,5 +77,21 @@ describe('OrderRepository Telegram & Attribute Mapping Tests', () => {
     assert.deepEqual(formatted.items, []);
     assert.equal(formatted.totalAmount, 50000);
     assert.equal(formatted.isPaid, false);
+  });
+
+  it('lưu và format đúng fulfillmentType DINE_IN và DELIVERY', () => {
+    const formattedDineIn = orderRepository.formatDoc({
+      id: 'FO-TEST-DINEIN',
+      fulfillmentType: 'DINE_IN',
+      customerName: 'Khách Tại Quán'
+    });
+    assert.equal(formattedDineIn.fulfillmentType, 'DINE_IN');
+
+    const formattedDelivery = orderRepository.formatDoc({
+      id: 'FO-TEST-DELIV',
+      fulfillmentType: 'DELIVERY',
+      address: '123 Nguyễn Trãi'
+    });
+    assert.equal(formattedDelivery.fulfillmentType, 'DELIVERY');
   });
 });

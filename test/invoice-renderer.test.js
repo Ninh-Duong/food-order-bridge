@@ -239,4 +239,38 @@ describe('Admin Invoice Renderer Tests', () => {
     const noItemsOrderHtml = renderInvoiceHTML({ id: 'FO-EMPTY', isPaid: true, items: [] });
     assert.ok(noItemsOrderHtml.includes('Không có dữ liệu món ăn.'));
   });
+
+  it('renderInvoiceHTML: Render đơn dùng tại quán (DINE_IN) không hiển thị dòng địa chỉ trống', async () => {
+    const { renderInvoiceHTML } = await import('../public/js/admin/invoice-renderer.js');
+
+    const dineInOrder = {
+      id: 'FO-DINEIN-001',
+      createdAt: '2026-08-10T12:00:00.000Z',
+      isPaid: true,
+      paidAt: '2026-08-10T12:05:00.000Z',
+      fulfillmentType: 'DINE_IN',
+      customer: {
+        name: 'Nguyễn Văn B',
+        phone: '0909998877',
+        address: ''
+      },
+      items: [
+        {
+          productId: 'COM_GA',
+          name: 'Cơm gà',
+          quantity: 1,
+          unitPrice: 50000,
+          itemTotal: 50000
+        }
+      ],
+      totalAmount: 50000
+    };
+
+    const html = renderInvoiceHTML(dineInOrder);
+
+    assert.ok(html.includes('🍽️ Dùng tại quán'));
+    assert.ok(html.includes('Nguyễn Văn B'));
+    assert.ok(html.includes('0909998877'));
+    assert.ok(!html.includes('Địa chỉ:'));
+  });
 });

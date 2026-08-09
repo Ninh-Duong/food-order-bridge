@@ -71,14 +71,16 @@ describe('Telegram Kitchen Ticket Formatter Tests', () => {
     assert.ok(ticket.includes('[3] 1 × TRÀ ĐÀO'));
     assert.ok(ticket.includes('GHI CHÚ CHUNG'));
     assert.ok(ticket.includes('Giao trước 19:15. Gói riêng nước.'));
+    assert.ok(ticket.includes('HÌNH THỨC: 🛵 GIAO TẬN NƠI'));
     assert.ok(ticket.includes('KHÁCH HÀNG'));
     assert.ok(ticket.includes('Nguyễn Văn A · 0901234567'));
     assert.ok(ticket.includes('12 Nguyễn Trãi, Quận 5'));
     assert.ok(ticket.includes('TỔNG THANH TOÁN:        240.000đ'));
   });
 
-  it('formatCustomerSection: Định dạng phần khách hàng', () => {
+  it('formatCustomerSection: Định dạng phần khách hàng giao tận nơi (DELIVERY)', () => {
     const order = {
+      fulfillmentType: 'DELIVERY',
       customer: {
         name: 'Lê Thị B',
         phone: '0988776655',
@@ -86,7 +88,21 @@ describe('Telegram Kitchen Ticket Formatter Tests', () => {
       }
     };
     const text = formatCustomerSection(order);
-    assert.equal(text, 'KHÁCH HÀNG\nLê Thị B · 0988776655\n456 Lê Lai, Quận 1');
+    assert.equal(text, 'HÌNH THỨC: 🛵 GIAO TẬN NƠI\nKHÁCH HÀNG\nLê Thị B · 0988776655\n456 Lê Lai, Quận 1');
+  });
+
+  it('formatCustomerSection: Định dạng phần khách hàng dùng tại quán (DINE_IN)', () => {
+    const order = {
+      fulfillmentType: 'DINE_IN',
+      customer: {
+        name: 'Trần Văn C',
+        phone: '0901112233',
+        address: ''
+      }
+    };
+    const text = formatCustomerSection(order);
+    assert.equal(text, 'HÌNH THỨC: 🍽️ DÙNG TẠI QUÁN\nKHÁCH HÀNG\nTrần Văn C · 0901112233\nĐịa chỉ: Không yêu cầu');
+    assert.ok(!text.includes('N/A'));
   });
 
   it('formatPaymentSection: Định dạng phần thanh toán khi có giảm giá', () => {

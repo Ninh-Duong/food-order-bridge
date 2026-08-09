@@ -399,6 +399,38 @@ body.invoice-modal-open {
   color: #dc2626;
 }
 
+.invoice-footer {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px dashed #cbd5e1;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Fulfillment badges */
+.fulfillment-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+}
+
+.fulfillment-badge.fulfillment-delivery {
+  background-color: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+.fulfillment-badge.fulfillment-dine-in {
+  background-color: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+
 .invoice-grand-total {
   font-size: 14px;
   font-weight: 800;
