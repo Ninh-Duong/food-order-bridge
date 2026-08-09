@@ -40,8 +40,11 @@ export function renderInvoiceHTML(order, settings = {}) {
 
   const customerName = escapeHTML(order.customer?.name || order.customerName || 'Khách lẻ');
   const customerPhone = escapeHTML(order.customer?.phone || order.phone || '');
-  const customerAddress = escapeHTML(order.customer?.address || order.address || '');
+  const rawAddress = order.customer?.address || order.address || '';
+  const customerAddress = escapeHTML(rawAddress);
   const customerNote = escapeHTML(order.customer?.note || order.note || '');
+  const fulfillmentType = order.fulfillmentType || 'DELIVERY';
+  const fulfillmentLabel = fulfillmentType === 'DINE_IN' ? '🍽️ Dùng tại quán' : '🛵 Giao tận nơi';
 
   const items = Array.isArray(order.items) ? order.items : [];
 
@@ -132,6 +135,10 @@ export function renderInvoiceHTML(order, settings = {}) {
 
       <section class="invoice-customer-info">
         <div class="invoice-cust-row">
+          <span class="invoice-label">Hình thức:</span>
+          <span class="invoice-val"><strong>${fulfillmentLabel}</strong></span>
+        </div>
+        <div class="invoice-cust-row">
           <span class="invoice-label">Khách hàng:</span>
           <span class="invoice-val"><strong>${customerName}</strong></span>
         </div>
@@ -141,7 +148,7 @@ export function renderInvoiceHTML(order, settings = {}) {
             <span class="invoice-val">${customerPhone}</span>
           </div>
         ` : ''}
-        ${customerAddress ? `
+        ${fulfillmentType === 'DELIVERY' && customerAddress ? `
           <div class="invoice-cust-row">
             <span class="invoice-label">Địa chỉ:</span>
             <span class="invoice-val">${customerAddress}</span>

@@ -44,9 +44,10 @@ const paidBySchema = new mongoose.Schema({
 const orderSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   requestId: { type: String, required: true, unique: true, index: true },
+  fulfillmentType: { type: String, enum: ['DELIVERY', 'DINE_IN'], default: 'DELIVERY', index: true },
   customerName: { type: String, required: true },
   phone: { type: String, required: true },
-  address: { type: String, required: true },
+  address: { type: String, default: '' },
   note: { type: String, default: '' },
   items: { type: Array, required: true },
   subtotalAmount: { type: Number, default: 0 },

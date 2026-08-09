@@ -1,4 +1,5 @@
 const { sendTelegramMessage } = require('../integrations/telegram-client');
+const config = require('../config');
 
 function formatVND(amount) {
   if (typeof amount !== 'number') return '0đ';
@@ -7,14 +8,22 @@ function formatVND(amount) {
 
 function formatDate(dateInput) {
   const dateObj = new Date(dateInput || Date.now());
-  const hours = String(dateObj.getHours()).padStart(2, '0');
-  const minutes = String(dateObj.getMinutes()).padStart(2, '0');
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const year = dateObj.getFullYear();
+  if (isNaN(dateObj.getTime())) {
+    return { dateStr: '--/--/----', timeStr: '--:--' };
+  }
+  const parts = new Intl.DateTimeFormat('vi-VN', {
+    timeZone: config.ORDER_TIMEZONE || 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(dateObj);
+  const values = Object.fromEntries(parts.map(p => [p.type, p.value]));
   return {
-    dateStr: `${day}/${month}/${year}`,
-    timeStr: `${hours}:${minutes}`
+    dateStr: `${values.day}/${values.month}/${values.year}`,
+    timeStr: `${values.hour}:${values.minute}`
   };
 }
 
@@ -35,7 +44,16 @@ function formatItemBlock(item, index) {
 
 function formatCustomerSection(order) {
   const cust = order.customer || {};
-  return `KHÁCH HÀNG\n${cust.name || 'N/A'} · ${cust.phone || 'N/A'}\n${cust.address || 'N/A'}`;
+  const name = cust.name || order.customerName || 'N/A';
+  const phone = cust.phone || order.phone || 'N/A';
+  const fulfillmentType = order.fulfillmentType || 'DELIVERY';
+
+  if (fulfillmentType === 'DINE_IN') {
+    return `HÌNH THỨC: 🍽️ DÙNG TẠI QUÁN\nKHÁCH HÀNG\n${name} · ${phone}\nĐịa chỉ: Không yêu cầu`;
+  } else {
+    const address = cust.address || order.address || 'N/A';
+    return `HÌNH THỨC: 🛵 GIAO TẬN NƠI\nKHÁCH HÀNG\n${name} · ${phone}\n${address}`;
+  }
 }
 
 function formatPaymentSection(order) {

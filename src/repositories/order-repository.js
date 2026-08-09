@@ -65,7 +65,7 @@ class OrderRepository {
     }
     const orderId = this.requests.get(requestId);
     if (orderId) {
-      return this.orders.get(orderId) || null;
+      return this.formatMemoryOrder(this.orders.get(orderId)) || null;
     }
     return null;
   }
@@ -81,7 +81,7 @@ class OrderRepository {
         throw err;
       }
     }
-    return this.orders.get(orderId) || null;
+    return this.formatMemoryOrder(this.orders.get(orderId)) || null;
   }
 
   async getPaginated({ page = 1, limit = 10 }) {
@@ -130,7 +130,7 @@ class OrderRepository {
 
     const totalOrders = list.length;
     const totalPages = Math.max(1, Math.ceil(totalOrders / limitNum));
-    const orders = list.slice(skip, skip + limitNum);
+    const orders = list.slice(skip, skip + limitNum).map(o => this.formatMemoryOrder(o));
 
     return {
       orders,
@@ -203,6 +203,7 @@ class OrderRepository {
         const docData = {
           id: order.id,
           requestId: order.requestId,
+          fulfillmentType: order.fulfillmentType || 'DELIVERY',
           customerName: order.customer ? order.customer.name : (order.customerName || ''),
           phone: order.customer ? order.customer.phone : (order.phone || ''),
           address: order.customer ? order.customer.address : (order.address || ''),
@@ -232,6 +233,7 @@ class OrderRepository {
 
     const orderToSave = {
       ...order,
+      fulfillmentType: order.fulfillmentType || 'DELIVERY',
       subtotalAmount: order.subtotalAmount ?? 0,
       discountAmount: order.discountAmount ?? 0,
       totalAmount: order.totalAmount ?? order.totalPrice ?? 0,
@@ -335,13 +337,16 @@ class OrderRepository {
 
   formatDoc(doc) {
     if (!doc) return null;
+    const normalizedAddress = doc.address ?? (doc.customer ? doc.customer.address : '') ?? '';
+    const fulfillmentType = doc.fulfillmentType || 'DELIVERY';
     return {
       id: doc.id,
       requestId: doc.requestId,
+      fulfillmentType,
       customer: {
         name: doc.customerName ?? (doc.customer ? doc.customer.name : '') ?? '',
         phone: doc.phone ?? (doc.customer ? doc.customer.phone : '') ?? '',
-        address: doc.address ?? (doc.customer ? doc.customer.address : '') ?? '',
+        address: normalizedAddress,
         note: doc.note ?? (doc.customer ? doc.customer.note : '') ?? ''
       },
       items: doc.items || [],
@@ -357,6 +362,22 @@ class OrderRepository {
       paidAt: doc.paidAt ?? null,
       paidBy: doc.paidBy ?? null,
       createdAt: doc.createdAt ?? null
+    };
+  }
+
+  formatMemoryOrder(order) {
+    if (!order) return null;
+    const cust = order.customer || {};
+    const normalizedAddress = cust.address ?? order.address ?? '';
+    return {
+      ...order,
+      fulfillmentType: order.fulfillmentType || 'DELIVERY',
+      customer: {
+        name: cust.name ?? order.customerName ?? '',
+        phone: cust.phone ?? order.phone ?? '',
+        address: normalizedAddress,
+        note: cust.note ?? order.note ?? ''
+      }
     };
   }
 

@@ -14,6 +14,40 @@ let currentPage = 1;
 let pageSize = 10;
 let paginationState = { page: 1, limit: 10, totalOrders: 0, totalPages: 1 };
 
+export function formatOrderDateTime(value) {
+  if (!value) return { dateText: '—', timeText: '', fullText: '—' };
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return { dateText: '—', timeText: '', fullText: '—' };
+
+  try {
+    const parts = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    }).formatToParts(d);
+    const values = Object.fromEntries(parts.map(p => [p.type, p.value]));
+    const dateText = `${values.day}/${values.month}/${values.year}`;
+    const timeText = `${values.hour}:${values.minute}`;
+    return {
+      dateText,
+      timeText,
+      fullText: `${dateText} ${timeText}`
+    };
+  } catch (e) {
+    const dateText = d.toLocaleDateString('vi-VN');
+    const timeText = d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    return {
+      dateText,
+      timeText,
+      fullText: `${dateText} ${timeText}`
+    };
+  }
+}
+
 export async function initOrderMonitor() {
   await fetchOrders(1, pageSize);
 
@@ -128,7 +162,7 @@ function renderOrdersTable(orders) {
   if (!tableBody) return;
 
   if (orders.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">Chưa có đơn hàng nào được ghi nhận.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--color-text-muted);">Chưa có đơn hàng nào được ghi nhận.</td></tr>`;
     return;
   }
 
@@ -136,6 +170,31 @@ function renderOrdersTable(orders) {
     const discount = order.discountAmount || 0;
     const safeOrderId = escapeHTML(order.id);
     const isPaid = order.isPaid === true;
+
+    const fulfillmentType = order.fulfillmentType || 'DELIVERY';
+    const isDineIn = fulfillmentType === 'DINE_IN';
+
+    const fulfillmentCellHtml = isDineIn ? `
+      <div>
+        <span class="badge fulfillment-badge fulfillment-dine-in">🍽️ Dùng tại quán</span>
+        <div style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 4px;">Không yêu cầu địa chỉ</div>
+      </div>
+    ` : `
+      <div>
+        <span class="badge fulfillment-badge fulfillment-delivery">🛵 Giao tận nơi</span>
+        <div style="font-size: var(--font-size-xs); max-width: 200px; margin-top: 4px;" class="line-clamp-2" title="${escapeHTML(order.customer?.address || '')}">
+          ${escapeHTML(order.customer?.address || '')}
+        </div>
+      </div>
+    `;
+
+    const dt = formatOrderDateTime(order.createdAt);
+    const dateCellHtml = `
+      <div class="order-date-cell" title="${escapeHTML(dt.fullText)}">
+        <div style="font-weight: 600; color: var(--color-text-main); font-size: var(--font-size-xs);">${escapeHTML(dt.dateText)}</div>
+        <div style="font-size: 11px; color: var(--color-text-muted); margin-top: 2px;">${escapeHTML(dt.timeText)}</div>
+      </div>
+    `;
 
     const itemsHtml = (order.items || []).map(i => {
       const hasDiscount = i.discountPercent > 0 && i.originalUnitPrice > i.unitPrice;
@@ -186,7 +245,7 @@ function renderOrdersTable(orders) {
           <strong>${escapeHTML(order.customer?.name || 'Khách lẻ')}</strong>
           <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">${escapeHTML(order.customer?.phone || '')}</div>
         </td>
-        <td style="font-size: var(--font-size-xs); max-width: 180px;" class="line-clamp-2">${escapeHTML(order.customer?.address || '')}</td>
+        <td>${fulfillmentCellHtml}</td>
         <td>
           <ul style="font-size: var(--font-size-xs); padding-left: 12px; margin: 0;">
             ${itemsHtml}
@@ -206,7 +265,7 @@ function renderOrdersTable(orders) {
             ${order.notificationStatus === 'SENT' ? '🟢 Telegram OK' : '🔴 Lỗi Telegram'}
           </span>
         </td>
-        <td style="font-size: var(--font-size-xs); color: var(--color-text-muted);">${new Date(order.createdAt).toLocaleTimeString('vi-VN')}</td>
+        <td>${dateCellHtml}</td>
         <td>
           ${printBtnHtml}
         </td>
@@ -245,6 +304,9 @@ function bindOrderTableEvents() {
         }
 
         renderOrdersTable(adminOrdersList);
+        document.dispatchEvent(new CustomEvent('paymentStatusUpdated', {
+          detail: { orderId, isPaid: targetPaid }
+        }));
         showToast(targetPaid ? 'Đã xác nhận thanh toán đơn hàng' : 'Đã chuyển đơn hàng về chưa thanh toán', 'success');
       } catch (err) {
         console.error('[Payment Toggle Error]:', err);
