@@ -39,6 +39,32 @@ module.exports = {
     return process.env.TELEGRAM_CHAT_ID || loadSettings().telegramChatId || '';
   },
 
+  getTelegramAdminUserIds() {
+    const raw = process.env.TELEGRAM_ADMIN_USER_IDS || loadSettings().telegramAdminUserIds || '';
+    if (Array.isArray(raw)) {
+      return raw.map(id => String(id).trim()).filter(Boolean);
+    }
+    return String(raw)
+      .split(',')
+      .map(id => id.trim())
+      .filter(Boolean);
+  },
+
+  getTelegramWebhookSecret() {
+    return process.env.TELEGRAM_WEBHOOK_SECRET || loadSettings().telegramWebhookSecret || '';
+  },
+
+  getPublicBaseUrl() {
+    return process.env.PUBLIC_BASE_URL || loadSettings().publicBaseUrl || '';
+  },
+
+  getLowStockThreshold() {
+    const val = process.env.LOW_STOCK_THRESHOLD ?? loadSettings().lowStockThreshold;
+    const parsed = Number(val);
+    return isNaN(parsed) || parsed < 0 ? 5 : parsed;
+  },
+
   loadSettings,
   saveSettings
 };
+

@@ -12,14 +12,26 @@ let originalMenuBackup = null;
 let originalOrdersBackup = null;
 
 describe('Order Service Customization & Snapshot Tests', () => {
-  before(() => {
+  before(async () => {
     if (fs.existsSync(MENU_FILE)) {
       originalMenuBackup = fs.readFileSync(MENU_FILE, 'utf8');
     }
     if (fs.existsSync(ORDERS_FILE)) {
       originalOrdersBackup = fs.readFileSync(ORDERS_FILE, 'utf8');
     }
+
+    const menuItems = await menuRepository.getAll();
+    const comGa = menuItems.find(i => i.id === 'COM_GA');
+    if (comGa) {
+      comGa.customizationOptions = [
+        { id: 'HANH_PHI', name: 'Hành phi', sortOrder: 1 },
+        { id: 'TOI_PHI', name: 'Tỏi phi', sortOrder: 2 }
+      ];
+      menuRepository.saveAll(menuItems);
+    }
   });
+
+
 
   after(() => {
     if (originalMenuBackup !== null) {

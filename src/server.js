@@ -12,6 +12,7 @@ const healthRoutes = require('./routes/health-routes');
 const authRoutes = require('./routes/auth-routes');
 const adminRoutes = require('./routes/admin-routes');
 const reportRoutes = require('./routes/report-routes');
+const telegramRoutes = require('./routes/telegram-routes');
 const authService = require('./services/auth-service');
 const { requireAuth, requireAdmin } = require('./middleware/auth');
 
@@ -36,7 +37,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // API Routes
 app.use('/health', healthRoutes);
+app.use('/api/telegram', telegramRoutes);
 app.use('/api/auth', authRoutes);
+
 app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api/reports', requireAuth, requireAdmin, reportRoutes);
 app.use('/api/categories', (req, res, next) => {
