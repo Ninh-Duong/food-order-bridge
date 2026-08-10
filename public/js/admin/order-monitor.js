@@ -162,7 +162,7 @@ function renderOrdersTable(orders) {
   if (!tableBody) return;
 
   if (orders.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--color-text-muted);">Chưa có đơn hàng nào được ghi nhận.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">Chưa có đơn hàng nào được ghi nhận.</td></tr>`;
     return;
   }
 
@@ -259,11 +259,6 @@ function renderOrdersTable(orders) {
         </td>
         <td>
           ${paymentBtnHtml}
-        </td>
-        <td>
-          <span class="badge ${order.notificationStatus === 'SENT' ? 'badge-active' : 'badge-inactive'}">
-            ${order.notificationStatus === 'SENT' ? '🟢 Telegram OK' : '🔴 Lỗi Telegram'}
-          </span>
         </td>
         <td>${dateCellHtml}</td>
         <td>

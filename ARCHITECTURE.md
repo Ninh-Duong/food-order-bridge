@@ -129,5 +129,8 @@ flowchart TB
   - `SHOP_NAME=Food Order Shop`
   - `ORDER_TIMEZONE=Asia/Bangkok`
   - `MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/food-order?retryWrites=true&w=majority`
+  - `TELEGRAM_ORDER_NOTIFICATIONS_ENABLED=false` *(Mặc định false - tắt gửi đơn hàng outbound tới Telegram; webhook báo cáo vẫn hoạt động)*
   - `TELEGRAM_BOT_TOKEN=<Token_tu_BotFather>`
-  - `TELEGRAM_CHAT_ID=<ID_Nhom_Telegram>`
+  - `TELEGRAM_CHAT_ID=<ID_Nhom_Telegram>` *(Tùy chọn, dùng khi TELEGRAM_ORDER_NOTIFICATIONS_ENABLED=true)*
+  - `TELEGRAM_ADMIN_USER_IDS=<User_IDs_Admin>`
+  - `TELEGRAM_WEBHOOK_SECRET=<Secret_Token>`
