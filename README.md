@@ -38,7 +38,7 @@ flowchart LR
 ### Workflow Summary:
 1. **Customer Order (Storefront)**: Customers browse the menu, customize dish components (toppings/exclusions), select fulfillment type (Delivery or Dine-in), and submit their order.
 2. **Secure Server Processing**: The backend validates the request, performs atomic stock deduction to prevent overselling, recalculates item prices server-side, and enforces idempotency via unique `requestId` (UUID v4).
-3. **Instant Telegram Notification**: Upon success, a formatted order receipt is dispatched directly to the merchant's Telegram group or channel.
+3. **Optional Telegram Notification & Webhook Reports**: Outbound order notifications can be enabled via `TELEGRAM_ORDER_NOTIFICATIONS_ENABLED=true`. Inbound Telegram Webhook (`/today`, `/month`, `/inventory`) functions independently for sales reporting.
 4. **Order Management & Printing (Admin Dashboard)**: Merchants and staff log into the admin dashboard to manage order statuses, print receipts (formatted for thermal 80mm printers & A4 paper), and monitor revenue analytics.
 
 ---

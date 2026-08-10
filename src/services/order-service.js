@@ -489,6 +489,19 @@ class OrderService {
   }
 
   async sendNotificationAndRespond(newOrder) {
+    if (!config.isTelegramOrderNotificationEnabled()) {
+      return {
+        statusCode: 201,
+        result: {
+          orderId: newOrder.id,
+          status: 'CONFIRMED',
+          fulfillmentType: newOrder.fulfillmentType,
+          createdAt: newOrder.createdAt,
+          total: newOrder.totalAmount
+        }
+      };
+    }
+
     try {
       const result = await telegramService.notifyNewOrder(newOrder);
       await orderRepository.update(newOrder.id, {

@@ -58,6 +58,12 @@ module.exports = {
     return process.env.PUBLIC_BASE_URL || loadSettings().publicBaseUrl || '';
   },
 
+  isTelegramOrderNotificationEnabled() {
+    return String(
+      process.env.TELEGRAM_ORDER_NOTIFICATIONS_ENABLED || 'false'
+    ).toLowerCase() === 'true';
+  },
+
   getLowStockThreshold() {
     const val = process.env.LOW_STOCK_THRESHOLD ?? loadSettings().lowStockThreshold;
     const parsed = Number(val);

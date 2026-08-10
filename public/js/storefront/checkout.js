@@ -547,7 +547,7 @@ function showOrderSuccessModal(orderData, fulfillmentType = 'DELIVERY', delivery
         ✓
       </div>
       <h3 style="font-size: var(--font-size-2xl); font-weight: 800; color: var(--color-secondary);">Đặt hàng thành công!</h3>
-      <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: 4px;">Đơn hàng của bạn đã được chuyển tới phiếu bếp Telegram của cửa hàng.</p>
+      <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-top: 4px;">Đơn hàng của bạn đã được tiếp nhận và xác nhận.</p>
       
       <div style="background-color: var(--color-bg-alt); padding: var(--space-4); border-radius: var(--radius-lg); margin: var(--space-6) 0; text-align: left;">
         <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm); margin-bottom: 8px;">
@@ -564,13 +564,9 @@ function showOrderSuccessModal(orderData, fulfillmentType = 'DELIVERY', delivery
             <span style="font-weight: 600; max-width: 60%; text-align: right;">${escapeHTML(deliveryAddress)}</span>
           </div>
         ` : ''}
-        <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm); margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm);">
           <span style="color: var(--color-text-muted);">Trạng thái:</span>
           <span class="badge badge-active">${escapeHTML(orderData.status || 'CONFIRMED')}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between; font-size: var(--font-size-sm);">
-          <span style="color: var(--color-text-muted);">Thông báo Telegram:</span>
-          <span style="font-weight: 600;">${orderData.notificationStatus === 'SENT' ? '🟢 Đã gửi phiếu bếp' : '🟡 Đã ghi nhận'}</span>
         </div>
       </div>
 
