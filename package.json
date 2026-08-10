@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "prestart": "npm run healthcheck",
     "dev": "node --watch src/server.js",
+    "healthcheck": "node src/healthcheck.js",
+    "build": "npm run healthcheck",
     "test": "node --test --test-concurrency=1"
   },
   "keywords": [

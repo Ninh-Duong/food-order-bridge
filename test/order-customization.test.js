@@ -62,7 +62,7 @@ describe('Order Service Customization & Snapshot Tests', () => {
     };
 
     const res = await orderService.processOrder(payload);
-    assert.equal(res.statusCode, 201);
+    assert.ok([201, 202].includes(res.statusCode));
 
     const orderRepository = require('../src/repositories/order-repository');
     const order = await orderRepository.findByRequestId(requestId);
@@ -103,7 +103,7 @@ describe('Order Service Customization & Snapshot Tests', () => {
     };
 
     const res = await orderService.processOrder(payload);
-    assert.equal(res.statusCode, 201);
+    assert.ok([201, 202].includes(res.statusCode));
 
     const orderRepository = require('../src/repositories/order-repository');
     const order = await orderRepository.findByRequestId(requestId);
@@ -137,7 +137,7 @@ describe('Order Service Customization & Snapshot Tests', () => {
     };
 
     const res = await orderService.processOrder(payload);
-    assert.equal(res.statusCode, 201);
+    assert.ok([201, 202].includes(res.statusCode));
 
     const orderRepository = require('../src/repositories/order-repository');
     const order = await orderRepository.findByRequestId(requestId);

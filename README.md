@@ -1,135 +1,177 @@
-# Food Order Bridge (Telegram Bot Integration)
+# 🍜 Food Order Bridge
 
-Hệ thống đặt đồ ăn nhanh tích hợp nhận đơn trực tiếp qua nhóm Telegram, thiết kế theo kiến trúc 1-repo 1-service trên Render với giao diện Web tĩnh tối ưu UI/UX & Performance (Mobile-First & Desktop).
-
----
-
-## 🌟 Tính Năng Nổi Bật
-
-### 🛒 Trang Bán Hàng (Storefront - `index.html`)
-- **Sale-Focused UI & Smart Badges**: Hiển thị nổi bật badge giảm giá (`-XX%`), giá sau giảm to đậm, giá gốc gạch ngang và số tiền tiết kiệm ("Tiết kiệm 20.000đ").
-- **Tùy chọn thành phần miễn phí (Product Options)**: Cho phép khách hàng chọn/bỏ chọn các thành phần kèm theo món (Hành phi, Tỏi phi, Nước tương, Dưa leo...). Giỏ hàng quản lý theo cấu hình độc lập (`lineId`), cho phép đặt cùng một món với các yêu cầu chế biến khác nhau mà không bị nén/gộp nhầm.
-- **Quản lý Tồn kho & Trạng thái Hết hàng**: Khóa bộ đếm (+) khi chạm giới hạn tồn kho. Kiểm tra tổng tồn kho chính xác trên tất cả các cấu hình tùy chọn của cùng một món. Món hết hàng (`stockQuantity = 0`) hiển thị badge "Hết hàng" với hiệu ứng mờ nhẹ, ngăn chặn chọn vượt tồn kho ở mọi điểm chạm (Card, Quick View, Checkout Drawer).
-- **Revalidation & 409 Conflict Handling**: Tự động revalidate menu khi mở Checkout. Nếu tồn kho thay đổi bị từ chối 409 Conflict `INSUFFICIENT_STOCK`, hệ thống giữ nguyên giỏ hàng và highlight dòng món lỗi cho khách chỉnh sửa.
-- **Mobile-First & Responsive Grid**: Tự động tương thích hoàn hảo từ Điện thoại màn hình nhỏ đến Desktop 4K.
-- **Sticky Category Bar & Scrollspy**: Vuốt ngang mượt mà trên Mobile, tự động highlight danh mục theo vị trí cuộn màn hình (`IntersectionObserver`).
-- **Mobile Bottom Sheet Drawer & Floating Cart Bar**: Thanh giỏ hàng nổi ở đáy màn hình Mobile, Drawer trượt từ dưới lên cho Quick View & Checkout.
-
-### ⚙️ Trang Quản Trị (Admin Dashboard - `admin.html`)
-- **Quản lý Tùy chọn thành phần theo món**: Admin thiết lập mã tùy chọn, tên thành phần, thứ tự hiển thị, trạng thái mặc định chọn và bật/tắt tùy chọn trực tiếp trong form sửa món. Tự động gợi ý mã ID in hoa slugify từ tên.
-- **In Hóa đơn & Xem trước (Invoice Preview & Print View)**: Nút `[🖨 In hóa đơn]` hiển thị Modal xem trước hóa đơn với đầy đủ thông tin cửa hàng, thông tin khách hàng, số lượng, đơn giá, chiết khấu, tùy chọn loại trừ thành phần (`KHÔNG LẤY`) và tổng tiền thanh toán. Nút `[In ngay]` kích hoạt `window.print()` tối ưu cho cả giấy nhiệt 80mm và khổ A4.
-- **Quản lý Tồn kho & Khuyến mãi (Inventory & Discount)**: Admin nhập Giá gốc (VND), Phần trăm giảm giá (0-100%) và Số lượng tồn kho. Hỗ trợ Preview real-time giá sau giảm & số tiền tiết kiệm trong modal.
-- **Bảng Món ăn Thông Minh**: Cảnh báo màu sắc trực quan về tồn kho (Còn X: xanh, Sắp hết <= 5: cam, Hết hàng: đỏ) và Badge % giảm giá.
-- **Quản lý Danh mục (Category Management)**: Xem danh sách, tạo mới, chỉnh sửa tên/mô tả/thứ tự hiển thị (`sortOrder`), bật/tắt danh mục (`active`).
-- **Cờ Bật/Tắt Kinh Doanh (`active`)**: Công tắc chuyển đổi độc lập với tồn kho. `active = false` đại diện cửa hàng chủ động ngưng bán; `stockQuantity = 0` đại diện hết hàng.
-- **Cấu hình Telegram Bot API**: Giao diện điền `TELEGRAM_BOT_TOKEN` & `TELEGRAM_CHAT_ID`, nút Lưu và nút **Gửi tin nhắn thử (Test Telegram)**.
-- **Theo dõi Đơn hàng**: Xem lịch sử đơn hàng chi tiết với snapshot tên thành phần loại bỏ (`KHÔNG LẤY: ...`), giá gốc, % giảm giá, tổng giảm giá và số tiền thực trả.
-
-### 🛡 Backend Node.js / Express
-- **Atomic Stock Decrement & Concurrency Control**: Luồng trừ kho là thao tác atomic ở MongoDB (dùng `findOneAndUpdate` điều kiện `stockQuantity >= quantity` trong session transaction) hoặc Async Mutex Lock ở JSON Fallback Mode, ngăn chặn tuyệt đối việc bán vượt kho (overselling) khi nhiều khách mua đồng thời.
-- **Tính giá Server-side & Safe Formula**: Công thức quy chuẩn toàn hệ thống `Math.round(price * (100 - discountPercent) / 100)`. Backend tự tính lại toàn bộ giá trị từ thực đơn tác quyền, không tin giá do client gửi lên.
-- **Idempotency & RequestId Lifecycle**: Client tự tạo `requestId` cho phiên checkout và tái sử dụng khi retry cùng payload. Tránh trừ kho hai lần hay gửi Telegram trùng lặp khi rớt mạng.
-- **Ghi File Bền Vững (Atomic Write)**: Lưu đơn hàng ra file `orders.json` và cập nhật `menu.json` qua file tạm `.tmp` giúp giữ tính lặp lại (idempotency) sau khi restart server. (Lưu ý: Hoàn kho khi hủy đơn là feature tiếp theo).
+> **Smart food ordering & management system with real-time Telegram integration**, built with a Mobile-First UI/UX and a Node.js + Express backend supporting a hybrid data architecture (MongoDB Cloud / Local JSON).
 
 ---
 
-## 📁 Cấu Trúc Thư Mục Mô-Đun
+## 📋 Table of Contents
+1. [Prerequisites](#-prerequisites)
+2. [System Workflow](#-system-workflow)
+3. [Key Features](#-key-features)
+4. [Local Setup Guide](#-local-setup-guide)
+5. [User Guide](#-user-guide)
+6. [Deployment to Render](#-deployment-to-render)
+7. [Directory Structure](#-directory-structure)
+
+---
+
+## 🛠 Prerequisites
+
+- **Node.js**: `v18.x` or higher
+- **npm**: `v8.x` or higher
+- **Telegram Bot Token & Chat ID**: For receiving instant order notifications ([How to create a Telegram Bot with @BotFather](https://core.telegram.org/bots#how-do-i-create-a-bot)).
+- **MongoDB Atlas URI**: *(Optional for Production)* - The system automatically falls back to local JSON files (`src/data/`) during local development.
+
+---
+
+## 🔄 System Workflow
+
+```mermaid
+flowchart LR
+    A[👤 Customer] -->|1. Select items & Checkout| B[🛒 Storefront Website]
+    B -->|2. Send order payload with requestId| C[🛡 Express Backend Server]
+    C -->|3. Atomic stock check & Server-side pricing| D[(💾 Database MongoDB / JSON)]
+    C -->|4. Dispatch instant notification| E[🤖 Telegram Group / Bot]
+    F[⚙️ Admin / Merchant] -->|5. Manage orders, Print invoices & View analytics| C
+```
+
+### Workflow Summary:
+1. **Customer Order (Storefront)**: Customers browse the menu, customize dish components (toppings/exclusions), select fulfillment type (Delivery or Dine-in), and submit their order.
+2. **Secure Server Processing**: The backend validates the request, performs atomic stock deduction to prevent overselling, recalculates item prices server-side, and enforces idempotency via unique `requestId` (UUID v4).
+3. **Instant Telegram Notification**: Upon success, a formatted order receipt is dispatched directly to the merchant's Telegram group or channel.
+4. **Order Management & Printing (Admin Dashboard)**: Merchants and staff log into the admin dashboard to manage order statuses, print receipts (formatted for thermal 80mm printers & A4 paper), and monitor revenue analytics.
+
+---
+
+## ⭐ Key Features
+
+### 🛒 1. Customer Storefront (`index.html`)
+- **Mobile-First Responsive Design**: Optimized for smartphones, tablets, and desktop displays.
+- **Scrollspy Navigation & Search**: Sticky category bar with auto-highlighting scrollspy and instant product search.
+- **Customizable Item Options**: Select or exclude ingredients and toppings (e.g., crispy shallots, garlic oil, soy sauce) independently per item.
+- **Real-Time Inventory Control**: Out-of-stock items (`stock = 0`) display an "Out of Stock" badge and disable cart additions automatically.
+- **Promotional Discounts**: Clear badge indicators (`-XX%`), original vs. discounted prices, and total savings display.
+- **Bottom Sheet Drawer & Floating Cart Bar**: Mobile bottom sheet drawer for smooth item quick-view and checkout.
+
+### ⚙️ 2. Admin Dashboard (`admin.html`)
+- **Authentication & Role-Based Control**: Secure JWT authentication supporting Admin and Staff roles.
+- **Menu & Category Management**: Full CRUD operations for menu items, categories, pricing, stock levels, customization options, and availability toggles (`active`).
+- **Invoice Preview & Thermal Printing**: Modal preview and instant one-click browser printing (`window.print()`) pre-styled for 80mm thermal receipts and A4 invoices.
+- **Sales Analytics & PDF Export**: Detailed revenue reports by timeframe, top-selling items, and downloadable PDF report generation.
+- **Telegram Bot Settings & Webhook**: Interactive settings tab for Bot Token & Chat ID, connection testing, and automated Telegram webhook reporting commands.
+
+### 🛡 3. Backend & Infrastructure Security
+- **Anti-Overselling Concurrency Protection**: Atomic inventory decrements on MongoDB and Async Mutex Locks in JSON mode.
+- **Strict Server-Side Price Calculation**: Ensures zero client-side pricing tampering.
+- **Idempotency Safeguard**: Prevents duplicate orders from rapid button taps or network retries using UUID `requestId`.
+- **Hybrid Data Architecture**: Seamless switching between MongoDB Atlas (Production) and local JSON storage (Development).
+
+---
+
+## 🚀 Local Setup Guide
+
+### Step 1: Clone Repository & Install Dependencies
+```bash
+git clone https://github.com/Ninh-Duong/food-order-bridge.git
+cd food-order-bridge
+npm install
+```
+
+### Step 2: Create Environment Configuration (`.env`)
+Create a `.env` file in the root directory (refer to `.env.example`):
+```env
+PORT=3000
+NODE_ENV=development
+SHOP_NAME=Food Order Shop
+ORDER_TIMEZONE=Asia/Bangkok
+
+# Initial Admin Credentials (Created automatically on first launch)
+AUTH_SECRET=replace-with-a-random-secret-at-least-32-characters
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=adminpassword123
+
+# Telegram Integration (Optional for local testing)
+TELEGRAM_BOT_TOKEN=123456789:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TELEGRAM_CHAT_ID=-1001234567890
+```
+
+### Step 3: Run the Application
+```bash
+# Start in Development Mode (with hot-reload)
+npm run dev
+
+# Or start in Production Mode locally
+npm start
+```
+
+### Step 4: Access the Application
+- 🛒 **Customer Storefront**: [http://localhost:3000](http://localhost:3000)
+- ⚙️ **Admin Dashboard**: [http://localhost:3000/admin.html](http://localhost:3000/admin.html)
+  - *Default Credentials*: `admin` / `adminpassword123` *(Please change password after initial setup)*.
+
+---
+
+## 📖 User Guide
+
+### 📱 For Customers:
+1. Open the storefront at [http://localhost:3000](http://localhost:3000).
+2. Browse categories or use the search bar to select items.
+3. Click an item to customize options (add or remove ingredients), then click **Add to Cart**.
+4. Open the Cart, choose **Delivery** or **Dine-In**, enter contact details, and click **Place Order**.
+
+### ⚙️ For Merchants / Administrators:
+1. Navigate to [http://localhost:3000/admin.html](http://localhost:3000/admin.html) and log in.
+2. **Telegram Bot Setup**: Go to the **🤖 Telegram Settings** tab, input your Bot Token & Chat ID -> Click **Save Settings** -> Click **Send Test Message**.
+3. **Menu Management**: Go to the **Menu** tab to add new items, update prices, manage stock quantities, or toggle item availability.
+4. **Order Processing**: Go to the **Orders** tab to monitor incoming orders, update status, and click **🖨 Print Invoice** for fulfillment.
+5. **Analytics & Staff Accounts**: View sales reports, export PDF summaries, or manage staff user accounts.
+
+---
+
+## ☁️ Deployment to Render
+
+The repository includes a ready-to-use `render.yaml` blueprint for 1-click deployment on **Render**:
+
+1. Push your repository to **GitHub**.
+2. Log in to [Render.com](https://render.com) -> Click **New +** -> Select **Blueprint**.
+3. Connect your `food-order-bridge` repository.
+4. Render automatically detects `render.yaml` with the following configuration:
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+   - **Health Check Path**: `/health`
+5. Configure Environment Variables in the Render Dashboard:
+   - `AUTH_SECRET`: Random long string (at least 32 characters)
+   - `ADMIN_USERNAME` & `ADMIN_PASSWORD`: Initial Admin login credentials
+   - `MONGODB_URI`: MongoDB Atlas connection string (e.g., `mongodb+srv://<user>:<pass>@cluster0.mongodb.net/food-order`)
+   - `TELEGRAM_BOT_TOKEN` & `TELEGRAM_CHAT_ID`: Telegram Bot configuration values
+6. Click **Apply**. Render will automatically build and deploy your application.
+
+---
+
+## 📁 Directory Structure
 
 ```text
 food-order-bridge/
-├─ public/
-│  ├─ index.html                  # Page chính: Bán hàng cho Khách (Storefront)
-│  ├─ admin.html                  # Page quản lý: Dành cho Chủ shop / Admin
-│  ├─ css/
-│  │  ├─ main.css                 # Design tokens (Rule of 8, colors, CSS variables)
-│  │  ├─ components.css           # Components (Buttons, Modals, Skeleton, Badges, Steppers)
-│  │  ├─ storefront.css           # Sticky nav, Scrollspy, Mobile Bottom Drawer, Floating Cart Bar
-│  │  └─ admin.css                # Admin Dashboard tables, Forms, Toggle switches & Invoice Print CSS
-│  └─ js/
-│     ├─ common/
-│     │  ├─ api.js                # Fetch API client wrapper
-│     │  └─ utils.js              # Format VND, Toast notifications, Dynamic Alt Generator
-│     ├─ storefront/
-│     │  ├─ menu-catalog.js       # Dynamic Catalog render, Search/Filter, Scrollspy
-│     │  ├─ cart.js               # Optimistic UI Cart State & Stepper
-│     │  ├─ quick-view-drawer.js  # Mobile Bottom Sheet Drawer
-│     │  └─ checkout.js           # Form đặt hàng, tạo UUID requestId, submit API
-│     └─ admin/
-│        ├─ item-manager.js       # CRUD món ăn & Cờ bật/tắt bán hôm nay
-│        ├─ invoice-renderer.js   # Module render HTML hóa đơn in chuẩn mực
-│        ├─ telegram-settings.js  # Cấu hình Token/Chat ID & Gửi tin thử
-│        └─ order-monitor.js      # Xem lịch sử đơn hàng & Xem trước/In hóa đơn
-├─ src/
-│  ├─ server.js                   # Entry point Express server
-│  ├─ config.js                   # Cấu hình môi trường & file
-│  ├─ data/
-│  │  ├─ menu.json                # Source of truth thực đơn
-│  │  └─ settings.json            # Lưu trữ động Bot Token & Chat ID
-│  ├─ routes/
-│  │  ├─ menu-routes.js           # GET/POST/PUT /api/menu
-│  │  ├─ order-routes.js          # POST /api/orders, GET /api/orders
-│  │  ├─ settings-routes.js       # GET/POST /api/settings
-│  │  └─ health-routes.js         # GET /health
-│  ├─ services/
-│  │  ├─ order-service.js         # Validate, tính giá server-side, gửi Telegram
-│  │  ├─ menu-service.js          # Xử lý logic thực đơn
-│  │  └─ telegram-service.js      # Plain-text Telegram order formatting & dispatch
-│  ├─ repositories/
-│  │  ├─ order-repository.js      # In-memory order store & idempotency requests
-│  │  └─ menu-repository.js       # Đọc/Ghi dữ liệu menu.json
-│  └─ integrations/
-│     └─ telegram-client.js       # Native HTTPS Telegram fetch integration
-├─ package.json
-├─ .env.example
-├─ render.yaml
-└─ README.md
+├── public/                     # Static Frontend Assets
+│   ├── index.html              # Customer Storefront SPA
+│   ├── admin.html              # Admin Dashboard SPA
+│   ├── css/                    # Modular CSS & Design Tokens
+│   └── js/                     # Client JavaScript Modules (Storefront & Admin)
+├── src/                        # Express / Node.js Backend Codebase
+│   ├── server.js               # Application Entry Point & Server Listener
+│   ├── config.js               # Environment & Runtime Settings Loader
+│   ├── db.js                   # MongoDB Connection & Fallback Handler
+│   ├── models.js               # Mongoose Schemas (Category, MenuItem, Order, Settings, User)
+│   ├── routes/                 # REST API Routers (menu, orders, settings, auth, reports, etc.)
+│   ├── services/               # Business Logic Layer (Order, Menu, Auth, Telegram, Report PDF)
+│   ├── repositories/           # Data Access Layer (Hybrid Storage Adapter)
+│   └── integrations/           # External API Clients (Telegram HTTPS Client)
+├── package.json                # NPM Scripts & Dependencies
+├── render.yaml                 # Render Blueprint Deployment Spec
+└── README.md                   # Project Documentation
 ```
 
 ---
 
-## 🚀 Hướng Dẫn Chạy Cục Bộ (Local)
-
-1. Cài đặt các gói phụ thuộc:
-   ```bash
-   npm install
-   ```
-
-2. Chạy ứng dụng ở chế độ Development:
-   Tạo file `.env` hoặc cấu hình các biến môi trường sau trước khi chạy:
-   ```env
-   AUTH_SECRET=chuoi-ngau-nhien-dai-it-nhat-32-ky-tu
-   ADMIN_USERNAME=admin
-   ADMIN_PASSWORD=mat-khau-manh-it-nhat-8-ky-tu
-   ```
-   Lần chạy đầu tiên hệ thống sẽ tạo duy nhất một tài khoản admin. Sau đó admin có thể tạo tài khoản nhân viên trong tab **Tài khoản nhân viên**.
-
-   ```bash
-   npm run dev
-   ```
-
-3. Truy cập trình duyệt:
-   - **Trang Bán hàng (Khách đặt món)**: `http://localhost:3000`
-   - **Trang Quản trị (Admin)**: `http://localhost:3000/admin.html`
-
-4. Cấu hình Telegram trong Admin Page:
-   - Truy cập `http://localhost:3000/admin.html`, chọn tab **🤖 Cấu hình Telegram Bot**.
-   - Điền `TELEGRAM_BOT_TOKEN` và `TELEGRAM_CHAT_ID`.
-   - Bấm **Lưu cấu hình** và chọn **Gửi tin nhắn thử (Test Telegram)** để xác nhận kết nối thành công.
-
----
-
-## ☁️ Triển Khai Lên Render (Deploy)
-
-1. Đẩy dự án lên GitHub repository.
-2. Tạo **New Web Service** trên [Render](https://render.com).
-3. Chọn repo `food-order-bridge`.
-4. Render sẽ tự động phát hiện `render.yaml`:
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-   - Health Check Path: `/health`
-5. Thêm các Biến Môi Trường (Environment Variables) trên Render Dashboard nếu muốn hardcode cố định:
-   - `AUTH_SECRET` (chuỗi ngẫu nhiên, tối thiểu 32 ký tự)
-   - `ADMIN_USERNAME`
-   - `ADMIN_PASSWORD` (tối thiểu 8 ký tự; chỉ dùng để khởi tạo admin lần đầu)
-   - `TELEGRAM_BOT_TOKEN`
-   - `TELEGRAM_CHAT_ID`
+## 📝 License
+This project is licensed under the **MIT License**.
