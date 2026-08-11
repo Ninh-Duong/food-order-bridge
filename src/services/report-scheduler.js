@@ -1,8 +1,7 @@
 const { DateTime } = require('luxon');
 const config = require('../config');
 const reportService = require('./report-service');
-const telegramClient = require('../integrations/telegram-client');
-const { formatSalesReport } = require('./telegram-report-formatter');
+const telegramBotService = require('./telegram-bot-service');
 
 let timer = null;
 const sentKeys = new Set();
@@ -16,10 +15,7 @@ async function sendScheduledReport(period, referenceDate, key) {
   sentKeys.add(key);
   try {
     const report = await reportService.generateSalesReport(period, referenceDate);
-    await telegramClient.sendTelegramMessage({
-      text: formatSalesReport(report),
-      parseMode: 'HTML'
-    });
+    await telegramBotService.sendSalesReport(config.getTelegramChatId(), report);
   } catch (err) {
     sentKeys.delete(key);
     console.warn(`[Report Scheduler] ${period} report failed:`, err.message);

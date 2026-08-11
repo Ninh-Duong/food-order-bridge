@@ -113,6 +113,26 @@ module.exports = {
     };
   },
 
+  getReportChartEnabled() {
+    const raw = process.env.REPORT_CHART_ENABLED;
+    if (raw === undefined) return true;
+    return String(raw).toLowerCase() === 'true';
+  },
+
+  getReportChartBaseUrl() {
+    return process.env.REPORT_CHART_BASE_URL || 'https://quickchart.io/chart';
+  },
+
+  getReportChartWidth() {
+    const parsed = Number.parseInt(process.env.REPORT_CHART_WIDTH, 10);
+    return Number.isInteger(parsed) && parsed >= 400 ? parsed : 900;
+  },
+
+  getReportChartHeight() {
+    const parsed = Number.parseInt(process.env.REPORT_CHART_HEIGHT, 10);
+    return Number.isInteger(parsed) && parsed >= 250 ? parsed : 450;
+  },
+
   getMomoConfig() {
     return {
       partnerCode: process.env.MOMO_PARTNER_CODE || '',

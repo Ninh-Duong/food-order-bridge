@@ -2,12 +2,17 @@ const config = require('../config');
 const telegramClient = require('../integrations/telegram-client');
 const reportService = require('./report-service');
 const menuService = require('./menu-service');
+const { parseReportDate } = require('./telegram-date-parser');
+const { buildHourlyChartUrl } = require('./telegram-chart-service');
 const {
   formatSalesReport,
   formatInventoryReport,
   buildMenuReplyMarkup,
   escapeHtml
 } = require('./telegram-report-formatter');
+
+const pendingDateRequests = new Map();
+const DATE_REQUEST_TTL_MS = 10 * 60 * 1000;
 
 class TelegramBotService {
   isAuthorized(userId) {
@@ -42,8 +47,89 @@ class TelegramBotService {
     return `👋 <b>Xin chào! Chào mừng bạn đến với hệ thống báo cáo ${shopName}.</b>\n\nVui lòng chọn loại thông tin bạn muốn tra cứu bên dưới:`;
   }
 
+  async requestDateInput(chatId) {
+    pendingDateRequests.set(String(chatId), Date.now());
+    return telegramClient.sendTelegramMessage({
+      chatId,
+      text: '📅 <b>Báo cáo theo ngày</b>\n\nVui lòng nhập ngày theo định dạng <code>DD/MM/YYYY</code>.\nVí dụ: <code>12/08/2026</code>',
+      parseMode: 'HTML',
+      replyMarkup: {
+        force_reply: true,
+        input_field_placeholder: 'DD/MM/YYYY',
+        selective: true
+      }
+    });
+  }
+
+  async sendHourlyChart(chatId, report) {
+    let chartUrl;
+    try {
+      chartUrl = buildHourlyChartUrl(report);
+    } catch (err) {
+      console.warn('[Telegram Report Chart] Cấu hình biểu đồ không hợp lệ:', err.message);
+      chartUrl = null;
+    }
+    if (!chartUrl) return null;
+
+    const peak = report.hourlyOrders
+      .filter(bucket => Number(bucket.totalOrderCount) > 0)
+      .reduce((max, bucket) => Math.max(max, Number(bucket.totalOrderCount) || 0), 0);
+    const caption = peak > 0
+      ? `📈 Biểu đồ số đơn theo giờ ngày ${report.reportDate || ''}\nGiờ cao điểm: ${report.hourlyOrders.filter(bucket => Number(bucket.totalOrderCount) === peak).map(bucket => bucket.label).join(', ')} - ${peak} đơn`
+      : `📈 Biểu đồ số đơn theo giờ ngày ${report.reportDate || ''}\nChưa có đơn hàng.`;
+
+    try {
+      return await telegramClient.sendTelegramPhoto({
+        chatId,
+        photo: chartUrl,
+        caption,
+        replyMarkup: buildMenuReplyMarkup()
+      });
+    } catch (err) {
+      console.warn('[Telegram Report Chart] Không thể gửi biểu đồ:', err.message);
+      await telegramClient.sendTelegramMessage({
+        chatId,
+        text: '⚠️ Không thể tải biểu đồ lúc này. Báo cáo text vẫn được gửi đầy đủ.',
+        parseMode: 'HTML'
+      }).catch(() => {});
+      return null;
+    }
+  }
+
+  async sendSalesReport(chatId, report) {
+    const result = await telegramClient.sendTelegramMessage({
+      chatId,
+      text: formatSalesReport(report),
+      parseMode: 'HTML',
+      replyMarkup: buildMenuReplyMarkup()
+    });
+    await this.sendHourlyChart(chatId, report);
+    return result;
+  }
+
+  async sendDateReport(chatId, input) {
+    const parsed = parseReportDate(input);
+    if (!parsed) {
+      return telegramClient.sendTelegramMessage({
+        chatId,
+        text: '⚠️ Ngày không hợp lệ hoặc là ngày tương lai. Vui lòng nhập theo định dạng <code>DD/MM/YYYY</code>.',
+        parseMode: 'HTML',
+        replyMarkup: {
+          force_reply: true,
+          input_field_placeholder: 'DD/MM/YYYY',
+          selective: true
+        }
+      });
+    }
+
+    pendingDateRequests.delete(String(chatId));
+    const report = await reportService.generateSalesReport('date', parsed.referenceDate);
+    return this.sendSalesReport(chatId, report);
+  }
+
   async handleCommand(chatId, text) {
-    const cleanCmd = (text || '').trim().toLowerCase().split(' ')[0];
+    const parts = (text || '').trim().split(/\s+/);
+    const cleanCmd = (parts[0] || '').toLowerCase();
 
     if (cleanCmd === '/start' || cleanCmd === '/menu' || cleanCmd === '/help') {
       const welcomeText = await this.getWelcomeMessage();
@@ -57,35 +143,21 @@ class TelegramBotService {
 
     if (cleanCmd === '/today' || cleanCmd === '/baocao') {
       const report = await reportService.generateSalesReport('today');
-      const text = formatSalesReport(report);
-      return telegramClient.sendTelegramMessage({
-        chatId,
-        text,
-        parseMode: 'HTML',
-        replyMarkup: buildMenuReplyMarkup()
-      });
+      return this.sendSalesReport(chatId, report);
+    }
+
+    if (cleanCmd === '/date' || cleanCmd === '/ngay') {
+      return parts[1] ? this.sendDateReport(chatId, parts[1]) : this.requestDateInput(chatId);
     }
 
     if (cleanCmd === '/month' || cleanCmd === '/thang') {
       const report = await reportService.generateSalesReport('month');
-      const text = formatSalesReport(report);
-      return telegramClient.sendTelegramMessage({
-        chatId,
-        text,
-        parseMode: 'HTML',
-        replyMarkup: buildMenuReplyMarkup()
-      });
+      return this.sendSalesReport(chatId, report);
     }
 
     if (cleanCmd === '/week' || cleanCmd === '/tuan') {
       const report = await reportService.generateSalesReport('week');
-      const text = formatSalesReport(report);
-      return telegramClient.sendTelegramMessage({
-        chatId,
-        text,
-        parseMode: 'HTML',
-        replyMarkup: buildMenuReplyMarkup()
-      });
+      return this.sendSalesReport(chatId, report);
     }
 
     if (cleanCmd === '/stock' || cleanCmd === '/inventory' || cleanCmd === '/tonkho') {
@@ -129,16 +201,19 @@ class TelegramBotService {
     }
 
     let text = '';
+    let reportForChart = null;
 
     if (data === 'report:today') {
-      const report = await reportService.generateSalesReport('today');
-      text = formatSalesReport(report);
+      reportForChart = await reportService.generateSalesReport('today');
+      text = formatSalesReport(reportForChart);
     } else if (data === 'report:month') {
       const report = await reportService.generateSalesReport('month');
       text = formatSalesReport(report);
     } else if (data === 'report:week') {
       const report = await reportService.generateSalesReport('week');
       text = formatSalesReport(report);
+    } else if (data === 'report:date') {
+      return this.requestDateInput(chatId);
     } else if (data === 'inventory:current') {
       const menuItems = await menuService.getMenu();
       const threshold = config.getLowStockThreshold();
@@ -151,13 +226,15 @@ class TelegramBotService {
     }
 
     try {
-      return await telegramClient.editMessageText({
+      const result = await telegramClient.editMessageText({
         chatId,
         messageId,
         text,
         parseMode: 'HTML',
         replyMarkup: buildMenuReplyMarkup()
       });
+      if (reportForChart) await this.sendHourlyChart(chatId, reportForChart);
+      return result;
     } catch (err) {
       // If message edit fails (e.g. text unchanged or message too old), fallback to sending new message
       return await telegramClient.sendTelegramMessage({
@@ -193,6 +270,13 @@ class TelegramBotService {
         await this.sendUnauthorizedNotice(chatId, fromId);
         return { handled: true, type: 'unauthorized' };
       }
+
+      const pendingAt = pendingDateRequests.get(String(chatId));
+      if (pendingAt && Date.now() - pendingAt <= DATE_REQUEST_TTL_MS && !text.trim().startsWith('/')) {
+        await this.sendDateReport(chatId, text.trim());
+        return { handled: true, type: 'date_input' };
+      }
+      if (pendingAt) pendingDateRequests.delete(String(chatId));
 
       await this.handleCommand(chatId, text);
       return { handled: true, type: 'message' };

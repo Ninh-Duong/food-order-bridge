@@ -230,6 +230,9 @@ function renderOrdersTable(orders) {
       <button type="button" class="btn btn-secondary btn-payment-toggle" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background: rgba(239, 68, 68, 0.1); color: #dc2626; border-color: rgba(239, 68, 68, 0.3); font-weight: 700;" data-action="toggle-payment" data-order-id="${safeOrderId}" data-current-paid="false" title="Bấm để xác nhận Đã thanh toán">
         ○ Chưa thanh toán
       </button>
+      <button type="button" class="btn btn-outline" style="min-height: 28px; padding: 2px 8px; font-size: 11px; margin-top: 6px; color: #dc2626; border-color: #fca5a5; font-weight: 700;" data-action="admin-cancel" data-order-id="${safeOrderId}" title="Hủy đơn chưa thanh toán">
+        ✕ Hủy đơn
+      </button>
     `;
 
     const printBtnHtml = isPaid ? `
@@ -278,6 +281,34 @@ function bindOrderTableEvents() {
   if (!tableBody) return;
 
   tableBody.addEventListener('click', async (event) => {
+    // Admin/Staff cancellation handler
+    const cancelBtn = event.target.closest('[data-action="admin-cancel"]');
+    if (cancelBtn) {
+      const orderId = cancelBtn.dataset.orderId;
+      const order = adminOrdersList.find(o => o.id === orderId);
+      if (!order || order.isPaid === true || order.orderStatus === 'CANCELLED') return;
+
+      const confirmed = window.confirm(`Hủy đơn ${orderId}? Tồn kho và slot chờ thanh toán sẽ được giải phóng.`);
+      if (!confirmed) return;
+
+      cancelBtn.disabled = true;
+      cancelBtn.textContent = '⏳ Đang hủy...';
+
+      try {
+        const resData = await API.post(`/api/orders/${encodeURIComponent(orderId)}/admin-cancel`, {});
+        const updated = resData.order || resData;
+        const idx = adminOrdersList.findIndex(o => o.id === orderId);
+        if (idx !== -1) adminOrdersList[idx] = { ...adminOrdersList[idx], ...updated };
+        renderOrdersTable(adminOrdersList);
+        showToast('Đã hủy đơn hàng và giải phóng tồn kho', 'success');
+      } catch (err) {
+        console.error('[Admin Cancel Error]:', err);
+        showToast(err.message || 'Lỗi hủy đơn hàng', 'error');
+        renderOrdersTable(adminOrdersList);
+      }
+      return;
+    }
+
     // Payment Toggle Handler
     const paymentBtn = event.target.closest('[data-action="toggle-payment"]');
     if (paymentBtn) {

@@ -17,6 +17,12 @@ class ReportService {
       return { from, to, timezone };
     }
 
+    if (period === 'date') {
+      const from = dt.startOf('day');
+      const to = from.plus({ days: 1 });
+      return { from, to, timezone };
+    }
+
     if (period === 'week') {
       const from = dt.startOf('week'); // Monday 00:00:00
       const to = dt.startOf('day').plus({ days: 1 });
@@ -33,7 +39,7 @@ class ReportService {
   }
 
   async generateSalesReport(period = 'today', referenceDate = new Date()) {
-    if (!['today', 'week', 'month'].includes(period)) {
+    if (!['today', 'date', 'week', 'month'].includes(period)) {
       throw { status: 400, message: 'Bộ lọc báo cáo không hợp lệ' };
     }
 
@@ -118,7 +124,7 @@ class ReportService {
       return a.productName.localeCompare(b.productName, 'vi');
     });
 
-    if (period === 'today') {
+    if (period === 'today' || period === 'date') {
       for (const order of createdOrders) {
         const created = DateTime.fromJSDate(new Date(order.createdAt)).setZone(timezone);
         const bucket = hourlyOrders[created.hour];
@@ -138,9 +144,10 @@ class ReportService {
       from: from.toISO(),
       to: to.toISO(),
       generatedAt: nowDt.toISO(),
+      reportDate: from.toFormat('dd/MM/yyyy'),
       summary,
       products,
-      hourlyOrders: period === 'today' ? hourlyOrders : []
+      hourlyOrders: period === 'today' || period === 'date' ? hourlyOrders : []
     };
   }
 }

@@ -148,6 +148,23 @@ async function sendTelegramMessage(payloadOrText) {
   return lastResult;
 }
 
+async function sendTelegramPhoto(payload) {
+  const targetChatId = payload?.chatId || payload?.chat_id || config.getTelegramChatId();
+  if (!targetChatId) throw new Error('Telegram Chat ID chưa được cấu hình.');
+  if (!payload?.photo) throw new Error('Telegram photo URL chưa được cấu hình.');
+
+  const body = {
+    chat_id: targetChatId,
+    photo: payload.photo
+  };
+  if (payload.caption) body.caption = payload.caption;
+  if (payload.parseMode || payload.parse_mode) body.parse_mode = payload.parseMode || payload.parse_mode;
+  if (payload.replyMarkup || payload.reply_markup) body.reply_markup = payload.replyMarkup || payload.reply_markup;
+
+  const result = await callTelegramApi('sendPhoto', body);
+  return { ok: true, messageId: result.message_id };
+}
+
 async function answerCallbackQuery(options) {
   const body = {
     callback_query_id: typeof options === 'string' ? options : options.callbackQueryId,
@@ -186,6 +203,7 @@ async function getWebhookInfo() {
 
 module.exports = {
   sendTelegramMessage,
+  sendTelegramPhoto,
   answerCallbackQuery,
   editMessageText,
   setWebhook,
