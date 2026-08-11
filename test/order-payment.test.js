@@ -2,6 +2,7 @@ const { describe, it, beforeEach } = require('node:test');
 const assert = require('node:assert/strict');
 const orderRepository = require('../src/repositories/order-repository');
 const orderService = require('../src/services/order-service');
+const paymentService = require('../src/services/payment-service');
 
 describe('Order Payment Repository & Service Tests', () => {
   beforeEach(async () => {
@@ -114,5 +115,64 @@ describe('Order Payment Repository & Service Tests', () => {
         return err.status === 400;
       }
     );
+  });
+
+  it('Tạo QR mock khi MoMo chưa có config và hoàn thành bằng nút test phía server', async () => {
+    const oldMockEnabled = process.env.PAYMENT_MOCK_ENABLED;
+    const oldPartnerCode = process.env.MOMO_PARTNER_CODE;
+    const oldAccessKey = process.env.MOMO_ACCESS_KEY;
+    const oldSecretKey = process.env.MOMO_SECRET_KEY;
+    const oldIpnUrl = process.env.MOMO_IPN_URL;
+    const oldRedirectUrl = process.env.MOMO_REDIRECT_URL;
+
+    process.env.PAYMENT_MOCK_ENABLED = 'true';
+    delete process.env.MOMO_PARTNER_CODE;
+    delete process.env.MOMO_ACCESS_KEY;
+    delete process.env.MOMO_SECRET_KEY;
+    delete process.env.MOMO_IPN_URL;
+    delete process.env.MOMO_REDIRECT_URL;
+
+    try {
+      const payment = await paymentService.createPaymentForOrder({
+        orderId: 'FO-MOCK-01',
+        amount: 65000,
+        paymentMethod: 'MOMO_QR'
+      });
+
+      assert.equal(payment.isMock, true);
+      assert.equal(payment.paymentStatus, 'PENDING');
+      assert.match(payment.qrImageUrl, /^data:image\/png;base64,/);
+
+      await orderRepository.save({
+        id: 'FO-MOCK-01',
+        requestId: 'req-mock-01',
+        fulfillmentType: 'DINE_IN',
+        customer: { name: '', phone: '', address: '', note: '' },
+        items: [],
+        totalAmount: 65000,
+        paymentMethod: 'MOMO_QR',
+        paymentProvider: 'MOCK',
+        paymentStatus: 'PENDING',
+        paymentMock: true,
+        isPaid: false
+      });
+
+      const completed = await orderService.completeMockPayment('FO-MOCK-01');
+      assert.equal(completed.isPaid, true);
+      assert.equal(completed.paymentStatus, 'PAID');
+      assert.equal(completed.paymentProvider, 'MOCK');
+    } finally {
+      for (const [key, value] of Object.entries({
+        PAYMENT_MOCK_ENABLED: oldMockEnabled,
+        MOMO_PARTNER_CODE: oldPartnerCode,
+        MOMO_ACCESS_KEY: oldAccessKey,
+        MOMO_SECRET_KEY: oldSecretKey,
+        MOMO_IPN_URL: oldIpnUrl,
+        MOMO_REDIRECT_URL: oldRedirectUrl
+      })) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
   });
 });

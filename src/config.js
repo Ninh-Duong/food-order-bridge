@@ -70,6 +70,31 @@ module.exports = {
     return isNaN(parsed) || parsed < 0 ? 5 : parsed;
   },
 
+  getPaymentMockEnabled() {
+    const raw = process.env.PAYMENT_MOCK_ENABLED;
+    if (raw !== undefined) return String(raw).toLowerCase() === 'true';
+    return this.NODE_ENV !== 'production';
+  },
+
+  getMomoConfig() {
+    return {
+      partnerCode: process.env.MOMO_PARTNER_CODE || '',
+      accessKey: process.env.MOMO_ACCESS_KEY || '',
+      secretKey: process.env.MOMO_SECRET_KEY || '',
+      apiBaseUrl: process.env.MOMO_API_BASE_URL || 'https://test-payment.momo.vn',
+      ipnUrl: process.env.MOMO_IPN_URL || '',
+      redirectUrl: process.env.MOMO_REDIRECT_URL || this.getPublicBaseUrl()
+    };
+  },
+
+  getBankQrConfig() {
+    return {
+      bankCode: process.env.BANK_QR_BANK_CODE || '',
+      accountNumber: process.env.BANK_QR_ACCOUNT_NUMBER || '',
+      accountName: process.env.BANK_QR_ACCOUNT_NAME || ''
+    };
+  },
+
   loadSettings,
   saveSettings
 };

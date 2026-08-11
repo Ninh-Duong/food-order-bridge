@@ -7,6 +7,7 @@ const { connectDB } = require('./db');
 const menuRoutes = require('./routes/menu-routes');
 const categoryRoutes = require('./routes/category-routes');
 const orderRoutes = require('./routes/order-routes');
+const paymentRoutes = require('./routes/payment-routes');
 const settingsRoutes = require('./routes/settings-routes');
 const healthRoutes = require('./routes/health-routes');
 const authRoutes = require('./routes/auth-routes');
@@ -52,6 +53,7 @@ app.use('/api/menu', (req, res, next) => {
   return requireAuth(req, res, next);
 }, menuRoutes);
 app.use('/api/orders', orderLimiter, orderRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/settings', requireAuth, requireAdmin, settingsRoutes);
 
 // Fallback to index.html for SPA routing

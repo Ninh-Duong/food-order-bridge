@@ -11,6 +11,8 @@ import { closeDrawer } from './quick-view-drawer.js';
 let activeCheckoutRequestId = null;
 let lastPayloadFingerprint = null;
 let activeFulfillmentType = 'DELIVERY'; // 'DELIVERY' | 'DINE_IN'
+let activePaymentMethod = 'CASH'; // 'CASH' | 'BANK_QR' | 'MOMO_QR'
+let paymentPollTimer = null;
 
 const RECENT_ADDRESS_KEY = 'food_order_recent_addresses';
 
@@ -220,16 +222,18 @@ function renderCheckoutContent() {
     </div>
 
     <form id="checkout-form" novalidate>
-      <div class="form-group">
-        <label class="form-label" for="cust-name">Họ và tên *</label>
-        <input type="text" id="cust-name" class="form-control" placeholder="VD: Nguyễn Văn A" required />
-        <div class="field-error" id="err-cust-name" style="display: none;"></div>
-      </div>
+      <div id="customer-contact-section" style="${activeFulfillmentType === 'DINE_IN' ? 'display: none;' : 'display: block;'}">
+        <div class="form-group">
+          <label class="form-label" for="cust-name">Họ và tên *</label>
+          <input type="text" id="cust-name" class="form-control" placeholder="VD: Nguyễn Văn A" ${activeFulfillmentType === 'DELIVERY' ? 'required' : ''} />
+          <div class="field-error" id="err-cust-name" style="display: none;"></div>
+        </div>
 
-      <div class="form-group">
-        <label class="form-label" for="cust-phone">Số điện thoại *</label>
-        <input type="tel" id="cust-phone" class="form-control" placeholder="VD: 0901234567" inputmode="numeric" autocomplete="tel" maxlength="10" required />
-        <div class="field-error" id="err-cust-phone" style="display: none;">Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0.</div>
+        <div class="form-group">
+          <label class="form-label" for="cust-phone">Số điện thoại *</label>
+          <input type="tel" id="cust-phone" class="form-control" placeholder="VD: 0901234567" inputmode="numeric" autocomplete="tel" maxlength="10" ${activeFulfillmentType === 'DELIVERY' ? 'required' : ''} />
+          <div class="field-error" id="err-cust-phone" style="display: none;">Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0.</div>
+        </div>
       </div>
 
       <div class="form-group checkout-address-section" id="address-section" style="${activeFulfillmentType === 'DINE_IN' ? 'display: none;' : 'display: block;'}">
@@ -252,6 +256,36 @@ function renderCheckoutContent() {
               </div>
             `).join('')}
           </div>
+        </div>
+      </div>
+
+      <div class="form-group" id="payment-section" style="${activeFulfillmentType === 'DINE_IN' ? 'display: block;' : 'display: none;'} margin-bottom: var(--space-4);">
+        <label class="form-label" style="font-weight: 700; margin-bottom: 6px; display: block;">Phương thức thanh toán *</label>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <label class="fulfillment-option ${activePaymentMethod === 'CASH' ? 'is-selected' : ''}" id="payment-option-cash" style="padding: 10px 12px;">
+            <input type="radio" name="paymentMethod" value="CASH" ${activePaymentMethod === 'CASH' ? 'checked' : ''} />
+            <div class="fulfillment-card-content">
+              <span class="fulfillment-icon">💵</span>
+              <div class="fulfillment-text"><span class="fulfillment-title">Tiền mặt tại quán</span><span class="fulfillment-desc">Nhân viên xác nhận khi nhận tiền</span></div>
+              <span class="fulfillment-check">✓</span>
+            </div>
+          </label>
+          <label class="fulfillment-option ${activePaymentMethod === 'BANK_QR' ? 'is-selected' : ''}" id="payment-option-bank" style="padding: 10px 12px;">
+            <input type="radio" name="paymentMethod" value="BANK_QR" ${activePaymentMethod === 'BANK_QR' ? 'checked' : ''} />
+            <div class="fulfillment-card-content">
+              <span class="fulfillment-icon">🏦</span>
+              <div class="fulfillment-text"><span class="fulfillment-title">QR ngân hàng</span><span class="fulfillment-desc">VietQR theo đúng số tiền đơn hàng</span></div>
+              <span class="fulfillment-check">✓</span>
+            </div>
+          </label>
+          <label class="fulfillment-option ${activePaymentMethod === 'MOMO_QR' ? 'is-selected' : ''}" id="payment-option-momo" style="padding: 10px 12px;">
+            <input type="radio" name="paymentMethod" value="MOMO_QR" ${activePaymentMethod === 'MOMO_QR' ? 'checked' : ''} />
+            <div class="fulfillment-card-content">
+              <span class="fulfillment-icon">🟣</span>
+              <div class="fulfillment-text"><span class="fulfillment-title">QR MoMo</span><span class="fulfillment-desc">MoMo Merchant hoặc QR mô phỏng khi chưa cấu hình</span></div>
+              <span class="fulfillment-check">✓</span>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -296,21 +330,34 @@ function renderCheckoutContent() {
     const addressSection = document.getElementById('address-section');
     const addressInput = document.getElementById('cust-address');
     const errAddress = document.getElementById('err-cust-address');
+    const customerContactSection = document.getElementById('customer-contact-section');
+    const nameInput = document.getElementById('cust-name');
+    const phoneInput = document.getElementById('cust-phone');
     const submitBtn = document.getElementById('btn-submit-order');
+    const paymentSection = document.getElementById('payment-section');
 
     if (type === 'DELIVERY') {
       if (optionDelivery) optionDelivery.classList.add('is-selected');
       if (optionDineIn) optionDineIn.classList.remove('is-selected');
       if (addressSection) addressSection.style.display = 'block';
       if (addressInput) addressInput.setAttribute('required', 'true');
+      if (customerContactSection) customerContactSection.style.display = 'block';
+      if (nameInput) nameInput.setAttribute('required', 'true');
+      if (phoneInput) phoneInput.setAttribute('required', 'true');
+      if (paymentSection) paymentSection.style.display = 'none';
+      activePaymentMethod = 'CASH';
       if (submitBtn) submitBtn.innerHTML = `🚀 Đặt giao tận nơi · ${formatVND(cart.getTotalAmount())}`;
     } else {
       if (optionDineIn) optionDineIn.classList.add('is-selected');
       if (optionDelivery) optionDelivery.classList.remove('is-selected');
       if (addressSection) addressSection.style.display = 'none';
       if (addressInput) addressInput.removeAttribute('required');
+      if (customerContactSection) customerContactSection.style.display = 'none';
+      if (nameInput) nameInput.removeAttribute('required');
+      if (phoneInput) phoneInput.removeAttribute('required');
+      if (paymentSection) paymentSection.style.display = 'block';
       if (errAddress) errAddress.style.display = 'none';
-      if (submitBtn) submitBtn.innerHTML = `🚀 Đặt dùng tại quán · ${formatVND(cart.getTotalAmount())}`;
+      if (submitBtn) submitBtn.innerHTML = `${activePaymentMethod === 'CASH' ? '🚀 Đặt dùng tại quán' : '💳 Tiếp tục thanh toán'} · ${formatVND(cart.getTotalAmount())}`;
     }
   };
 
@@ -320,6 +367,21 @@ function renderCheckoutContent() {
   if (radioDineIn) {
     radioDineIn.addEventListener('change', () => updateFulfillmentUI('DINE_IN'));
   }
+
+  updateFulfillmentUI(activeFulfillmentType);
+
+  document.querySelectorAll('input[name="paymentMethod"]').forEach(input => {
+    input.addEventListener('change', () => {
+      activePaymentMethod = input.value;
+      document.querySelectorAll('#payment-section .fulfillment-option').forEach(option => option.classList.remove('is-selected'));
+      const selected = document.querySelector(`#payment-section input[value="${activePaymentMethod}"]`);
+      if (selected) selected.closest('.fulfillment-option')?.classList.add('is-selected');
+      const submitBtn = document.getElementById('btn-submit-order');
+      if (submitBtn && activeFulfillmentType === 'DINE_IN') {
+        submitBtn.innerHTML = `${activePaymentMethod === 'CASH' ? '🚀 Đặt dùng tại quán' : '💳 Tiếp tục thanh toán'} · ${formatVND(cart.getTotalAmount())}`;
+      }
+    });
+  });
 
   // Geolocation button
   const locBtn = document.getElementById('btn-use-location');
@@ -432,8 +494,8 @@ async function handleOrderSubmit(e) {
 
   let hasError = false;
 
-  const name = nameInput ? nameInput.value.trim() : '';
-  if (!name) {
+  const name = activeFulfillmentType === 'DELIVERY' && nameInput ? nameInput.value.trim() : '';
+  if (activeFulfillmentType === 'DELIVERY' && !name) {
     if (errName) {
       errName.textContent = 'Vui lòng nhập họ và tên.';
       errName.style.display = 'block';
@@ -441,9 +503,9 @@ async function handleOrderSubmit(e) {
     hasError = true;
   }
 
-  const phoneRaw = phoneInput ? phoneInput.value : '';
+  const phoneRaw = activeFulfillmentType === 'DELIVERY' && phoneInput ? phoneInput.value : '';
   const phone = phoneRaw.replace(/[\s.-]/g, '');
-  if (!/^0\d{9}$/.test(phone)) {
+  if (activeFulfillmentType === 'DELIVERY' && !/^0\d{9}$/.test(phone)) {
     if (errPhone) {
       errPhone.textContent = 'Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0.';
       errPhone.style.display = 'block';
@@ -483,6 +545,7 @@ async function handleOrderSubmit(e) {
   const payload = {
     requestId: activeCheckoutRequestId,
     fulfillmentType: activeFulfillmentType,
+    paymentMethod: activeFulfillmentType === 'DINE_IN' ? activePaymentMethod : 'CASH',
     customer: { name, phone, address, note },
     items: currentPayloadItems
   };
@@ -501,7 +564,11 @@ async function handleOrderSubmit(e) {
     cart.clear();
     closeDrawer();
 
-    showOrderSuccessModal(orderData, activeFulfillmentType, address);
+    if (activeFulfillmentType === 'DINE_IN' && orderData.payment?.paymentStatus === 'PENDING') {
+      showPaymentPendingModal(orderData);
+    } else {
+      showOrderSuccessModal(orderData, activeFulfillmentType, address);
+    }
   } catch (error) {
     if (error.code === 'INSUFFICIENT_STOCK' || error.status === 409) {
       showToast(error.message || 'Món ăn trong giỏ hàng đã thay đổi tồn kho!', 'error');
@@ -527,9 +594,73 @@ async function handleOrderSubmit(e) {
     if (submitBtn) {
       submitBtn.disabled = false;
       const total = cart.getTotalAmount();
-      submitBtn.innerHTML = `🚀 ${activeFulfillmentType === 'DINE_IN' ? 'Đặt dùng tại quán' : 'Đặt giao tận nơi'} · ${formatVND(total)}`;
+      submitBtn.innerHTML = `🚀 ${activeFulfillmentType === 'DINE_IN' && activePaymentMethod !== 'CASH' ? 'Tiếp tục thanh toán' : activeFulfillmentType === 'DINE_IN' ? 'Đặt dùng tại quán' : 'Đặt giao tận nơi'} · ${formatVND(total)}`;
     }
   }
+}
+
+function showPaymentPendingModal(orderData) {
+  const modalOverlay = document.getElementById('modal-overlay');
+  const drawerContent = document.getElementById('drawer-content');
+  const payment = orderData.payment || {};
+  const orderId = orderData.orderId || 'FO-ORDER';
+
+  if (!modalOverlay || !drawerContent) return;
+  if (paymentPollTimer) clearInterval(paymentPollTimer);
+
+  const mockNotice = payment.isMock
+    ? `<div style="background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; padding: 10px; border-radius: 8px; font-size: 12px; margin-top: 12px;">⚠️ QR mô phỏng: ${escapeHTML(payment.message || 'Chưa cấu hình payment provider')}.</div>`
+    : '';
+  const mockButton = payment.isMock && payment.mockCompletionEnabled
+    ? `<button class="btn btn-primary" id="btn-mock-complete-payment" style="width: 100%; margin-top: 12px;">✅ Hoàn thành thanh toán (test)</button>`
+    : '';
+
+  drawerContent.innerHTML = `
+    <div class="drawer-drag-handle"></div>
+    <div style="text-align: center; padding: var(--space-3) 0;">
+      <h3 style="font-size: var(--font-size-xl); font-weight: 800;">Thanh toán đơn hàng</h3>
+      <p style="font-size: 13px; color: var(--color-text-muted); margin-top: 4px;">Đơn #${escapeHTML(orderId)} · ${formatVND(payment.paymentAmount || orderData.total || 0)}</p>
+      ${payment.qrImageUrl ? `<img src="${escapeHTML(payment.qrImageUrl)}" alt="QR thanh toán" style="display: block; width: min(280px, 80vw); height: auto; margin: 18px auto 10px; border-radius: 10px; background: white; padding: 8px; border: 1px solid var(--color-border);" />` : ''}
+      <div id="payment-waiting-status" style="font-size: 13px; color: var(--color-text-muted);">Đang chờ xác nhận thanh toán...</div>
+      ${payment.paymentReference ? `<div style="font-size: 12px; color: var(--color-text-muted); margin-top: 6px;">Mã tham chiếu: <strong>${escapeHTML(payment.paymentReference)}</strong></div>` : ''}
+      ${payment.paymentLink ? `<a href="${escapeHTML(payment.paymentLink)}" target="_blank" rel="noopener" class="btn btn-outline" style="display: inline-block; margin-top: 12px;">Mở trang MoMo</a>` : ''}
+      ${mockNotice}
+      ${mockButton}
+      <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;" onclick="closeDrawer()">Đóng</button>
+    </div>
+  `;
+
+  const finishIfPaid = async () => {
+    try {
+      const status = await API.get(`/api/orders/${encodeURIComponent(orderId)}`);
+      if (status.isPaid === true || status.payment?.paymentStatus === 'PAID') {
+        clearInterval(paymentPollTimer);
+        paymentPollTimer = null;
+        showOrderSuccessModal({ ...orderData, ...status, payment: status.payment }, 'DINE_IN');
+      }
+    } catch (err) {
+      console.warn('[Payment Polling]', err.message);
+    }
+  };
+
+  const mockButtonElement = document.getElementById('btn-mock-complete-payment');
+  if (mockButtonElement) {
+    mockButtonElement.addEventListener('click', async () => {
+      mockButtonElement.disabled = true;
+      mockButtonElement.textContent = '⏳ Đang cập nhật...';
+      try {
+        await API.post(`/api/orders/${encodeURIComponent(orderId)}/payment/mock-complete`, {});
+        await finishIfPaid();
+      } catch (err) {
+        mockButtonElement.disabled = false;
+        mockButtonElement.textContent = '✅ Hoàn thành thanh toán (test)';
+        showToast(err.message || 'Không thể hoàn thành thanh toán mock', 'error');
+      }
+    });
+  }
+
+  paymentPollTimer = window.setInterval(finishIfPaid, 3000);
+  modalOverlay.classList.add('active');
 }
 
 function showOrderSuccessModal(orderData, fulfillmentType = 'DELIVERY', deliveryAddress = '') {

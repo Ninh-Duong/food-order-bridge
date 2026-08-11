@@ -49,7 +49,10 @@ function formatCustomerSection(order) {
   const fulfillmentType = order.fulfillmentType || 'DELIVERY';
 
   if (fulfillmentType === 'DINE_IN') {
-    return `HÌNH THỨC: 🍽️ DÙNG TẠI QUÁN\nKHÁCH HÀNG\n${name} · ${phone}\nĐịa chỉ: Không yêu cầu`;
+    const contactLine = (cust.name || order.customerName || cust.phone || order.phone)
+      ? `${name} · ${phone}`
+      : 'Khách dùng tại quán';
+    return `HÌNH THỨC: 🍽️ DÙNG TẠI QUÁN\nKHÁCH HÀNG\n${contactLine}\nĐịa chỉ: Không yêu cầu`;
   } else {
     const address = cust.address || order.address || 'N/A';
     return `HÌNH THỨC: 🛵 GIAO TẬN NƠI\nKHÁCH HÀNG\n${name} · ${phone}\n${address}`;

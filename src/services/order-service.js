@@ -4,6 +4,7 @@ const orderRepository = require('../repositories/order-repository');
 const menuRepository = require('../repositories/menu-repository');
 const menuService = require('./menu-service');
 const telegramService = require('./telegram-service');
+const paymentService = require('./payment-service');
 const { calculateSalePrice } = require('../utils/price-calculator');
 const { isDBConnected } = require('../db');
 const config = require('../config');
@@ -11,11 +12,11 @@ const config = require('../config');
 const OrderSchema = z.object({
   requestId: z.string().min(1, 'requestId là bắt buộc'),
   fulfillmentType: z.enum(['DELIVERY', 'DINE_IN']).default('DELIVERY'),
+  paymentMethod: z.enum(['CASH', 'BANK_QR', 'MOMO_QR']).optional().default('CASH'),
   customer: z.object({
-    name: z.string().min(1, 'Tên khách hàng là bắt buộc'),
-    phone: z.string()
-      .transform(val => (typeof val === 'string' ? val.replace(/[\s.-]/g, '') : val))
-      .refine(val => /^0\d{9}$/.test(val), { message: 'Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0' }),
+    name: z.string().optional().default(''),
+    phone: z.string().optional().default('')
+      .transform(val => (typeof val === 'string' ? val.replace(/[\s.-]/g, '') : val)),
     address: z.string().optional().default(''),
     note: z.string().optional().default('')
   }),
@@ -27,7 +28,29 @@ const OrderSchema = z.object({
     })
   ).min(1, 'Đơn hàng phải chứa ít nhất 1 món')
 }).superRefine((data, ctx) => {
+  if (data.fulfillmentType === 'DELIVERY' && data.paymentMethod !== 'CASH') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Thanh toán QR hiện chỉ áp dụng cho đơn dùng tại quán',
+      path: ['paymentMethod']
+    });
+  }
+
   if (data.fulfillmentType === 'DELIVERY') {
+    if (!data.customer.name.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Tên khách hàng là bắt buộc',
+        path: ['customer', 'name']
+      });
+    }
+    if (!/^0\d{9}$/.test(data.customer.phone)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0',
+        path: ['customer', 'phone']
+      });
+    }
     const trimmedAddress = (data.customer.address || '').trim();
     if (trimmedAddress.length < 5) {
       ctx.addIssue({
@@ -39,6 +62,13 @@ const OrderSchema = z.object({
       data.customer.address = trimmedAddress;
     }
   } else if (data.fulfillmentType === 'DINE_IN') {
+    if (data.customer.phone && !/^0\d{9}$/.test(data.customer.phone)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Số điện thoại phải gồm đúng 10 chữ số và bắt đầu bằng 0',
+        path: ['customer', 'phone']
+      });
+    }
     data.customer.address = '';
   }
 });
@@ -72,7 +102,7 @@ class OrderService {
       throw { status: 422, message: `Dữ liệu không hợp lệ: ${errorMsg}` };
     }
 
-    const { requestId, fulfillmentType, customer, items: rawItems } = parseResult.data;
+    const { requestId, fulfillmentType, paymentMethod, customer, items: rawItems } = parseResult.data;
 
     // 2. Aggregate duplicate (productId + sorted excludedOptionIds) in payload
     const configMap = new Map();
@@ -107,20 +137,21 @@ class OrderService {
           notificationStatus: existingOrder.notificationStatus,
           fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
           createdAt: existingOrder.createdAt,
-          total: existingOrder.totalAmount
+          total: existingOrder.totalAmount,
+          payment: this.serializePayment(existingOrder)
         }
       };
     }
 
     // 4. Branch logic based on MongoDB vs JSON file mode
     if (isDBConnected()) {
-      return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType);
+      return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod);
     } else {
-      return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType));
+      return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod));
     }
   }
 
-  async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true, fulfillmentType = 'DELIVERY') {
+  async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH') {
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -131,7 +162,8 @@ class OrderService {
           notificationStatus: existingOrder.notificationStatus,
           fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
           createdAt: existingOrder.createdAt,
-          total: existingOrder.totalAmount
+          total: existingOrder.totalAmount,
+          payment: this.serializePayment(existingOrder)
         }
       };
     }
@@ -294,6 +326,16 @@ class OrderService {
         notificationAttempts: 0,
         notificationError: null,
         isPaid: false,
+        paymentMethod,
+        paymentProvider: paymentMethod === 'CASH' ? 'MANUAL' : null,
+        paymentStatus: paymentMethod === 'CASH' ? 'UNPAID' : 'PENDING',
+        paymentReference: null,
+        paymentTransactionId: null,
+        paymentAmount: totalAmount,
+        paymentExpiresAt: paymentMethod === 'CASH' ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        paymentQrImageUrl: null,
+        paymentLink: null,
+        paymentMock: false,
         paidAt: null,
         paidBy: null,
         createdAt: new Date().toISOString(),
@@ -307,7 +349,7 @@ class OrderService {
         session.endSession();
       }
 
-      return await this.sendNotificationAndRespond(newOrder);
+      return await this.preparePaymentAndNotify(newOrder);
 
     } catch (err) {
       if (session) {
@@ -328,14 +370,14 @@ class OrderService {
 
       if (isTxNotSupported && allowTransaction) {
         console.warn('⚠️ MongoDB deployment does not support transactions. Falling back to non-transactional atomic operations.');
-        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, false, fulfillmentType);
+        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, false, fulfillmentType, paymentMethod);
       }
 
       throw err;
     }
   }
 
-  async processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType = 'DELIVERY') {
+  async processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH') {
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -346,7 +388,8 @@ class OrderService {
           notificationStatus: existingOrder.notificationStatus,
           fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
           createdAt: existingOrder.createdAt,
-          total: existingOrder.totalAmount
+          total: existingOrder.totalAmount,
+          payment: this.serializePayment(existingOrder)
         }
       };
     }
@@ -472,6 +515,16 @@ class OrderService {
         notificationAttempts: 0,
         notificationError: null,
         isPaid: false,
+        paymentMethod,
+        paymentProvider: paymentMethod === 'CASH' ? 'MANUAL' : null,
+        paymentStatus: paymentMethod === 'CASH' ? 'UNPAID' : 'PENDING',
+        paymentReference: null,
+        paymentTransactionId: null,
+        paymentAmount: totalAmount,
+        paymentExpiresAt: paymentMethod === 'CASH' ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        paymentQrImageUrl: null,
+        paymentLink: null,
+        paymentMock: false,
         paidAt: null,
         paidBy: null,
         createdAt: new Date().toISOString(),
@@ -480,12 +533,57 @@ class OrderService {
 
       await orderRepository.save(newOrder);
 
-      return await this.sendNotificationAndRespond(newOrder);
+      return await this.preparePaymentAndNotify(newOrder);
 
     } catch (err) {
       menuRepository.saveAll(menuBackup);
       throw err;
     }
+  }
+
+  serializePayment(order) {
+    if (!order) return null;
+    return {
+      paymentMethod: order.paymentMethod || 'CASH',
+      paymentProvider: order.paymentProvider || 'MANUAL',
+      paymentStatus: order.paymentStatus || (order.isPaid ? 'PAID' : 'UNPAID'),
+      paymentReference: order.paymentReference || null,
+      paymentTransactionId: order.paymentTransactionId || null,
+      paymentAmount: order.paymentAmount ?? order.totalAmount ?? 0,
+      paymentExpiresAt: order.paymentExpiresAt || null,
+      qrImageUrl: order.paymentQrImageUrl || null,
+      paymentLink: order.paymentLink || null,
+      isMock: order.paymentMock === true,
+      mockCompletionEnabled: order.paymentMock === true && config.getPaymentMockEnabled()
+    };
+  }
+
+  async preparePaymentAndNotify(newOrder) {
+    const payment = await paymentService.createPaymentForOrder({
+      orderId: newOrder.id,
+      amount: newOrder.totalAmount,
+      paymentMethod: newOrder.paymentMethod || 'CASH'
+    });
+
+    const paymentFields = {
+      paymentMethod: payment.paymentMethod,
+      paymentProvider: payment.paymentProvider,
+      paymentStatus: payment.paymentStatus,
+      paymentReference: payment.paymentReference,
+      paymentTransactionId: payment.paymentTransactionId,
+      paymentAmount: payment.paymentAmount,
+      paymentExpiresAt: payment.paymentExpiresAt || newOrder.paymentExpiresAt || null,
+      paymentQrImageUrl: payment.qrImageUrl,
+      paymentLink: payment.paymentLink,
+      paymentMock: payment.isMock === true
+    };
+
+    await orderRepository.update(newOrder.id, paymentFields);
+    const response = await this.sendNotificationAndRespond({ ...newOrder, ...paymentFields });
+    response.result.payment = { ...payment, paymentExpiresAt: paymentFields.paymentExpiresAt };
+    response.result.paymentStatus = payment.paymentStatus;
+    response.result.isPaid = payment.paymentStatus === 'PAID';
+    return response;
   }
 
   async sendNotificationAndRespond(newOrder) {
@@ -561,6 +659,7 @@ class OrderService {
     const paymentData = isPaid
       ? {
           isPaid: true,
+          paymentStatus: 'PAID',
           paidAt: new Date().toISOString(),
           paidBy: {
             userId: actor?.sub || actor?.userId || null,
@@ -570,12 +669,64 @@ class OrderService {
         }
       : {
           isPaid: false,
+          paymentStatus: order.paymentMethod && order.paymentMethod !== 'CASH' ? 'PENDING' : 'UNPAID',
           paidAt: null,
           paidBy: null
         };
 
     const updated = await orderRepository.updatePaymentStatus(orderId, paymentData);
     return updated;
+  }
+
+  async completeMockPayment(orderId, actor = null) {
+    if (!config.getPaymentMockEnabled()) {
+      throw { status: 403, message: 'Mock payment đang bị tắt. Chỉ bật trong môi trường test.' };
+    }
+
+    const order = await orderRepository.findById(orderId);
+    if (!order) throw { status: 404, message: 'Không tìm thấy đơn hàng' };
+    if (!['BANK_QR', 'MOMO_QR'].includes(order.paymentMethod)) {
+      throw { status: 422, message: 'Đơn hàng này không dùng thanh toán QR' };
+    }
+    if (order.paymentMock !== true) {
+      throw { status: 409, message: 'Đơn hàng đang dùng QR thật, không thể dùng mock bypass' };
+    }
+    if (order.isPaid === true) return order;
+
+    return await orderRepository.updatePaymentStatus(orderId, {
+      isPaid: true,
+      paymentStatus: 'PAID',
+      paymentProvider: 'MOCK',
+      paymentTransactionId: `MOCK-${Date.now()}`,
+      paidAt: new Date().toISOString(),
+      paidBy: {
+        userId: actor?.sub || null,
+        username: actor?.username || 'mock-test',
+        role: actor?.role || 'system'
+      }
+    });
+  }
+
+  async handleMomoIpn(payload) {
+    if (!paymentService.verifyMomoIpn(payload)) {
+      throw { status: 400, message: 'Chữ ký IPN MoMo không hợp lệ' };
+    }
+
+    const order = await orderRepository.findById(payload.orderId);
+    if (!order) throw { status: 404, message: 'Không tìm thấy đơn hàng MoMo' };
+    if (Number(payload.amount) !== Number(order.totalAmount)) {
+      throw { status: 422, message: 'Số tiền IPN MoMo không khớp với đơn hàng' };
+    }
+    if (Number(payload.resultCode) !== 0 || order.isPaid === true) return order;
+
+    return await orderRepository.updatePaymentStatus(order.id, {
+      isPaid: true,
+      paymentStatus: 'PAID',
+      paymentProvider: 'MOMO',
+      paymentTransactionId: String(payload.transId || ''),
+      paidAt: new Date().toISOString(),
+      paidBy: { userId: null, username: 'momo-ipn', role: 'system' }
+    });
   }
 
   async getOrderStatus(orderId) {
@@ -590,6 +741,7 @@ class OrderService {
       isPaid: order.isPaid === true,
       paidAt: order.paidAt || null,
       paidBy: order.paidBy || null,
+      payment: this.serializePayment(order),
       createdAt: order.createdAt
     };
   }
@@ -611,4 +763,3 @@ class OrderService {
 }
 
 module.exports = new OrderService();
-
