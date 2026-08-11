@@ -46,7 +46,7 @@ function generateSalesPDFBuffer(report, shopName = 'Food Order Shop') {
 
       // Summary Box
       const summaryY = doc.y;
-      doc.rect(40, summaryY, 515, 65).fillAndStroke('#f8fafc', '#cbd5e1');
+      doc.rect(40, summaryY, 515, 112).fillAndStroke('#f8fafc', '#cbd5e1');
 
       doc.font(fontBold).fontSize(10).fillColor('#0f172a');
       doc.text('TỔNG QUAN DOANH THU', 50, summaryY + 8);
@@ -57,11 +57,17 @@ function generateSalesPDFBuffer(report, shopName = 'Food Order Shop') {
 
       doc.text(`• Tạm tính: ${formatVND(report.summary.subtotalAmount)}`, 240, summaryY + 24);
       doc.text(`• Tổng giảm giá: ${formatVND(report.summary.discountAmount)}`, 240, summaryY + 40);
+      doc.text(`• Đơn dùng tại quán: ${report.summary.dineInOrderCount || 0}`, 50, summaryY + 58);
+      doc.text(`• Đơn giao tận nơi: ${report.summary.deliveryOrderCount || 0}`, 240, summaryY + 58);
+      doc.text(`• Tự hủy quá hạn: ${report.summary.autoCancelledOrderCount || 0}`, 50, summaryY + 76);
+      doc.text(`• Hủy thủ công: ${report.summary.manuallyCancelledOrderCount || 0}`, 240, summaryY + 76);
+      doc.text(`• Tổng đơn phát sinh: ${report.summary.totalOrderCount || 0}`, 50, summaryY + 94);
+      doc.text(`• Tổng đơn bị hủy: ${report.summary.cancelledOrderCount || 0}`, 240, summaryY + 94);
 
       doc.font(fontBold).fontSize(10).fillColor('#059669');
       doc.text(`THỰC THU: ${formatVND(report.summary.revenue)}`, 380, summaryY + 8);
 
-      doc.y = summaryY + 75;
+      doc.y = summaryY + 122;
       doc.moveDown(0.5);
 
       // Table Headers

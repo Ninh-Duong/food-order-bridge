@@ -34,6 +34,9 @@ export const API = {
       if (!response.ok && response.status !== 202) {
         const err = new Error(data.message || `API Error: ${response.status}`);
         err.status = response.status;
+        err.code = data.code;
+        err.pendingCount = data.pendingCount;
+        err.limit = data.limit;
         throw err;
       }
       return { status: response.status, data };
@@ -57,6 +60,9 @@ export const API = {
       if (!response.ok) {
         const err = new Error(data.message || `API Error: ${response.status}`);
         err.status = response.status;
+        err.code = data.code;
+        err.pendingCount = data.pendingCount;
+        err.limit = data.limit;
         throw err;
       }
       return data;

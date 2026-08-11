@@ -13,8 +13,27 @@ let lastPayloadFingerprint = null;
 let activeFulfillmentType = 'DELIVERY'; // 'DELIVERY' | 'DINE_IN'
 let activePaymentMethod = 'CASH'; // 'CASH' | 'BANK_QR' | 'MOMO_QR'
 let paymentPollTimer = null;
+let activeOrderActionToken = null;
 
 const RECENT_ADDRESS_KEY = 'food_order_recent_addresses';
+const LAST_ORDER_ACTION_KEY = 'food_order_last_action';
+
+function saveOrderAction(orderId, actionToken) {
+  if (!orderId || !actionToken) return;
+  activeOrderActionToken = actionToken;
+  try {
+    localStorage.setItem(LAST_ORDER_ACTION_KEY, JSON.stringify({ orderId, actionToken }));
+  } catch (e) {}
+}
+
+function getStoredOrderAction(orderId) {
+  try {
+    const raw = localStorage.getItem(LAST_ORDER_ACTION_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && parsed.orderId === orderId && parsed.actionToken) return parsed.actionToken;
+  } catch (e) {}
+  return null;
+}
 
 function getRecentAddresses() {
   try {
@@ -100,7 +119,50 @@ async function openCheckoutDrawer() {
     return;
   }
 
+  const capacity = await API.get('/api/orders/payment-capacity').catch(err => {
+    console.warn('[Payment Capacity Check]', err.message);
+    return null;
+  });
+  if (capacity?.blocked) {
+    showPaymentCapacityWarning(capacity);
+    return;
+  }
+
   renderCheckoutContent();
+  modalOverlay.classList.add('active');
+}
+
+async function checkPaymentCapacity(showWarning = true) {
+  try {
+    const capacity = await API.get('/api/orders/payment-capacity');
+    if (capacity.blocked && activeFulfillmentType === 'DINE_IN') {
+      if (showWarning) showPaymentCapacityWarning(capacity);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn('[Payment Capacity Check]', err.message);
+    return true;
+  }
+}
+
+function showPaymentCapacityWarning(capacity = {}) {
+  const drawerContent = document.getElementById('drawer-content');
+  const modalOverlay = document.getElementById('modal-overlay');
+  if (!drawerContent || !modalOverlay) return;
+  drawerContent.innerHTML = `
+    <div class="drawer-drag-handle"></div>
+    <div style="text-align: center; padding: var(--space-5) 0;">
+      <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
+      <h3 style="font-size: var(--font-size-xl); font-weight: 800; color: #b45309;">Hệ thống đang quá tải</h3>
+      <p style="font-size: 14px; line-height: 1.6; color: var(--color-text-muted); margin: 12px 0 20px;">
+        Hiện tại hệ thống đã có ${Number(capacity.pendingCount) || 3}/${Number(capacity.limit) || 3} đơn chờ thanh toán.
+        Vui lòng liên hệ chủ quán để được hỗ trợ.
+      </p>
+      <button class="btn btn-secondary" id="btn-close-capacity-warning" style="width: 100%;">Quay lại</button>
+    </div>
+  `;
+  document.getElementById('btn-close-capacity-warning')?.addEventListener('click', renderCheckoutContent);
   modalOverlay.classList.add('active');
 }
 
@@ -365,7 +427,10 @@ function renderCheckoutContent() {
     radioDelivery.addEventListener('change', () => updateFulfillmentUI('DELIVERY'));
   }
   if (radioDineIn) {
-    radioDineIn.addEventListener('change', () => updateFulfillmentUI('DINE_IN'));
+    radioDineIn.addEventListener('change', async () => {
+      updateFulfillmentUI('DINE_IN');
+      await checkPaymentCapacity(true);
+    });
   }
 
   updateFulfillmentUI(activeFulfillmentType);
@@ -553,6 +618,7 @@ async function handleOrderSubmit(e) {
   try {
     const response = await API.post('/api/orders', payload);
     const orderData = response.data;
+    saveOrderAction(orderData.orderId, orderData.actionToken);
 
     if (activeFulfillmentType === 'DELIVERY' && address) {
       saveRecentAddress(address);
@@ -570,6 +636,11 @@ async function handleOrderSubmit(e) {
       showOrderSuccessModal(orderData, activeFulfillmentType, address);
     }
   } catch (error) {
+    if (error.code === 'PAYMENT_CAPACITY_FULL') {
+      showPaymentCapacityWarning({ pendingCount: error.pendingCount, limit: error.limit });
+      return;
+    }
+
     if (error.code === 'INSUFFICIENT_STOCK' || error.status === 409) {
       showToast(error.message || 'Món ăn trong giỏ hàng đã thay đổi tồn kho!', 'error');
 
@@ -604,6 +675,7 @@ function showPaymentPendingModal(orderData) {
   const drawerContent = document.getElementById('drawer-content');
   const payment = orderData.payment || {};
   const orderId = orderData.orderId || 'FO-ORDER';
+  const actionToken = orderData.actionToken || activeOrderActionToken || getStoredOrderAction(orderId);
 
   if (!modalOverlay || !drawerContent) return;
   if (paymentPollTimer) clearInterval(paymentPollTimer);
@@ -626,6 +698,7 @@ function showPaymentPendingModal(orderData) {
       ${payment.paymentLink ? `<a href="${escapeHTML(payment.paymentLink)}" target="_blank" rel="noopener" class="btn btn-outline" style="display: inline-block; margin-top: 12px;">Mở trang MoMo</a>` : ''}
       ${mockNotice}
       ${mockButton}
+      <button class="btn btn-outline" id="btn-cancel-pending-order" style="width: 100%; margin-top: 12px; color: #dc2626; border-color: #fca5a5;">Hủy đơn</button>
       <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;" onclick="closeDrawer()">Đóng</button>
     </div>
   `;
@@ -637,6 +710,10 @@ function showPaymentPendingModal(orderData) {
         clearInterval(paymentPollTimer);
         paymentPollTimer = null;
         showOrderSuccessModal({ ...orderData, ...status, payment: status.payment }, 'DINE_IN');
+      } else if (status.orderStatus === 'CANCELLED') {
+        clearInterval(paymentPollTimer);
+        paymentPollTimer = null;
+        showCancelledOrderModal({ ...orderData, ...status, actionToken });
       }
     } catch (err) {
       console.warn('[Payment Polling]', err.message);
@@ -659,7 +736,125 @@ function showPaymentPendingModal(orderData) {
     });
   }
 
+  document.getElementById('btn-cancel-pending-order')?.addEventListener('click', async () => {
+    if (!actionToken) {
+      showToast('Không tìm thấy quyền thao tác đơn hàng. Vui lòng tải lại trang.', 'error');
+      return;
+    }
+    const confirmed = window.confirm('Bạn có chắc muốn hủy đơn này không?');
+    if (!confirmed) return;
+    const button = document.getElementById('btn-cancel-pending-order');
+    if (button) {
+      button.disabled = true;
+      button.textContent = '⏳ Đang hủy đơn...';
+    }
+    try {
+      const response = await API.post(`/api/orders/${encodeURIComponent(orderId)}/cancel`, { actionToken });
+      clearInterval(paymentPollTimer);
+      paymentPollTimer = null;
+      showCancelledOrderModal({ ...orderData, ...(response.data?.order || {}), actionToken });
+    } catch (err) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Hủy đơn';
+      }
+      showToast(err.message || 'Không thể hủy đơn hàng', 'error');
+    }
+  });
+
   paymentPollTimer = window.setInterval(finishIfPaid, 3000);
+  modalOverlay.classList.add('active');
+}
+
+function showCancelledOrderModal(orderData) {
+  const modalOverlay = document.getElementById('modal-overlay');
+  const drawerContent = document.getElementById('drawer-content');
+  if (!modalOverlay || !drawerContent) return;
+  const orderId = orderData.orderId || orderData.id || 'FO-ORDER';
+  const actionToken = orderData.actionToken || activeOrderActionToken || getStoredOrderAction(orderId);
+  const total = orderData.total || orderData.totalAmount || orderData.payment?.paymentAmount || 0;
+
+  drawerContent.innerHTML = `
+    <div class="drawer-drag-handle"></div>
+    <div style="text-align: center; padding: var(--space-4) 0;">
+      <div style="font-size: 44px; margin-bottom: 10px;">❌</div>
+      <h3 style="font-size: var(--font-size-xl); font-weight: 800; color: #dc2626;">Đơn đã hủy</h3>
+      <p style="font-size: 13px; color: var(--color-text-muted); margin: 8px 0 20px;">Đơn #${escapeHTML(orderId)} · ${formatVND(total)}</p>
+      <button class="btn btn-primary" id="btn-retry-cancelled-order" style="width: 100%;">💳 Thanh toán lại</button>
+      <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;" onclick="closeDrawer()">Đóng</button>
+    </div>
+  `;
+
+  document.getElementById('btn-retry-cancelled-order')?.addEventListener('click', () => {
+    showRetryPaymentChooser({ ...orderData, orderId, actionToken });
+  });
+  modalOverlay.classList.add('active');
+}
+
+function showRetryPaymentChooser(orderData) {
+  const modalOverlay = document.getElementById('modal-overlay');
+  const drawerContent = document.getElementById('drawer-content');
+  if (!modalOverlay || !drawerContent) return;
+  const orderId = orderData.orderId || orderData.id;
+  const actionToken = orderData.actionToken || activeOrderActionToken || getStoredOrderAction(orderId);
+  let retryPaymentMethod = orderData.payment?.paymentMethod || activePaymentMethod || 'CASH';
+
+  drawerContent.innerHTML = `
+    <div class="drawer-drag-handle"></div>
+    <div style="padding: var(--space-3) 0;">
+      <h3 style="font-size: var(--font-size-xl); font-weight: 800;">Thanh toán lại đơn hàng</h3>
+      <p style="font-size: 13px; color: var(--color-text-muted); margin: 6px 0 18px;">Đơn #${escapeHTML(orderId)} · Hình thức: 🍽️ Dùng tại quán</p>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${[
+          ['CASH', '💵', 'Tiền mặt tại quán', 'Thanh toán trực tiếp với nhân viên'],
+          ['BANK_QR', '🏦', 'QR ngân hàng', 'Quét mã theo đúng số tiền'],
+          ['MOMO_QR', '🟣', 'QR MoMo', 'MoMo Merchant hoặc QR test']
+        ].map(([value, icon, title, desc]) => `
+          <label class="fulfillment-option ${retryPaymentMethod === value ? 'is-selected' : ''}" data-retry-payment="${value}" style="padding: 10px 12px;">
+            <input type="radio" name="retryPaymentMethod" value="${value}" ${retryPaymentMethod === value ? 'checked' : ''} />
+            <div class="fulfillment-card-content"><span class="fulfillment-icon">${icon}</span><div class="fulfillment-text"><span class="fulfillment-title">${title}</span><span class="fulfillment-desc">${desc}</span></div><span class="fulfillment-check">✓</span></div>
+          </label>
+        `).join('')}
+      </div>
+      <button class="btn btn-primary" id="btn-submit-retry-payment" style="width: 100%; margin-top: 18px;">Tiếp tục</button>
+      <button class="btn btn-secondary" style="width: 100%; margin-top: 12px;" onclick="closeDrawer()">Đóng</button>
+    </div>
+  `;
+
+  document.querySelectorAll('input[name="retryPaymentMethod"]').forEach(input => {
+    input.addEventListener('change', () => {
+      retryPaymentMethod = input.value;
+      document.querySelectorAll('[data-retry-payment]').forEach(option => option.classList.remove('is-selected'));
+      input.closest('[data-retry-payment]')?.classList.add('is-selected');
+    });
+  });
+
+  document.getElementById('btn-submit-retry-payment')?.addEventListener('click', async () => {
+    const button = document.getElementById('btn-submit-retry-payment');
+    if (button) {
+      button.disabled = true;
+      button.textContent = '⏳ Đang tạo đơn thanh toán lại...';
+    }
+    try {
+      const response = await API.post(`/api/orders/${encodeURIComponent(orderId)}/retry`, {
+        actionToken,
+        paymentMethod: retryPaymentMethod
+      });
+      const newOrder = response.data;
+      saveOrderAction(newOrder.orderId, newOrder.actionToken);
+      if (newOrder.payment?.paymentStatus === 'PENDING') {
+        showPaymentPendingModal(newOrder);
+      } else {
+        showOrderSuccessModal(newOrder, 'DINE_IN');
+      }
+    } catch (err) {
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Tiếp tục';
+      }
+      showToast(err.message || 'Không thể tạo lại đơn hàng', 'error');
+    }
+  });
   modalOverlay.classList.add('active');
 }
 
@@ -670,6 +865,8 @@ function showOrderSuccessModal(orderData, fulfillmentType = 'DELIVERY', delivery
   if (!modalOverlay || !drawerContent) return;
 
   const isDineIn = (orderData.fulfillmentType || fulfillmentType) === 'DINE_IN';
+  const isUnpaid = isDineIn && orderData.isPaid !== true && orderData.payment?.paymentStatus !== 'PAID';
+  const actionToken = orderData.actionToken || activeOrderActionToken || getStoredOrderAction(orderData.orderId);
 
   drawerContent.innerHTML = `
     <div class="drawer-drag-handle"></div>
@@ -701,9 +898,21 @@ function showOrderSuccessModal(orderData, fulfillmentType = 'DELIVERY', delivery
         </div>
       </div>
 
+      ${isUnpaid ? `<button class="btn btn-outline" id="btn-cancel-unpaid-order" style="width: 100%; margin-bottom: 12px; color: #dc2626; border-color: #fca5a5;">Hủy đơn</button>` : ''}
       <button class="btn btn-primary" style="width: 100%;" onclick="closeDrawer()">Hoàn tất</button>
     </div>
   `;
+
+  document.getElementById('btn-cancel-unpaid-order')?.addEventListener('click', async () => {
+    if (!actionToken) return showToast('Không tìm thấy quyền thao tác đơn hàng.', 'error');
+    if (!window.confirm('Bạn có chắc muốn hủy đơn này không?')) return;
+    try {
+      const response = await API.post(`/api/orders/${encodeURIComponent(orderData.orderId)}/cancel`, { actionToken });
+      showCancelledOrderModal({ ...orderData, ...(response.data?.order || {}), actionToken });
+    } catch (err) {
+      showToast(err.message || 'Không thể hủy đơn hàng', 'error');
+    }
+  });
 
   modalOverlay.classList.add('active');
 }

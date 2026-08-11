@@ -76,6 +76,43 @@ module.exports = {
     return this.NODE_ENV !== 'production';
   },
 
+  getPaymentPendingOrderLimit() {
+    const raw = process.env.PAYMENT_PENDING_ORDER_LIMIT;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 3;
+  },
+
+  getPaymentPendingTimeoutMinutes() {
+    const raw = process.env.PAYMENT_PENDING_TIMEOUT_MINUTES;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : 5;
+  },
+
+  getPaymentPendingScope() {
+    const raw = String(process.env.PAYMENT_PENDING_SCOPE || 'ALL').toUpperCase();
+    return raw === 'ALL' ? 'ALL' : 'DINE_IN';
+  },
+
+  getPaymentCapacityAlertCooldownMinutes() {
+    const raw = process.env.PAYMENT_CAPACITY_ALERT_COOLDOWN_MINUTES;
+    const parsed = Number.parseInt(raw, 10);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : 5;
+  },
+
+  getReportScheduleEnabled() {
+    const raw = process.env.REPORT_SCHEDULE_ENABLED;
+    if (raw === undefined) return false;
+    return String(raw).toLowerCase() === 'true';
+  },
+
+  getReportScheduleTimes() {
+    return {
+      daily: process.env.REPORT_DAILY_TIME || '23:59',
+      weekly: process.env.REPORT_WEEKLY_TIME || '00:05',
+      monthly: process.env.REPORT_MONTHLY_TIME || '00:10'
+    };
+  },
+
   getMomoConfig() {
     return {
       partnerCode: process.env.MOMO_PARTNER_CODE || '',

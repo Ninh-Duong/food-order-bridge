@@ -41,15 +41,34 @@ class ReportService {
     const fromJS = from.toJSDate();
     const toJS = to.toJSDate();
 
-    const paidOrders = await orderRepository.getPaidOrdersByRange({ from: fromJS, to: toJS });
+    const [paidOrders, createdOrders, cancelledOrders] = await Promise.all([
+      orderRepository.getPaidOrdersByRange({ from: fromJS, to: toJS }),
+      orderRepository.getOrdersByCreatedRange({ from: fromJS, to: toJS }),
+      orderRepository.getCancelledOrdersByRange({ from: fromJS, to: toJS })
+    ]);
 
     const summary = {
       paidOrderCount: 0,
       totalQuantitySold: 0,
       subtotalAmount: 0,
       discountAmount: 0,
-      revenue: 0
+      revenue: 0,
+      totalOrderCount: createdOrders.length,
+      cancelledOrderCount: cancelledOrders.length,
+      autoCancelledOrderCount: cancelledOrders.filter(order => order.cancelReason === 'PAYMENT_TIMEOUT').length,
+      manuallyCancelledOrderCount: cancelledOrders.filter(order => order.cancelReason !== 'PAYMENT_TIMEOUT').length,
+      dineInOrderCount: createdOrders.filter(order => order.fulfillmentType === 'DINE_IN').length,
+      deliveryOrderCount: createdOrders.filter(order => order.fulfillmentType !== 'DINE_IN').length
     };
+
+    const hourlyOrders = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      label: `${String(hour).padStart(2, '0')}:00`,
+      totalOrderCount: 0,
+      paidOrderCount: 0,
+      cancelledOrderCount: 0,
+      pendingOrderCount: 0
+    }));
 
     const productMap = new Map();
 
@@ -99,6 +118,18 @@ class ReportService {
       return a.productName.localeCompare(b.productName, 'vi');
     });
 
+    if (period === 'today') {
+      for (const order of createdOrders) {
+        const created = DateTime.fromJSDate(new Date(order.createdAt)).setZone(timezone);
+        const bucket = hourlyOrders[created.hour];
+        if (!bucket) continue;
+        bucket.totalOrderCount += 1;
+        if (order.isPaid === true) bucket.paidOrderCount += 1;
+        else if (order.orderStatus === 'CANCELLED') bucket.cancelledOrderCount += 1;
+        else bucket.pendingOrderCount += 1;
+      }
+    }
+
     const nowDt = DateTime.fromJSDate(referenceDate).setZone(timezone);
 
     return {
@@ -108,7 +139,8 @@ class ReportService {
       to: to.toISO(),
       generatedAt: nowDt.toISO(),
       summary,
-      products
+      products,
+      hourlyOrders: period === 'today' ? hourlyOrders : []
     };
   }
 }

@@ -1,5 +1,6 @@
 const { z } = require('zod');
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 const orderRepository = require('../repositories/order-repository');
 const menuRepository = require('../repositories/menu-repository');
 const menuService = require('./menu-service');
@@ -93,6 +94,10 @@ function runWithLock(fn) {
   return nextLock;
 }
 
+function hashOrderActionToken(token) {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
 class OrderService {
   async processOrder(rawPayload) {
     // 1. Validate payload schema
@@ -138,17 +143,31 @@ class OrderService {
           fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
           createdAt: existingOrder.createdAt,
           total: existingOrder.totalAmount,
+          actionToken: existingOrder.requestId || null,
           payment: this.serializePayment(existingOrder)
         }
       };
     }
 
-    // 4. Branch logic based on MongoDB vs JSON file mode
+    const createOrder = async () => {
+      await this._expireUnpaidOrders();
+      await this.assertPaymentCapacity(fulfillmentType);
+      if (isDBConnected()) {
+        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod);
+      }
+      return await this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod);
+    };
+
+    // Serialize DINE_IN creation so the global three-order capacity cannot be
+    // exceeded by concurrent requests in the same application instance.
+    if (fulfillmentType === 'DINE_IN' || config.getPaymentPendingScope() === 'ALL') {
+      return await runWithLock(createOrder);
+    }
+
     if (isDBConnected()) {
       return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod);
-    } else {
-      return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod));
     }
+    return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod));
   }
 
   async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH') {
@@ -163,6 +182,7 @@ class OrderService {
           fulfillmentType: existingOrder.fulfillmentType || 'DELIVERY',
           createdAt: existingOrder.createdAt,
           total: existingOrder.totalAmount,
+          actionToken: existingOrder.requestId || null,
           payment: this.serializePayment(existingOrder)
         }
       };
@@ -311,6 +331,7 @@ class OrderService {
 
       const totalDiscountAmount = subtotalAmount - totalAmount;
       const orderId = await generateOrderId(session);
+      const actionToken = requestId;
       const newOrder = {
         id: orderId,
         requestId,
@@ -332,10 +353,19 @@ class OrderService {
         paymentReference: null,
         paymentTransactionId: null,
         paymentAmount: totalAmount,
-        paymentExpiresAt: paymentMethod === 'CASH' ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        paymentExpiresAt: (fulfillmentType === 'DINE_IN' || config.getPaymentPendingScope() === 'ALL')
+          ? new Date(Date.now() + config.getPaymentPendingTimeoutMinutes() * 60 * 1000).toISOString()
+          : null,
         paymentQrImageUrl: null,
         paymentLink: null,
         paymentMock: false,
+        cancelReason: null,
+        cancelledAt: null,
+        cancelledBy: null,
+        retryOfOrderId: null,
+        unpaidSlotReleased: false,
+        orderActionTokenHash: hashOrderActionToken(actionToken),
+        actionToken,
         paidAt: null,
         paidBy: null,
         createdAt: new Date().toISOString(),
@@ -500,6 +530,7 @@ class OrderService {
 
       const totalDiscountAmount = subtotalAmount - totalAmount;
       const orderId = await generateOrderId();
+      const actionToken = requestId;
       const newOrder = {
         id: orderId,
         requestId,
@@ -521,10 +552,19 @@ class OrderService {
         paymentReference: null,
         paymentTransactionId: null,
         paymentAmount: totalAmount,
-        paymentExpiresAt: paymentMethod === 'CASH' ? null : new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+        paymentExpiresAt: (fulfillmentType === 'DINE_IN' || config.getPaymentPendingScope() === 'ALL')
+          ? new Date(Date.now() + config.getPaymentPendingTimeoutMinutes() * 60 * 1000).toISOString()
+          : null,
         paymentQrImageUrl: null,
         paymentLink: null,
         paymentMock: false,
+        cancelReason: null,
+        cancelledAt: null,
+        cancelledBy: null,
+        retryOfOrderId: null,
+        unpaidSlotReleased: false,
+        orderActionTokenHash: hashOrderActionToken(actionToken),
+        actionToken,
         paidAt: null,
         paidBy: null,
         createdAt: new Date().toISOString(),
@@ -583,6 +623,7 @@ class OrderService {
     response.result.payment = { ...payment, paymentExpiresAt: paymentFields.paymentExpiresAt };
     response.result.paymentStatus = payment.paymentStatus;
     response.result.isPaid = payment.paymentStatus === 'PAID';
+    response.result.actionToken = newOrder.actionToken || null;
     return response;
   }
 
@@ -642,6 +683,200 @@ class OrderService {
     }
   }
 
+  isPaymentCapacityScopeMatch(fulfillmentType) {
+    return config.getPaymentPendingScope() === 'ALL' || fulfillmentType === 'DINE_IN';
+  }
+
+  async assertPaymentCapacity(fulfillmentType) {
+    if (!this.isPaymentCapacityScopeMatch(fulfillmentType)) return;
+
+    const limit = config.getPaymentPendingOrderLimit();
+    const pendingCount = await orderRepository.countPendingPayments(config.getPaymentPendingScope());
+    if (pendingCount < limit) return;
+
+    await this.notifyPaymentCapacityBlocked(pendingCount, limit);
+    throw {
+      status: 409,
+      code: 'PAYMENT_CAPACITY_FULL',
+      message: 'Hệ thống hiện đang quá tải đơn chờ thanh toán. Vui lòng liên hệ chủ quán.',
+      pendingCount,
+      limit
+    };
+  }
+
+  async getPaymentCapacityStatus() {
+    await this._expireUnpaidOrders();
+    const scope = config.getPaymentPendingScope();
+    const limit = config.getPaymentPendingOrderLimit();
+    const pendingCount = await orderRepository.countPendingPayments(scope);
+    return {
+      scope,
+      pendingCount,
+      limit,
+      available: Math.max(0, limit - pendingCount),
+      blocked: pendingCount >= limit,
+      timeoutMinutes: config.getPaymentPendingTimeoutMinutes()
+    };
+  }
+
+  async notifyPaymentCapacityBlocked(pendingCount, limit) {
+    const now = Date.now();
+    const cooldown = config.getPaymentCapacityAlertCooldownMinutes() * 60 * 1000;
+    if (this.lastPaymentCapacityAlertAt && now - this.lastPaymentCapacityAlertAt < cooldown) return;
+    this.lastPaymentCapacityAlertAt = now;
+
+    try {
+      await telegramService.notifyPaymentCapacityBlocked({
+        pendingCount,
+        limit,
+        timeoutMinutes: config.getPaymentPendingTimeoutMinutes()
+      });
+    } catch (err) {
+      // Payment capacity must still be enforced if Telegram is unavailable.
+      console.warn('[Payment Capacity Alert]', err.message);
+    }
+  }
+
+  async _expireUnpaidOrders() {
+    const cutoff = new Date(Date.now() - config.getPaymentPendingTimeoutMinutes() * 60 * 1000);
+    const scope = config.getPaymentPendingScope();
+    const expiredOrders = await orderRepository.getPendingPaymentOrders({ scope, before: cutoff });
+    const expired = [];
+
+    for (const order of expiredOrders) {
+      const updated = await this.cancelOrderInternal(order.id, {
+        reason: 'PAYMENT_TIMEOUT',
+        actor: { username: 'payment-timeout', role: 'system' },
+        skipToken: true,
+        paymentStatus: 'EXPIRED',
+        notifyTelegram: true
+      });
+      if (updated && updated.orderStatus === 'CANCELLED') expired.push(updated);
+    }
+
+    return expired;
+  }
+
+  async expireUnpaidOrders() {
+    return await runWithLock(() => this._expireUnpaidOrders());
+  }
+
+  verifyOrderActionToken(order, actionToken) {
+    if (!order || !order.orderActionTokenHash || !actionToken) return false;
+    const actual = hashOrderActionToken(actionToken);
+    return crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(order.orderActionTokenHash));
+  }
+
+  async restoreOrderStock(order) {
+    const quantities = new Map();
+    for (const item of (order.items || [])) {
+      const productId = item.productId;
+      const quantity = Number(item.quantity) || 0;
+      if (!productId || quantity <= 0) continue;
+      quantities.set(productId, (quantities.get(productId) || 0) + quantity);
+    }
+    for (const [productId, quantity] of quantities.entries()) {
+      await menuRepository.incrementStockAtomic(productId, quantity);
+    }
+  }
+
+  async cancelOrderInternal(orderId, options = {}) {
+    const order = await orderRepository.findById(orderId);
+    if (!order) throw { status: 404, message: 'Không tìm thấy đơn hàng' };
+    if (order.isPaid === true || order.paymentStatus === 'PAID') {
+      if (options.reason === 'PAYMENT_TIMEOUT') return order;
+      throw { status: 409, message: 'Không thể hủy đơn đã thanh toán' };
+    }
+    if (order.orderStatus === 'CANCELLED') return order;
+    if (!options.skipToken && !this.verifyOrderActionToken(order, options.actionToken)) {
+      throw { status: 403, message: 'Token thao tác đơn hàng không hợp lệ hoặc đã hết hạn' };
+    }
+
+    const cancelledAt = new Date().toISOString();
+    const cancelledBy = options.actor || { userId: null, username: 'customer', role: 'system' };
+    const updated = await orderRepository.transitionPendingOrder(orderId, {
+      orderStatus: 'CANCELLED',
+      paymentStatus: options.paymentStatus || 'CANCELLED',
+      paymentQrImageUrl: null,
+      paymentLink: null,
+      cancelReason: options.reason || 'MANUAL_CANCEL',
+      cancelledAt,
+      cancelledBy,
+      unpaidSlotReleased: true,
+      updatedAt: cancelledAt
+    });
+
+    if (!updated) {
+      const latest = await orderRepository.findById(orderId);
+      if (latest?.isPaid === true) throw { status: 409, message: 'Đơn vừa được thanh toán, không thể hủy' };
+      return latest || order;
+    }
+
+    if (order.unpaidSlotReleased !== true) {
+      await this.restoreOrderStock(order);
+    }
+
+    if (options.notifyTelegram !== false && config.isTelegramOrderNotificationEnabled()) {
+      try {
+        await telegramService.notifyOrderCancelled({ ...order, ...updated });
+      } catch (err) {
+        console.warn(`[Telegram Cancel ${orderId}]`, err.message);
+      }
+    }
+
+    return updated;
+  }
+
+  async cancelOrder(orderId, actionToken, actor = null) {
+    return await runWithLock(() => this.cancelOrderInternal(orderId, {
+      actionToken,
+      actor: actor || { userId: null, username: 'customer', role: 'system' },
+      reason: 'MANUAL_CANCEL',
+      paymentStatus: 'CANCELLED'
+    }));
+  }
+
+  async retryOrder(orderId, actionToken, paymentMethod = null) {
+    const order = await orderRepository.findById(orderId);
+    if (!order) throw { status: 404, message: 'Không tìm thấy đơn hàng' };
+    if (!this.verifyOrderActionToken(order, actionToken)) {
+      throw { status: 403, message: 'Token thao tác đơn hàng không hợp lệ hoặc đã hết hạn' };
+    }
+    if (order.orderStatus !== 'CANCELLED') {
+      throw { status: 409, message: 'Chỉ có thể thanh toán lại đơn đã hủy' };
+    }
+    if (order.isPaid === true) {
+      throw { status: 409, message: 'Đơn đã thanh toán, không cần thanh toán lại' };
+    }
+
+    const items = (order.items || []).map(item => ({
+      productId: item.productId,
+      quantity: Number(item.quantity) || 0,
+      excludedOptionIds: (item.customization?.excludedOptions || []).map(option => option.id).filter(Boolean)
+    }));
+    const retryPaymentMethod = ['CASH', 'BANK_QR', 'MOMO_QR'].includes(paymentMethod)
+      ? paymentMethod
+      : (order.paymentMethod || 'CASH');
+    const requestId = crypto.randomUUID();
+
+    const result = await this.processOrder({
+      requestId,
+      fulfillmentType: 'DINE_IN',
+      paymentMethod: retryPaymentMethod,
+      customer: {
+        name: order.customer?.name || '',
+        phone: order.customer?.phone || '',
+        address: '',
+        note: order.customer?.note || ''
+      },
+      items
+    });
+
+    await orderRepository.update(result.result.orderId, { retryOfOrderId: order.id });
+    result.result.retryOfOrderId = order.id;
+    return result;
+  }
+
   async setPaymentStatus(orderId, isPaid, actor) {
     if (typeof isPaid !== 'boolean') {
       throw { status: 400, message: 'Trạng thái isPaid phải là kiểu boolean' };
@@ -650,6 +885,10 @@ class OrderService {
     const order = await orderRepository.findById(orderId);
     if (!order) {
       throw { status: 404, message: 'Không tìm thấy đơn hàng' };
+    }
+
+    if (order.orderStatus === 'CANCELLED') {
+      throw { status: 409, message: 'Không thể cập nhật thanh toán cho đơn đã hủy' };
     }
 
     if (order.isPaid === isPaid) {
@@ -665,13 +904,15 @@ class OrderService {
             userId: actor?.sub || actor?.userId || null,
             username: actor?.username || null,
             role: actor?.role || null
-          }
+          },
+          unpaidSlotReleased: true
         }
       : {
           isPaid: false,
           paymentStatus: order.paymentMethod && order.paymentMethod !== 'CASH' ? 'PENDING' : 'UNPAID',
           paidAt: null,
-          paidBy: null
+          paidBy: null,
+          unpaidSlotReleased: false
         };
 
     const updated = await orderRepository.updatePaymentStatus(orderId, paymentData);
@@ -691,9 +932,12 @@ class OrderService {
     if (order.paymentMock !== true) {
       throw { status: 409, message: 'Đơn hàng đang dùng QR thật, không thể dùng mock bypass' };
     }
+    if (order.orderStatus === 'CANCELLED') {
+      throw { status: 409, message: 'Đơn hàng đã hủy, QR test không còn hiệu lực' };
+    }
     if (order.isPaid === true) return order;
 
-    return await orderRepository.updatePaymentStatus(orderId, {
+    return await orderRepository.transitionPendingOrder(orderId, {
       isPaid: true,
       paymentStatus: 'PAID',
       paymentProvider: 'MOCK',
@@ -703,7 +947,8 @@ class OrderService {
         userId: actor?.sub || null,
         username: actor?.username || 'mock-test',
         role: actor?.role || 'system'
-      }
+      },
+      unpaidSlotReleased: true
     });
   }
 
@@ -714,18 +959,20 @@ class OrderService {
 
     const order = await orderRepository.findById(payload.orderId);
     if (!order) throw { status: 404, message: 'Không tìm thấy đơn hàng MoMo' };
+    if (order.orderStatus === 'CANCELLED') return order;
     if (Number(payload.amount) !== Number(order.totalAmount)) {
       throw { status: 422, message: 'Số tiền IPN MoMo không khớp với đơn hàng' };
     }
     if (Number(payload.resultCode) !== 0 || order.isPaid === true) return order;
 
-    return await orderRepository.updatePaymentStatus(order.id, {
+    return await orderRepository.transitionPendingOrder(order.id, {
       isPaid: true,
       paymentStatus: 'PAID',
       paymentProvider: 'MOMO',
       paymentTransactionId: String(payload.transId || ''),
       paidAt: new Date().toISOString(),
-      paidBy: { userId: null, username: 'momo-ipn', role: 'system' }
+      paidBy: { userId: null, username: 'momo-ipn', role: 'system' },
+      unpaidSlotReleased: true
     });
   }
 
@@ -741,6 +988,9 @@ class OrderService {
       isPaid: order.isPaid === true,
       paidAt: order.paidAt || null,
       paidBy: order.paidBy || null,
+      cancelReason: order.cancelReason || null,
+      cancelledAt: order.cancelledAt || null,
+      retryOfOrderId: order.retryOfOrderId || null,
       payment: this.serializePayment(order),
       createdAt: order.createdAt
     };

@@ -217,6 +217,7 @@ class OrderRepository {
           telegramMessageId: order.telegramMessageId ?? null,
           notificationAttempts: order.notificationAttempts ?? 0,
           notificationError: order.notificationError ?? null,
+          orderStatus: order.orderStatus ?? 'CONFIRMED',
           isPaid: order.isPaid === true,
           paymentMethod: order.paymentMethod ?? 'CASH',
           paymentProvider: order.paymentProvider ?? 'MANUAL',
@@ -228,6 +229,12 @@ class OrderRepository {
           paymentQrImageUrl: order.paymentQrImageUrl ?? null,
           paymentLink: order.paymentLink ?? null,
           paymentMock: order.paymentMock === true,
+          cancelReason: order.cancelReason ?? null,
+          cancelledAt: order.cancelledAt ?? null,
+          cancelledBy: order.cancelledBy ?? null,
+          retryOfOrderId: order.retryOfOrderId ?? null,
+          unpaidSlotReleased: order.unpaidSlotReleased === true,
+          orderActionTokenHash: order.orderActionTokenHash ?? null,
           paidAt: order.paidAt ?? null,
           paidBy: order.paidBy ?? null,
           createdAt: order.createdAt || new Date(),
@@ -241,8 +248,9 @@ class OrderRepository {
       }
     }
 
+    const { actionToken, ...persistableOrder } = order;
     const orderToSave = {
-      ...order,
+      ...persistableOrder,
       fulfillmentType: order.fulfillmentType || 'DELIVERY',
       subtotalAmount: order.subtotalAmount ?? 0,
       discountAmount: order.discountAmount ?? 0,
@@ -258,6 +266,13 @@ class OrderRepository {
       paymentQrImageUrl: order.paymentQrImageUrl ?? null,
       paymentLink: order.paymentLink ?? null,
       paymentMock: order.paymentMock === true,
+      orderStatus: order.orderStatus ?? 'CONFIRMED',
+      cancelReason: order.cancelReason ?? null,
+      cancelledAt: order.cancelledAt ?? null,
+      cancelledBy: order.cancelledBy ?? null,
+      retryOfOrderId: order.retryOfOrderId ?? null,
+      unpaidSlotReleased: order.unpaidSlotReleased === true,
+      orderActionTokenHash: order.orderActionTokenHash ?? null,
       paidAt: order.paidAt ?? null,
       paidBy: order.paidBy ?? null
     };
@@ -355,6 +370,133 @@ class OrderRepository {
     return paidOrders.sort((a, b) => new Date(a.paidAt) - new Date(b.paidAt));
   }
 
+  async getOrdersByCreatedRange({ from, to }) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isDBConnected()) {
+      try {
+        const docs = await OrderModel.find({
+          createdAt: { $gte: fromDate, $lt: toDate }
+        }).sort({ createdAt: 1 }).lean();
+        return (docs || []).map(d => this.formatDoc(d));
+      } catch (err) {
+        console.error('Error getting orders by created range from MongoDB:', err.message);
+        throw err;
+      }
+    }
+
+    return Array.from(this.orders.values())
+      .filter(order => {
+        const created = new Date(order.createdAt || 0);
+        return created >= fromDate && created < toDate;
+      })
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+      .map(order => this.formatMemoryOrder(order));
+  }
+
+  async getCancelledOrdersByRange({ from, to }) {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+
+    if (isDBConnected()) {
+      try {
+        const docs = await OrderModel.find({
+          orderStatus: 'CANCELLED',
+          cancelledAt: { $gte: fromDate, $lt: toDate }
+        }).sort({ cancelledAt: 1 }).lean();
+        return (docs || []).map(d => this.formatDoc(d));
+      } catch (err) {
+        console.error('Error getting cancelled orders by range from MongoDB:', err.message);
+        throw err;
+      }
+    }
+
+    return Array.from(this.orders.values())
+      .filter(order => {
+        const cancelled = new Date(order.cancelledAt || 0);
+        return order.orderStatus === 'CANCELLED' && cancelled >= fromDate && cancelled < toDate;
+      })
+      .sort((a, b) => new Date(a.cancelledAt) - new Date(b.cancelledAt))
+      .map(order => this.formatMemoryOrder(order));
+  }
+
+  async getPendingPaymentOrders({ scope = 'DINE_IN', before = null } = {}) {
+    const query = {
+      isPaid: false,
+      orderStatus: { $ne: 'CANCELLED' },
+      paymentStatus: { $in: ['UNPAID', 'PENDING'] }
+    };
+    if (scope === 'DINE_IN') query.fulfillmentType = 'DINE_IN';
+    if (before) query.createdAt = { $lte: new Date(before) };
+
+    if (isDBConnected()) {
+      try {
+        const docs = await OrderModel.find(query).sort({ createdAt: 1 }).lean();
+        return (docs || []).map(d => this.formatDoc(d));
+      } catch (err) {
+        console.error('Error getting pending payment orders from MongoDB:', err.message);
+        throw err;
+      }
+    }
+
+    return Array.from(this.orders.values())
+      .filter(order => {
+        const isPending = order.isPaid !== true && order.orderStatus !== 'CANCELLED'
+          && ['UNPAID', 'PENDING'].includes(order.paymentStatus || (order.isPaid ? 'PAID' : 'UNPAID'));
+        const inScope = scope !== 'DINE_IN' || (order.fulfillmentType || 'DELIVERY') === 'DINE_IN';
+        const beforeMatch = !before || new Date(order.createdAt || 0) <= new Date(before);
+        return isPending && inScope && beforeMatch;
+      })
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+      .map(order => this.formatMemoryOrder(order));
+  }
+
+  async countPendingPayments(scope = 'DINE_IN') {
+    if (isDBConnected()) {
+      const query = {
+        isPaid: false,
+        orderStatus: { $ne: 'CANCELLED' },
+        paymentStatus: { $in: ['UNPAID', 'PENDING'] }
+      };
+      if (scope === 'DINE_IN') query.fulfillmentType = 'DINE_IN';
+      return await OrderModel.countDocuments(query);
+    }
+    const pending = await this.getPendingPaymentOrders({ scope });
+    return pending.length;
+  }
+
+  async transitionPendingOrder(orderId, fields) {
+    if (isDBConnected()) {
+      try {
+        const doc = await OrderModel.findOneAndUpdate(
+          {
+            id: orderId,
+            isPaid: false,
+            orderStatus: { $ne: 'CANCELLED' },
+            paymentStatus: { $in: ['UNPAID', 'PENDING'] }
+          },
+          { $set: fields },
+          { returnDocument: 'after', new: true }
+        ).lean();
+        return doc ? this.formatDoc(doc) : null;
+      } catch (err) {
+        console.error('Error transitioning pending order in MongoDB:', err.message);
+        throw err;
+      }
+    }
+
+    const existing = this.orders.get(orderId);
+    if (!existing || existing.isPaid === true || existing.orderStatus === 'CANCELLED'
+      || !['UNPAID', 'PENDING'].includes(existing.paymentStatus || 'UNPAID')) {
+      return null;
+    }
+    const updated = { ...existing, ...fields, updatedAt: new Date().toISOString() };
+    this.orders.set(orderId, updated);
+    this.saveAllToFile();
+    return this.formatMemoryOrder(updated);
+  }
+
   formatDoc(doc) {
     if (!doc) return null;
     const normalizedAddress = doc.address ?? (doc.customer ? doc.customer.address : '') ?? '';
@@ -389,6 +531,12 @@ class OrderRepository {
       paymentQrImageUrl: doc.paymentQrImageUrl ?? null,
       paymentLink: doc.paymentLink ?? null,
       paymentMock: doc.paymentMock === true,
+      cancelReason: doc.cancelReason ?? null,
+      cancelledAt: doc.cancelledAt ?? null,
+      cancelledBy: doc.cancelledBy ?? null,
+      retryOfOrderId: doc.retryOfOrderId ?? null,
+      unpaidSlotReleased: doc.unpaidSlotReleased === true,
+      orderActionTokenHash: doc.orderActionTokenHash ?? null,
       paidAt: doc.paidAt ?? null,
       paidBy: doc.paidBy ?? null,
       createdAt: doc.createdAt ?? null

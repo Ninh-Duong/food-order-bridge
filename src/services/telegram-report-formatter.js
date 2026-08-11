@@ -15,7 +15,12 @@ function formatCurrency(amount) {
 
 function formatSalesReport(report) {
   const isToday = report.filter === 'today';
-  const title = isToday ? '📊 BÁO CÁO DOANH THU HÔM NAY' : '📅 BÁO CÁO DOANH THU THÁNG NÀY';
+  const isWeek = report.filter === 'week';
+  const title = isToday
+    ? '📊 BÁO CÁO DOANH THU HÔM NAY'
+    : isWeek
+      ? '📅 BÁO CÁO DOANH THU TUẦN NÀY'
+      : '📅 BÁO CÁO DOANH THU THÁNG NÀY';
 
   const dt = report.generatedAt
     ? DateTime.fromISO(report.generatedAt).setZone(report.timezone || 'Asia/Ho_Chi_Minh')
@@ -34,6 +39,10 @@ function formatSalesReport(report) {
   msg += `<i>🕒 Cập nhật: ${timeStr}</i>\n\n`;
 
   msg += `<b>Đơn đã thanh toán:</b> ${paidOrders}\n`;
+  msg += `<b>Tổng đơn phát sinh:</b> ${summary.totalOrderCount || 0}\n`;
+  msg += `<b>Đơn dùng tại quán:</b> ${summary.dineInOrderCount || 0}\n`;
+  msg += `<b>Đơn giao tận nơi:</b> ${summary.deliveryOrderCount || 0}\n`;
+  msg += `<b>Tổng đơn bị hủy:</b> ${summary.cancelledOrderCount || 0} (tự hủy: ${summary.autoCancelledOrderCount || 0}, thủ công: ${summary.manuallyCancelledOrderCount || 0})\n`;
   msg += `<b>Món đã bán:</b> ${itemsSold}\n`;
   msg += `<b>Tạm tính:</b> ${subtotal}\n`;
   if (summary.discountAmount > 0) {
@@ -128,7 +137,8 @@ function buildMenuReplyMarkup() {
         { text: '📅 Tháng này', callback_data: 'report:month' }
       ],
       [
-        { text: '📦 Tồn kho hiện tại', callback_data: 'inventory:current' }
+        { text: '📦 Tồn kho hiện tại', callback_data: 'inventory:current' },
+        { text: '📅 Tuần này', callback_data: 'report:week' }
       ],
       [
         { text: '🔄 Làm mới Menu', callback_data: 'menu:home' }
