@@ -32,6 +32,18 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/orders/:orderId/payment/mock-complete - Test-only payment bypass
+router.post('/:orderId/payment/mock-complete', async (req, res) => {
+  try {
+    const updatedOrder = await orderService.completeMockPayment(req.params.orderId);
+    res.json({ order: updatedOrder });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message });
+    console.error('Unhandled Mock Payment Error:', err);
+    res.status(500).json({ message: 'Lỗi mock hoàn thành thanh toán' });
+  }
+});
+
 // PUT /api/orders/:orderId/payment - Update payment status (Staff/Admin)
 router.put('/:orderId/payment', requireAuth, async (req, res) => {
   try {

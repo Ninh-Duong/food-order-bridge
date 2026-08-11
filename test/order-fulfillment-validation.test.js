@@ -85,6 +85,20 @@ describe('Order Fulfillment & Phone Validation Tests', () => {
     assert.equal(saved.customer.address, '');
   });
 
+  it('Chấp nhận đơn DINE_IN không có họ tên và số điện thoại', async () => {
+    const res = await orderService.processOrder({
+      requestId: 'req-dinein-no-contact',
+      fulfillmentType: 'DINE_IN',
+      customer: { address: '', note: 'Bàn 2' },
+      items: [{ productId: 'COM_GA', quantity: 1 }]
+    });
+
+    assert.ok([201, 202].includes(res.statusCode));
+    const saved = await orderRepository.findByRequestId('req-dinein-no-contact');
+    assert.equal(saved.customer.name, '');
+    assert.equal(saved.customer.phone, '');
+  });
+
   it('Chuẩn hóa số điện thoại có dấu cách / dấu chấm / dấu gạch ngang (090 123 4567 -> 0901234567)', async () => {
     const res = await orderService.processOrder({
       requestId: 'req-phone-norm',

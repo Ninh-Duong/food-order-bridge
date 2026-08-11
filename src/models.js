@@ -38,15 +38,23 @@ const menuItemSchema = new mongoose.Schema({
 const paidBySchema = new mongoose.Schema({
   userId: { type: String, default: null },
   username: { type: String, default: null },
-  role: { type: String, enum: ['admin', 'staff'], default: null }
+  role: { type: String, enum: ['admin', 'staff', 'system'], default: null }
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   requestId: { type: String, required: true, unique: true, index: true },
   fulfillmentType: { type: String, enum: ['DELIVERY', 'DINE_IN'], default: 'DELIVERY', index: true },
-  customerName: { type: String, required: true },
-  phone: { type: String, required: true },
+  customerName: {
+    type: String,
+    default: '',
+    required: function () { return this.fulfillmentType === 'DELIVERY'; }
+  },
+  phone: {
+    type: String,
+    default: '',
+    required: function () { return this.fulfillmentType === 'DELIVERY'; }
+  },
   address: { type: String, default: '' },
   note: { type: String, default: '' },
   items: { type: Array, required: true },
@@ -63,6 +71,16 @@ const orderSchema = new mongoose.Schema({
   notificationAttempts: { type: Number, default: 0 },
   notificationError: { type: String, default: null },
   isPaid: { type: Boolean, default: false, index: true },
+  paymentMethod: { type: String, enum: ['CASH', 'BANK_QR', 'MOMO_QR'], default: 'CASH' },
+  paymentProvider: { type: String, default: 'MANUAL' },
+  paymentStatus: { type: String, enum: ['UNPAID', 'PENDING', 'PAID', 'FAILED', 'EXPIRED'], default: 'UNPAID', index: true },
+  paymentReference: { type: String, default: null },
+  paymentTransactionId: { type: String, default: null },
+  paymentAmount: { type: Number, default: 0 },
+  paymentExpiresAt: { type: Date, default: null },
+  paymentQrImageUrl: { type: String, default: null },
+  paymentLink: { type: String, default: null },
+  paymentMock: { type: Boolean, default: false },
   paidAt: { type: Date, default: null, index: true },
   paidBy: { type: paidBySchema, default: null },
   createdAt: { type: Date, default: Date.now },
