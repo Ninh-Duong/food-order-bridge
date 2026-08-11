@@ -170,6 +170,7 @@ function renderOrdersTable(orders) {
     const discount = order.discountAmount || 0;
     const safeOrderId = escapeHTML(order.id);
     const isPaid = order.isPaid === true;
+    const isCancelled = order.orderStatus === 'CANCELLED';
 
     const fulfillmentType = order.fulfillmentType || 'DELIVERY';
     const isDineIn = fulfillmentType === 'DINE_IN';
@@ -218,7 +219,10 @@ function renderOrdersTable(orders) {
       `;
     }).join('');
 
-    const paymentBtnHtml = isPaid ? `
+    const paymentBtnHtml = isCancelled ? `
+      <span class="badge" style="background: rgba(239, 68, 68, 0.12); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.25); font-weight: 700;">✕ Đã hủy</span>
+      <div style="font-size: 10px; color: var(--color-text-muted); margin-top: 4px;">${escapeHTML(order.cancelReason === 'PAYMENT_TIMEOUT' ? 'Quá hạn thanh toán' : 'Hủy thủ công')}</div>
+    ` : isPaid ? `
       <button type="button" class="btn btn-secondary btn-payment-toggle" style="min-height: 28px; padding: 2px 8px; font-size: 11px; background: rgba(16, 185, 129, 0.15); color: #059669; border-color: rgba(16, 185, 129, 0.4); font-weight: 700;" data-action="toggle-payment" data-order-id="${safeOrderId}" data-current-paid="true" title="Bấm để chuyển về Chưa thanh toán">
         ✓ Đã thanh toán
       </button>

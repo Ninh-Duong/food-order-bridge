@@ -77,6 +77,17 @@ class TelegramBotService {
       });
     }
 
+    if (cleanCmd === '/week' || cleanCmd === '/tuan') {
+      const report = await reportService.generateSalesReport('week');
+      const text = formatSalesReport(report);
+      return telegramClient.sendTelegramMessage({
+        chatId,
+        text,
+        parseMode: 'HTML',
+        replyMarkup: buildMenuReplyMarkup()
+      });
+    }
+
     if (cleanCmd === '/stock' || cleanCmd === '/inventory' || cleanCmd === '/tonkho') {
       const menuItems = await menuService.getMenu();
       const threshold = config.getLowStockThreshold();
@@ -124,6 +135,9 @@ class TelegramBotService {
       text = formatSalesReport(report);
     } else if (data === 'report:month') {
       const report = await reportService.generateSalesReport('month');
+      text = formatSalesReport(report);
+    } else if (data === 'report:week') {
+      const report = await reportService.generateSalesReport('week');
       text = formatSalesReport(report);
     } else if (data === 'inventory:current') {
       const menuItems = await menuService.getMenu();

@@ -15,6 +15,8 @@ const adminRoutes = require('./routes/admin-routes');
 const reportRoutes = require('./routes/report-routes');
 const telegramRoutes = require('./routes/telegram-routes');
 const authService = require('./services/auth-service');
+const { startOrderExpiryJob } = require('./services/order-expiry-service');
+const { startReportScheduler } = require('./services/report-scheduler');
 const { requireAuth, requireAdmin } = require('./middleware/auth');
 
 const app = express();
@@ -65,6 +67,8 @@ app.get('*', (req, res) => {
 async function startServer() {
   await connectDB();
   await authService.bootstrapAdmin();
+  startOrderExpiryJob();
+  startReportScheduler();
 
   const server = app.listen(config.PORT, () => {
     console.log(`================================================`);

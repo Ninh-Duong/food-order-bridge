@@ -41,6 +41,7 @@ async function fetchReportData(period = 'today') {
   const summaryBox = document.getElementById('report-summary-cards');
   const tableBody = document.getElementById('report-product-table-body');
   const subtitleEl = document.getElementById('report-date-range-subtitle');
+  const hourlyChart = document.getElementById('report-hourly-chart');
 
   if (summaryBox) {
     summaryBox.innerHTML = `
@@ -58,6 +59,7 @@ async function fetchReportData(period = 'today') {
       </tr>
     `;
   }
+  if (hourlyChart) hourlyChart.innerHTML = '';
 
   try {
     const data = await API.get(`/api/reports/sales?period=${period}`);
@@ -91,6 +93,7 @@ function renderReportDashboard(report) {
   const subtitleEl = document.getElementById('report-date-range-subtitle');
   const summaryBox = document.getElementById('report-summary-cards');
   const tableBody = document.getElementById('report-product-table-body');
+  const hourlyChart = document.getElementById('report-hourly-chart');
 
   if (subtitleEl && report.from && report.to) {
     const fromStr = new Date(report.from).toLocaleDateString('vi-VN');
@@ -104,6 +107,11 @@ function renderReportDashboard(report) {
   const qtySold = s.totalQuantitySold || 0;
   const discountAmt = s.discountAmount || 0;
   const revenue = s.revenue || 0;
+  const cancelledCount = s.cancelledOrderCount || 0;
+  const autoCancelledCount = s.autoCancelledOrderCount || 0;
+  const manualCancelledCount = s.manuallyCancelledOrderCount || 0;
+  const dineInCount = s.dineInOrderCount || 0;
+  const deliveryCount = s.deliveryOrderCount || 0;
 
   if (summaryBox) {
     summaryBox.innerHTML = `
@@ -123,7 +131,64 @@ function renderReportDashboard(report) {
         <div style="font-size: 12px; color: var(--color-text-muted); font-weight: 600;">Doanh thu thực tế</div>
         <div style="font-size: 24px; font-weight: 800; color: #059669; margin-top: 4px;">${formatVND(revenue)}</div>
       </div>
+      <div class="admin-card" style="padding: 16px; border-left: 4px solid #ef4444;">
+        <div style="font-size: 12px; color: var(--color-text-muted); font-weight: 600;">Tổng đơn bị hủy</div>
+        <div style="font-size: 24px; font-weight: 800; color: #dc2626; margin-top: 4px;">${cancelledCount}</div>
+        <div style="font-size: 11px; color: var(--color-text-muted); margin-top: 3px;">Tự hủy: ${autoCancelledCount} · Thủ công: ${manualCancelledCount}</div>
+      </div>
+      <div class="admin-card" style="padding: 16px; border-left: 4px solid #0ea5e9;">
+        <div style="font-size: 12px; color: var(--color-text-muted); font-weight: 600;">Đơn dùng tại quán</div>
+        <div style="font-size: 24px; font-weight: 800; color: #0284c7; margin-top: 4px;">${dineInCount}</div>
+      </div>
+      <div class="admin-card" style="padding: 16px; border-left: 4px solid #a855f7;">
+        <div style="font-size: 12px; color: var(--color-text-muted); font-weight: 600;">Đơn giao tận nơi</div>
+        <div style="font-size: 24px; font-weight: 800; color: #9333ea; margin-top: 4px;">${deliveryCount}</div>
+      </div>
     `;
+  }
+
+  if (hourlyChart) {
+    if (report.filter !== 'today') {
+      hourlyChart.style.display = 'none';
+    } else {
+      hourlyChart.style.display = 'block';
+      const buckets = Array.isArray(report.hourlyOrders) ? report.hourlyOrders : [];
+      const maxCount = Math.max(1, ...buckets.map(bucket => Number(bucket.totalOrderCount) || 0));
+      const hasOrders = buckets.some(bucket => Number(bucket.totalOrderCount) > 0);
+      hourlyChart.innerHTML = `
+        <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline; flex-wrap: wrap;">
+          <div>
+            <h3 style="font-size: 15px; font-weight: 800; margin: 0;">📈 Khung giờ có nhiều đơn nhất hôm nay</h3>
+            <div style="font-size: 12px; color: var(--color-text-muted); margin-top: 4px;">Tính theo thời điểm tạo đơn, múi giờ ${escapeHTML(report.timezone || 'Asia/Ho_Chi_Minh')}</div>
+          </div>
+          <div style="font-size: 11px; color: var(--color-text-muted);">Cột đậm: đã thanh toán · Cột đỏ: đã hủy</div>
+        </div>
+        ${hasOrders ? `
+          <div style="height: 190px; display: flex; align-items: flex-end; gap: 3px; margin-top: 20px; overflow-x: auto; padding-bottom: 24px;">
+            ${buckets.map(bucket => {
+              const total = Number(bucket.totalOrderCount) || 0;
+              const paid = Number(bucket.paidOrderCount) || 0;
+              const cancelled = Number(bucket.cancelledOrderCount) || 0;
+              const height = total > 0 ? Math.max(8, Math.round((total / maxCount) * 145)) : 2;
+              const paidHeight = total > 0 ? Math.round((paid / total) * height) : 0;
+              const cancelledHeight = total > 0 ? Math.round((cancelled / total) * height) : 0;
+              const pendingHeight = Math.max(0, height - paidHeight - cancelledHeight);
+              return `
+                <div title="${bucket.label}: ${total} đơn" style="min-width: 24px; height: 170px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px;">
+                  <span style="font-size: 10px; color: var(--color-text-muted);">${total || ''}</span>
+                  <div style="width: 18px; height: ${height}px; display: flex; flex-direction: column-reverse; border-radius: 4px 4px 0 0; overflow: hidden; background: #e2e8f0;">
+                    <span style="height: ${paidHeight}px; background: #10b981;"></span>
+                    <span style="height: ${pendingHeight}px; background: #f59e0b;"></span>
+                    <span style="height: ${cancelledHeight}px; background: #ef4444;"></span>
+                  </div>
+                  <span style="font-size: 10px; color: var(--color-text-muted); transform: rotate(-45deg); transform-origin: top center; white-space: nowrap;">${bucket.label}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        ` : '<div style="padding: 32px 8px; text-align: center; color: var(--color-text-muted);">Chưa có đơn hàng trong hôm nay.</div>'}
+      `;
+    }
   }
 
   const products = report.products || [];

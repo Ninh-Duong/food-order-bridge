@@ -2,6 +2,7 @@ const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+process.env.PAYMENT_PENDING_SCOPE = 'DINE_IN';
 const orderService = require('../src/services/order-service');
 const menuRepository = require('../src/repositories/menu-repository');
 

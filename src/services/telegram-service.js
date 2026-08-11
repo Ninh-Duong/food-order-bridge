@@ -132,11 +132,38 @@ async function notifyNewOrder(order) {
   return lastResult || { messageId: null };
 }
 
+async function notifyPaymentCapacityBlocked({ pendingCount, limit, timeoutMinutes }) {
+  const text = [
+    '⚠️ CẢNH BÁO QUÁ TẢI THANH TOÁN',
+    '',
+    `Hệ thống đang có ${pendingCount}/${limit} đơn chờ thanh toán.`,
+    'Có khách vừa cố tạo thêm đơn mới.',
+    `Các đơn chờ sẽ tự hủy sau ${timeoutMinutes} phút nếu chưa thanh toán.`,
+    'Vui lòng kiểm tra và xử lý các đơn đang chờ.'
+  ].join('\n');
+  return sendTelegramMessage(text);
+}
+
+async function notifyOrderCancelled(order) {
+  const reason = order.cancelReason === 'PAYMENT_TIMEOUT'
+    ? 'quá thời gian chờ thanh toán'
+    : 'hủy thủ công';
+  const text = [
+    `❌ ĐƠN ĐÃ HỦY #${order.id || 'N/A'}`,
+    `Lý do: ${reason}`,
+    `Tổng tiền: ${formatVND(Number(order.totalAmount) || 0)}`,
+    'Slot chờ thanh toán và tồn kho đã được giải phóng.'
+  ].join('\n');
+  return sendTelegramMessage(text);
+}
+
 module.exports = {
   formatOrderMessage: formatKitchenTicket,
   formatKitchenTicket,
   formatCustomerSection,
   formatPaymentSection,
   splitTelegramMessage,
-  notifyNewOrder
+  notifyNewOrder,
+  notifyPaymentCapacityBlocked,
+  notifyOrderCancelled
 };

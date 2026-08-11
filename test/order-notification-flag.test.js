@@ -2,6 +2,7 @@ const { describe, it, before, after, beforeEach, afterEach } = require('node:tes
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
+process.env.PAYMENT_PENDING_SCOPE = 'DINE_IN';
 
 const MENU_FILE = path.join(__dirname, '..', 'src', 'data', 'menu.json');
 const ORDERS_FILE = path.join(__dirname, '..', 'src', 'data', 'orders.json');
