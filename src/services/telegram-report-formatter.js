@@ -13,11 +13,31 @@ function formatCurrency(amount) {
   return num.toLocaleString('vi-VN') + 'đ';
 }
 
+function getHourlyPeak(report) {
+  const buckets = Array.isArray(report?.hourlyOrders) ? report.hourlyOrders : [];
+  const maxCount = buckets.reduce((max, bucket) => Math.max(max, Number(bucket.totalOrderCount) || 0), 0);
+  if (maxCount <= 0) return { maxCount: 0, buckets: [] };
+  return {
+    maxCount,
+    buckets: buckets.filter(bucket => (Number(bucket.totalOrderCount) || 0) === maxCount)
+  };
+}
+
+function formatHourlyPeak(report) {
+  const peak = getHourlyPeak(report);
+  if (peak.maxCount <= 0) return 'Chưa có đơn hàng trong ngày này.';
+  const hours = peak.buckets.map(bucket => `${bucket.label} - ${peak.maxCount} đơn`).join(', ');
+  return `Giờ cao điểm: ${hours}`;
+}
+
 function formatSalesReport(report) {
   const isToday = report.filter === 'today';
+  const isDate = report.filter === 'date';
   const isWeek = report.filter === 'week';
   const title = isToday
     ? '📊 BÁO CÁO DOANH THU HÔM NAY'
+    : isDate
+      ? `📅 BÁO CÁO DOANH THU NGÀY ${escapeHtml(report.reportDate || '')}`
     : isWeek
       ? '📅 BÁO CÁO DOANH THU TUẦN NÀY'
       : '📅 BÁO CÁO DOANH THU THÁNG NÀY';
@@ -49,6 +69,10 @@ function formatSalesReport(report) {
     msg += `<b>Giảm giá:</b> -${discount}\n`;
   }
   msg += `<b>THU NHẬP RÒNG:</b> <code>${revenue}</code>\n\n`;
+
+  if (isToday || isDate) {
+    msg += `<b>⏰ ${escapeHtml(formatHourlyPeak(report))}</b>\n\n`;
+  }
 
   const products = Array.isArray(report.products) ? report.products : [];
   if (products.length > 0) {
@@ -137,8 +161,11 @@ function buildMenuReplyMarkup() {
         { text: '📅 Tháng này', callback_data: 'report:month' }
       ],
       [
-        { text: '📦 Tồn kho hiện tại', callback_data: 'inventory:current' },
-        { text: '📅 Tuần này', callback_data: 'report:week' }
+        { text: '📅 Tuần này', callback_data: 'report:week' },
+        { text: '📅 Theo ngày', callback_data: 'report:date' }
+      ],
+      [
+        { text: '📦 Tồn kho hiện tại', callback_data: 'inventory:current' }
       ],
       [
         { text: '🔄 Làm mới Menu', callback_data: 'menu:home' }
@@ -150,6 +177,8 @@ function buildMenuReplyMarkup() {
 module.exports = {
   escapeHtml,
   formatCurrency,
+  getHourlyPeak,
+  formatHourlyPeak,
   formatSalesReport,
   formatInventoryReport,
   buildMenuReplyMarkup

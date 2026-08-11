@@ -10,12 +10,14 @@ describe('Telegram Bot Service Tests', () => {
   let originalGetAdminUserIds;
   let originalGetChatId;
   let originalSendMessage;
+  let originalSendPhoto;
   let originalAnswerCallback;
   let originalEditMessage;
   let originalGenerateReport;
   let originalGetMenu;
 
   let sentMessages = [];
+  let sentPhotos = [];
   let answeredCallbacks = [];
   let editedMessages = [];
 
@@ -23,18 +25,25 @@ describe('Telegram Bot Service Tests', () => {
     originalGetAdminUserIds = config.getTelegramAdminUserIds;
     originalGetChatId = config.getTelegramChatId;
     originalSendMessage = telegramClient.sendTelegramMessage;
+    originalSendPhoto = telegramClient.sendTelegramPhoto;
     originalAnswerCallback = telegramClient.answerCallbackQuery;
     originalEditMessage = telegramClient.editMessageText;
     originalGenerateReport = reportService.generateSalesReport;
     originalGetMenu = menuService.getMenu;
 
     sentMessages = [];
+    sentPhotos = [];
     answeredCallbacks = [];
     editedMessages = [];
 
     telegramClient.sendTelegramMessage = async (payload) => {
       sentMessages.push(payload);
       return { ok: true, messageId: 100 };
+    };
+
+    telegramClient.sendTelegramPhoto = async (payload) => {
+      sentPhotos.push(payload);
+      return { ok: true, messageId: 101 };
     };
 
     telegramClient.answerCallbackQuery = async (payload) => {
@@ -69,6 +78,7 @@ describe('Telegram Bot Service Tests', () => {
     config.getTelegramAdminUserIds = originalGetAdminUserIds;
     config.getTelegramChatId = originalGetChatId;
     telegramClient.sendTelegramMessage = originalSendMessage;
+    telegramClient.sendTelegramPhoto = originalSendPhoto;
     telegramClient.answerCallbackQuery = originalAnswerCallback;
     telegramClient.editMessageText = originalEditMessage;
     reportService.generateSalesReport = originalGenerateReport;
@@ -139,6 +149,58 @@ describe('Telegram Bot Service Tests', () => {
     assert.equal(result.handled, true);
     assert.equal(sentMessages.length, 1);
     assert.ok(sentMessages[0].text.includes('BÁO CÁO DOANH THU HÔM NAY'));
+  });
+
+  it('handleUpdate: Lệnh /ngay gửi báo cáo theo ngày và biểu đồ giờ', async () => {
+    config.getTelegramAdminUserIds = () => ['123456'];
+    reportService.generateSalesReport = async (period, referenceDate) => ({
+      filter: period,
+      reportDate: '09/08/2026',
+      referenceDate,
+      timezone: 'Asia/Ho_Chi_Minh',
+      generatedAt: '2026-08-09T12:00:00.000+07:00',
+      summary: { paidOrderCount: 2, totalQuantitySold: 3, subtotalAmount: 100000, discountAmount: 0, revenue: 100000 },
+      products: [],
+      hourlyOrders: [{ hour: 18, label: '18:00', totalOrderCount: 2 }]
+    });
+
+    await telegramBotService.handleUpdate({
+      message: {
+        chat: { id: 123456 },
+        from: { id: 123456 },
+        text: '/ngay 09/08/2026'
+      }
+    });
+
+    assert.equal(sentMessages.length, 1);
+    assert.ok(sentMessages[0].text.includes('BÁO CÁO DOANH THU NGÀY 09/08/2026'));
+    assert.equal(sentPhotos.length, 1);
+    assert.ok(sentPhotos[0].photo.includes('quickchart.io'));
+  });
+
+  it('handleUpdate: Nút theo ngày yêu cầu nhập ngày rồi xử lý tin nhắn tiếp theo', async () => {
+    config.getTelegramAdminUserIds = () => ['123456'];
+
+    await telegramBotService.handleUpdate({
+      callback_query: {
+        id: 'cb_date_1',
+        from: { id: 123456 },
+        message: { chat: { id: 123456 }, message_id: 57 },
+        data: 'report:date'
+      }
+    });
+
+    assert.ok(sentMessages[0].replyMarkup.force_reply);
+
+    await telegramBotService.handleUpdate({
+      message: {
+        chat: { id: 123456 },
+        from: { id: 123456 },
+        text: '09/08/2026'
+      }
+    });
+
+    assert.ok(sentMessages.some(message => message.text.includes('BÁO CÁO DOANH THU NGÀY')));
   });
 
   it('handleUpdate: Callback Query report:today gọi editMessageText', async () => {

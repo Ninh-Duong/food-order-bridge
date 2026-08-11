@@ -129,6 +129,28 @@ describe('ReportService Sales Aggregation Tests', () => {
     assert.deepEqual(report.products, []);
   });
 
+  it('generateSalesReport: hỗ trợ báo cáo ngày tùy chọn và bucket theo 24 giờ', async () => {
+    await orderRepository.save({
+      id: 'FO-REP-DATE-01',
+      requestId: 'req-rep-date-01',
+      createdAt: '2026-08-09T18:30:00+07:00',
+      isPaid: true,
+      paidAt: '2026-08-09T18:31:00+07:00',
+      items: [{ productId: 'COM_GA', name: 'Cơm gà', quantity: 1, unitPrice: 50000, itemTotal: 50000 }],
+      subtotalAmount: 50000,
+      discountAmount: 0,
+      totalAmount: 50000
+    });
+
+    const report = await reportService.generateSalesReport('date', new Date('2026-08-09T20:00:00+07:00'));
+
+    assert.equal(report.filter, 'date');
+    assert.equal(report.reportDate, '09/08/2026');
+    assert.equal(report.hourlyOrders.length, 24);
+    assert.equal(report.hourlyOrders[18].paidOrderCount, 1);
+    assert.equal(report.hourlyOrders[18].totalOrderCount, 1);
+  });
+
   it('Từ chối period không hợp lệ với lỗi HTTP 400', async () => {
     await assert.rejects(
       async () => {

@@ -91,14 +91,18 @@ describe('Telegram Report Formatter Tests', () => {
   it('buildMenuReplyMarkup: Cấu trúc Inline Keyboard hợp lệ', () => {
     const markup = buildMenuReplyMarkup();
     assert.ok(Array.isArray(markup.inline_keyboard));
-    assert.equal(markup.inline_keyboard.length, 3);
+    assert.equal(markup.inline_keyboard.length, 4);
     assert.equal(markup.inline_keyboard[0][0].text, '📊 Hôm nay');
     assert.equal(markup.inline_keyboard[0][0].callback_data, 'report:today');
     assert.equal(markup.inline_keyboard[0][1].text, '📅 Tháng này');
     assert.equal(markup.inline_keyboard[0][1].callback_data, 'report:month');
-    assert.equal(markup.inline_keyboard[1][0].text, '📦 Tồn kho hiện tại');
-    assert.equal(markup.inline_keyboard[1][0].callback_data, 'inventory:current');
-    assert.equal(markup.inline_keyboard[2][0].text, '🔄 Làm mới Menu');
-    assert.equal(markup.inline_keyboard[2][0].callback_data, 'menu:home');
+    assert.equal(markup.inline_keyboard[1][0].text, '📅 Tuần này');
+    assert.equal(markup.inline_keyboard[1][0].callback_data, 'report:week');
+    assert.equal(markup.inline_keyboard[1][1].text, '📅 Theo ngày');
+    assert.equal(markup.inline_keyboard[1][1].callback_data, 'report:date');
+    assert.equal(markup.inline_keyboard[2][0].text, '📦 Tồn kho hiện tại');
+    assert.equal(markup.inline_keyboard[2][0].callback_data, 'inventory:current');
+    assert.equal(markup.inline_keyboard[3][0].text, '🔄 Làm mới Menu');
+    assert.equal(markup.inline_keyboard[3][0].callback_data, 'menu:home');
   });
 });
