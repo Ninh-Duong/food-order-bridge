@@ -68,6 +68,18 @@ router.post('/:orderId/cancel', async (req, res) => {
   }
 });
 
+// POST /api/orders/:orderId/admin-cancel - Admin/Staff cancellation before payment
+router.post('/:orderId/admin-cancel', requireAuth, async (req, res) => {
+  try {
+    const order = await orderService.adminCancelOrder(req.params.orderId, req.user);
+    res.json({ order });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
+    console.error('Unhandled Admin Order Cancel Error:', err);
+    res.status(500).json({ message: 'Lỗi máy chủ khi hủy đơn hàng' });
+  }
+});
+
 // POST /api/orders/:orderId/retry - Create a new DINE_IN order from a cancelled order
 router.post('/:orderId/retry', async (req, res) => {
   try {

@@ -97,6 +97,21 @@ describe('Payment capacity, auto-cancel and retry flow', () => {
     assert.equal((await orderService.getPaymentCapacityStatus()).pendingCount, 0);
   });
 
+  it('admin có thể hủy đơn chưa thanh toán và ghi nhận người thao tác', async () => {
+    await orderRepository.save(buildPendingOrder('FO-ADMIN-CANCEL-01'));
+
+    const cancelled = await orderService.adminCancelOrder('FO-ADMIN-CANCEL-01', {
+      sub: 'admin-1',
+      username: 'admin',
+      role: 'admin'
+    });
+
+    assert.equal(cancelled.orderStatus, 'CANCELLED');
+    assert.equal(cancelled.paymentStatus, 'CANCELLED');
+    assert.equal(cancelled.cancelReason, 'ADMIN_CANCEL');
+    assert.equal(cancelled.cancelledBy.username, 'admin');
+  });
+
   it('retry tạo payload DINE_IN mới và giữ liên kết với đơn cũ', async () => {
     await orderRepository.save(buildPendingOrder('FO-RETRY-OLD', {
       orderStatus: 'CANCELLED',

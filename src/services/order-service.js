@@ -836,6 +836,15 @@ class OrderService {
     }));
   }
 
+  async adminCancelOrder(orderId, actor) {
+    return await runWithLock(() => this.cancelOrderInternal(orderId, {
+      skipToken: true,
+      actor: actor || { userId: null, username: 'admin', role: 'admin' },
+      reason: 'ADMIN_CANCEL',
+      paymentStatus: 'CANCELLED'
+    }));
+  }
+
   async retryOrder(orderId, actionToken, paymentMethod = null) {
     const order = await orderRepository.findById(orderId);
     if (!order) throw { status: 404, message: 'Không tìm thấy đơn hàng' };
