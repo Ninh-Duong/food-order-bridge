@@ -45,12 +45,13 @@
       </div>
     </div>
     <div class="container">
-      <div class="admin-nav-tabs">
-        <button class="admin-tab-btn active" data-target="tab-items">🍔 Quản lý Món ăn</button>
-        <button class="admin-tab-btn" data-target="tab-categories">🗂 Quản lý Danh mục</button>
-        <button class="admin-tab-btn" data-target="tab-orders">📋 Lịch sử Đơn hàng</button>
-        <button class="admin-tab-btn admin-only" data-target="tab-reports">📊 Báo cáo bán hàng</button>
-        <button class="admin-tab-btn admin-only" data-target="tab-accounts">👥 Tài khoản nhân viên</button>
+      <div class="admin-nav-tabs" role="tablist" aria-label="Điều hướng quản trị">
+        <button class="admin-tab-btn active" role="tab" id="tab-btn-orders" aria-selected="true" aria-controls="tab-orders" data-target="tab-orders">📋 Lịch sử Đơn hàng</button>
+        <button class="admin-tab-btn" role="tab" id="tab-btn-items" aria-selected="false" aria-controls="tab-items" data-target="tab-items">🍔 Quản lý Món ăn</button>
+        <button class="admin-tab-btn" role="tab" id="tab-btn-categories" aria-selected="false" aria-controls="tab-categories" data-target="tab-categories">🗂 Quản lý Danh mục</button>
+        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-reports" aria-selected="false" aria-controls="tab-reports" data-target="tab-reports">📊 Báo cáo bán hàng</button>
+        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-accounts" aria-selected="false" aria-controls="tab-accounts" data-target="tab-accounts">👥 Tài khoản nhân viên</button>
+        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-telegram" aria-selected="false" aria-controls="tab-telegram" data-target="tab-telegram">🤖 Cấu hình Telegram</button>
       </div>
     </div>
   </header>
@@ -137,8 +138,8 @@
     <!-- TAB 3: ORDERS HISTORY MONITOR -->
     <section id="tab-orders" class="admin-tab-content" style="display: none;">
       <div class="admin-card">
-        <div class="admin-card-header">
-          <h2 style="font-size: var(--font-size-lg); font-weight: 800;">Lịch sử đơn hàng ghi nhận</h2>
+        <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; align-items: center;">
+          <h2 style="font-size: var(--font-size-lg); font-weight: 800; margin: 0;">Lịch sử đơn hàng ghi nhận</h2>
           <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
             <label for="orders-page-size" style="font-size: var(--font-size-xs); color: var(--color-text-muted);">Hiển thị:</label>
             <select id="orders-page-size" class="form-control" style="width: auto; padding: 4px 8px; font-size: var(--font-size-xs); font-weight: 600;">
@@ -148,6 +149,42 @@
             </select>
             <button class="btn btn-secondary" id="btn-refresh-orders">🔄 Tải lại</button>
           </div>
+        </div>
+
+        <!-- Orders Quick Summary Cards -->
+        <div id="orders-summary-cards" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 16px;">
+          <div class="admin-card" style="padding: 12px 16px; border-left: 4px solid var(--color-primary);">
+            <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">Tổng đơn trang này</div>
+            <div id="summary-total-count" style="font-size: 20px; font-weight: 800; color: var(--color-text-main); margin-top: 2px;">0</div>
+          </div>
+          <div class="admin-card" style="padding: 12px 16px; border-left: 4px solid #f59e0b;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">Đơn chờ thanh toán</div>
+            <div id="summary-pending-count" style="font-size: 20px; font-weight: 800; color: #b45309; margin-top: 2px;">0</div>
+          </div>
+          <div class="admin-card" style="padding: 12px 16px; border-left: 4px solid #10b981;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">Đã thanh toán</div>
+            <div id="summary-paid-count" style="font-size: 20px; font-weight: 800; color: #047857; margin-top: 2px;">0</div>
+          </div>
+          <div class="admin-card" style="padding: 12px 16px; border-left: 4px solid #ef4444;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--color-text-muted);">Đơn đã hủy</div>
+            <div id="summary-cancelled-count" style="font-size: 20px; font-weight: 800; color: #b91c1c; margin-top: 2px;">0</div>
+          </div>
+        </div>
+
+        <!-- Orders Search & Filter Bar -->
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+          <input type="search" id="search-orders-input" class="form-control" placeholder="🔍 Tìm theo Mã đơn, Tên khách, SĐT..." style="flex: 1; min-width: 220px; font-size: 13px;" />
+          <select id="filter-orders-status" class="form-control" style="width: auto; font-size: 13px;">
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="PAID">Đã thanh toán</option>
+            <option value="PENDING">Chờ thanh toán</option>
+            <option value="CANCELLED">Đã hủy</option>
+          </select>
+          <select id="filter-orders-fulfillment" class="form-control" style="width: auto; font-size: 13px;">
+            <option value="ALL">Tất cả hình thức</option>
+            <option value="DELIVERY">🛵 Giao tận nơi</option>
+            <option value="DINE_IN">🍽️ Dùng tại quán</option>
+          </select>
         </div>
         <div class="table-responsive">
           <table class="admin-table">
@@ -232,6 +269,32 @@
       </div>
     </section>
 
+    <!-- TAB 5: TELEGRAM BOT SETTINGS (Admin Only) -->
+    <section id="tab-telegram" class="admin-tab-content admin-only" role="tabpanel" tabindex="0" style="display: none;">
+      <div class="admin-card" style="max-width: 650px; margin: 0 auto;">
+        <div class="admin-card-header">
+          <h2 style="font-size: var(--font-size-lg); font-weight: 800;">🤖 Cấu hình kết nối Telegram Bot</h2>
+        </div>
+        <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-bottom: 16px;">
+          Cấu hình Bot Token và Chat ID để nhận thông báo đơn hàng tức thì qua Telegram Group / Channel.
+        </p>
+        <form id="telegram-settings-form">
+          <div class="form-group">
+            <label class="form-label" for="telegram-token-input">Telegram Bot Token *</label>
+            <input type="password" id="telegram-token-input" class="form-control" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="telegram-chat-id-input">Telegram Chat ID / Group ID *</label>
+            <input type="text" id="telegram-chat-id-input" class="form-control" placeholder="-1001234567890 hoặc @my_channel" autocomplete="off" />
+          </div>
+          <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
+            <button type="submit" class="btn btn-primary">💾 Lưu cấu hình Telegram</button>
+            <button type="button" class="btn btn-secondary" id="btn-test-telegram">Gửi tin nhắn thử (Test Telegram)</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
   </main>
 
   <!-- Item Edit Modal Overlay -->
@@ -265,25 +328,29 @@
     import { initCategoryManager } from './js/admin/category-manager.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
     import { initReportDashboard, refreshReportDashboard } from './js/admin/report-dashboard.js';
+    import { initTelegramSettings } from './js/admin/telegram-settings.js';
     import { initAuth } from './js/admin/auth.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
       const user = await initAuth();
       if (!user) return;
-      // Tab Navigation
+      
+      // Tab Navigation with ARIA State Management
       const tabs = document.querySelectorAll('.admin-tab-btn');
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-          tabs.forEach(t => t.classList.remove('active'));
+          tabs.forEach(t => {
+            t.classList.remove('active');
+            t.setAttribute('aria-selected', 'false');
+          });
           tab.classList.add('active');
+          tab.setAttribute('aria-selected', 'true');
 
           const target = tab.dataset.target;
           document.querySelectorAll('.admin-tab-content').forEach(content => {
             content.style.display = content.id === target ? 'block' : 'none';
           });
 
-          // Báo cáo có thể đã cũ sau khi trạng thái thanh toán thay đổi.
-          // Luôn lấy dữ liệu mới nhất mỗi lần quản trị viên mở tab báo cáo.
           if (target === 'tab-reports') {
             refreshReportDashboard();
           }
@@ -296,6 +363,7 @@
 
       if (user.role === 'admin') {
         initReportDashboard();
+        initTelegramSettings();
       }
     });
   </script>

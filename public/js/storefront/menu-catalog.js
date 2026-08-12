@@ -3,6 +3,7 @@
  */
 import { API } from '../common/api.js';
 import { formatVND, buildAltText, showToast, escapeHTML } from '../common/utils.js';
+import { renderSkeletonGrid, renderInlineError, renderEmptyState, FALLBACK_FOOD_IMAGE } from '../common/ui-state.js';
 import { cart } from './cart.js';
 import { openQuickView } from './quick-view-drawer.js';
 
@@ -20,7 +21,8 @@ export async function loadMenuCatalog() {
   const catalogContainer = document.getElementById('catalog-container');
   if (!catalogContainer) return;
 
-  renderSkeleton(catalogContainer);
+  catalogContainer.setAttribute('aria-busy', 'true');
+  renderSkeletonGrid(catalogContainer, 6);
 
   try {
     const [menuRes, catRes] = await Promise.all([
@@ -32,8 +34,6 @@ export async function loadMenuCatalog() {
     categoriesList = rawCategories.filter(c => c.active !== false);
 
     const rawItems = menuRes.items || [];
-    // Display items whose category is active (or legacy fallback)
-    // Note: Out-of-stock items (stockQuantity === 0) remain visible so customers see full menu!
     menuItems = rawItems.filter(item => {
       if (item.active === false) return false;
 
@@ -48,14 +48,13 @@ export async function loadMenuCatalog() {
       return true;
     });
 
-    // Reconcile cart in case items changed or became out of stock
     cart.reconcileWithMenu(menuItems);
 
+    catalogContainer.removeAttribute('aria-busy');
     renderCategories();
     renderGrid(menuItems);
     setupSearchFilter();
 
-    // Subscribe cart changes to update action buttons dynamically
     cart.subscribe(() => {
       menuItems.forEach(item => {
         const actionBox = document.getElementById(`action-box-${item.id}`);
@@ -67,25 +66,14 @@ export async function loadMenuCatalog() {
     });
 
   } catch (error) {
+    catalogContainer.removeAttribute('aria-busy');
     showToast('Không thể tải menu. Vui lòng thử lại sau.', 'error');
-    catalogContainer.innerHTML = `<p style="text-align: center; color: var(--color-accent-spicy); padding: var(--space-8);">Lỗi tải dữ liệu thực đơn.</p>`;
+    renderInlineError(
+      catalogContainer,
+      'Không thể tải dữ liệu thực đơn. Vui lòng kiểm tra kết nối mạng và thử lại.',
+      loadMenuCatalog
+    );
   }
-}
-
-function renderSkeleton(container) {
-  let skeletonsHtml = `<div class="food-grid">`;
-  for (let i = 0; i < 6; i++) {
-    skeletonsHtml += `
-      <div class="skeleton-card">
-        <div class="skeleton skeleton-img"></div>
-        <div class="skeleton skeleton-title"></div>
-        <div class="skeleton skeleton-text"></div>
-        <div class="skeleton skeleton-price"></div>
-      </div>
-    `;
-  }
-  skeletonsHtml += `</div>`;
-  container.innerHTML = skeletonsHtml;
 }
 
 function getActiveCategoriesWithItems(items) {
@@ -112,7 +100,6 @@ function getActiveCategoriesWithItems(items) {
       uncategorizedItems.push(item);
     }
   });
-
 
   const result = Array.from(catMap.values()).filter(c => c.items.length > 0);
 
@@ -166,7 +153,28 @@ function renderGrid(items) {
   if (!catalogContainer) return;
 
   if (items.length === 0) {
-    catalogContainer.innerHTML = `<div style="text-align: center; padding: var(--space-8); color: var(--color-text-muted);">Không tìm thấy món ăn phù hợp.</div>`;
+    const searchInput = document.getElementById('search-food-input');
+    const query = searchInput ? searchInput.value.trim() : '';
+
+    if (query) {
+      renderEmptyState(catalogContainer, {
+        icon: '🔍',
+        title: 'Không tìm thấy món ăn',
+        description: `Không có món nào phù hợp với từ khóa "${escapeHTML(query)}"`,
+        actionText: '❌ Xóa tìm kiếm',
+        onAction: () => {
+          if (searchInput) searchInput.value = '';
+          renderGrid(menuItems);
+        }
+      });
+    } else {
+      renderEmptyState(catalogContainer, {
+        icon: '🍲',
+        title: 'Chưa có món ăn',
+        description: 'Hiện chưa có món ăn nào trong danh mục này.'
+      });
+    }
+
     if (activeScrollspyObserver) {
       activeScrollspyObserver.disconnect();
       activeScrollspyObserver = null;
@@ -214,7 +222,6 @@ function createCardHtml(item) {
   const stock = item.stockQuantity ?? 0;
   const isOutOfStock = stock <= 0;
 
-  // Stock indicator text
   let stockText = '';
   let stockStyle = '';
   if (isOutOfStock) {
@@ -228,7 +235,6 @@ function createCardHtml(item) {
     stockStyle = 'color: var(--color-text-muted); font-size: 11px;';
   }
 
-  // Customization options hint tag
   const activeOpts = Array.isArray(item.customizationOptions) ? item.customizationOptions.filter(o => o.active !== false) : [];
   let customHintHtml = '';
   if (activeOpts.length > 0) {
@@ -242,13 +248,16 @@ function createCardHtml(item) {
     `;
   }
 
+  const imageUrl = item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80';
+
   return `
     <article class="food-card ${isOutOfStock ? 'out-of-stock' : ''}" data-item-id="${escapeHTML(item.id)}">
       <div class="food-card-img-wrapper" onclick="window.triggerQuickView('${escapeHTML(item.id)}')">
-        <img src="${item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80'}" 
+        <img src="${imageUrl}" 
              alt="${altText}" 
              class="food-card-img" 
-             loading="lazy" />
+             loading="lazy" 
+             onerror="this.onerror=null;this.src='${FALLBACK_FOOD_IMAGE}';" />
         
         <div class="food-card-badges">
           ${hasDiscount ? `<span class="badge badge-discount">-${discountPercent}%</span>` : ''}
@@ -293,6 +302,7 @@ function createCardHtml(item) {
 
 function renderActionBtn(item, qty) {
   const safeId = escapeHTML(item.id);
+  const safeName = escapeHTML(item.name);
   const stock = item.stockQuantity ?? 0;
 
   if (stock <= 0) {
@@ -318,7 +328,7 @@ function renderActionBtn(item, qty) {
   }
 
   return `
-    <button class="btn-quick-add" onclick="window.handleCartChange('${safeId}', 1)" aria-label="Thêm món ${escapeHTML(item.name)}">
+    <button class="btn-quick-add" onclick="window.handleCartChange('${safeId}', 1)" aria-label="Thêm món ${safeName}" title="Thêm ${safeName} vào giỏ hàng">
       +
     </button>
   `;

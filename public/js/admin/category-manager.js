@@ -3,6 +3,7 @@
  */
 import { API } from '../common/api.js';
 import { showToast, escapeHTML } from '../common/utils.js';
+import { renderSkeletonTable } from '../common/ui-state.js';
 
 let adminCategories = [];
 
@@ -18,6 +19,8 @@ export async function initCategoryManager() {
 export async function fetchCategories() {
   const tableBody = document.getElementById('admin-category-table-body');
   if (!tableBody) return [];
+
+  renderSkeletonTable(tableBody, 4, 6);
 
   try {
     const data = await API.get('/api/categories');

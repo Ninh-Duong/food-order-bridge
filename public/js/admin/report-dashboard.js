@@ -18,12 +18,14 @@ export function refreshReportDashboard() {
   return fetchReportData(currentPeriod);
 }
 
+let activeFetchToken = 0;
+
 function bindPeriodEvents() {
   const periodBtns = document.querySelectorAll('.report-period-btn');
   periodBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       const period = btn.dataset.period;
-      if (!period || period === currentPeriod) return;
+      if (!period || period === currentPeriod || btn.disabled) return;
 
       periodBtns.forEach(b => b.classList.remove('active', 'btn-primary'));
       periodBtns.forEach(b => b.classList.add('btn-secondary'));
@@ -42,6 +44,11 @@ async function fetchReportData(period = 'today') {
   const tableBody = document.getElementById('report-product-table-body');
   const subtitleEl = document.getElementById('report-date-range-subtitle');
   const hourlyChart = document.getElementById('report-hourly-chart');
+  const periodBtns = document.querySelectorAll('.report-period-btn');
+
+  const requestToken = ++activeFetchToken;
+
+  periodBtns.forEach(b => b.disabled = true);
 
   if (summaryBox) {
     summaryBox.innerHTML = `
@@ -63,8 +70,10 @@ async function fetchReportData(period = 'today') {
 
   try {
     const data = await API.get(`/api/reports/sales?period=${period}`);
+    if (requestToken !== activeFetchToken) return; // Prevent race condition if a newer request was dispatched
     renderReportDashboard(data);
   } catch (error) {
+    if (requestToken !== activeFetchToken) return;
     console.error('[Report Dashboard Error]:', error);
     if (error.status === 403) {
       showToast('Bạn không có quyền truy cập báo cáo', 'error');
@@ -78,6 +87,14 @@ async function fetchReportData(period = 'today') {
           ❌ Không thể tải báo cáo. <button class="btn btn-secondary" id="btn-retry-report" style="margin-left: 8px; font-size: 12px;">Thử lại</button>
         </div>
       `;
+      document.getElementById('btn-retry-report')?.addEventListener('click', () => fetchReportData(currentPeriod));
+    }
+  } finally {
+    if (requestToken === activeFetchToken) {
+      periodBtns.forEach(b => b.disabled = false);
+    }
+  }
+}
       const retryBtn = document.getElementById('btn-retry-report');
       if (retryBtn) {
         retryBtn.addEventListener('click', () => fetchReportData(currentPeriod));

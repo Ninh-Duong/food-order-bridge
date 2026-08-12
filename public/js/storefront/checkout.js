@@ -5,6 +5,7 @@
  */
 import { API } from '../common/api.js';
 import { formatVND, showToast, escapeHTML } from '../common/utils.js';
+import { setButtonLoading, restoreButton } from '../common/ui-state.js';
 import { cart } from './cart.js';
 import { closeDrawer } from './quick-view-drawer.js';
 
@@ -96,6 +97,7 @@ export function setupCheckoutModal() {
 async function openCheckoutDrawer() {
   const modalOverlay = document.getElementById('modal-overlay');
   const drawerContent = document.getElementById('drawer-content');
+  const checkoutBtn = document.getElementById('btn-open-checkout');
 
   if (!modalOverlay || !drawerContent) return;
 
@@ -104,32 +106,48 @@ async function openCheckoutDrawer() {
     return;
   }
 
-  // Revalidate menu before opening checkout
-  try {
-    const menuRes = await API.get('/api/menu');
-    const latestItems = menuRes.items || [];
-    cart.reconcileWithMenu(latestItems);
-  } catch (err) {
-    console.warn('Revalidation fetch failed:', err.message);
-  }
-
-  const count = cart.getTotalCount();
-  if (count === 0) {
-    showToast('Tất cả món trong giỏ hàng hiện đã hết hàng hoặc ngưng bán.', 'error');
-    return;
-  }
-
-  const capacity = await API.get('/api/orders/payment-capacity').catch(err => {
-    console.warn('[Payment Capacity Check]', err.message);
-    return null;
-  });
-  if (capacity?.blocked) {
-    showPaymentCapacityWarning(capacity);
-    return;
-  }
-
-  renderCheckoutContent();
+  // 1. Mở drawer ngay lập tức với trạng thái Skeleton Loading & disable nút mở
+  if (checkoutBtn) setButtonLoading(checkoutBtn, 'Đang mở...');
+  
+  drawerContent.innerHTML = `
+    <div class="drawer-drag-handle"></div>
+    <div style="padding: var(--space-6) var(--space-4); text-align: center;">
+      <div class="spinner-sm" style="width: 32px; height: 32px; color: var(--color-primary); margin: 0 auto 12px auto; display: block;"></div>
+      <p style="font-size: 14px; font-weight: 600; color: var(--color-text-muted);">Đang kiểm tra giỏ hàng và tồn kho...</p>
+    </div>
+  `;
   modalOverlay.classList.add('active');
+
+  try {
+    // 2. Revalidate thực đơn & kiểm tra payment capacity trong background
+    const [menuRes, capacity] = await Promise.all([
+      API.get('/api/menu').catch(err => { console.warn('Revalidation fetch failed:', err.message); return null; }),
+      API.get('/api/orders/payment-capacity').catch(err => { console.warn('[Payment Capacity Check]', err.message); return null; })
+    ]);
+
+    if (menuRes && menuRes.items) {
+      cart.reconcileWithMenu(menuRes.items);
+    }
+
+    if (checkoutBtn) restoreButton(checkoutBtn);
+
+    const count = cart.getTotalCount();
+    if (count === 0) {
+      showToast('Tất cả món trong giỏ hàng hiện đã hết hàng hoặc ngưng bán.', 'error');
+      closeDrawer();
+      return;
+    }
+
+    if (capacity?.blocked) {
+      showPaymentCapacityWarning(capacity);
+      return;
+    }
+
+    renderCheckoutContent();
+  } catch (err) {
+    if (checkoutBtn) restoreButton(checkoutBtn);
+    renderCheckoutContent();
+  }
 }
 
 async function checkPaymentCapacity(showWarning = true) {
@@ -898,10 +916,23 @@ function showOrderSuccessModal(orderData, fulfillmentType = 'DELIVERY', delivery
         </div>
       </div>
 
+      <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+        <button class="btn btn-outline" id="btn-copy-order-code" style="flex: 1; font-size: 13px;">📋 Sao chép mã đơn</button>
+      </div>
+
       ${isUnpaid ? `<button class="btn btn-outline" id="btn-cancel-unpaid-order" style="width: 100%; margin-bottom: 12px; color: #dc2626; border-color: #fca5a5;">Hủy đơn</button>` : ''}
-      <button class="btn btn-primary" style="width: 100%;" onclick="closeDrawer()">Hoàn tất</button>
+      <button class="btn btn-primary" style="width: 100%;" onclick="closeDrawer()">🍲 Tiếp tục chọn món</button>
     </div>
   `;
+
+  document.getElementById('btn-copy-order-code')?.addEventListener('click', () => {
+    const code = orderData.orderId || 'FO-ORDER';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(() => showToast('Đã sao chép mã đơn hàng!', 'success'));
+    } else {
+      showToast(`Mã đơn: ${code}`, 'info');
+    }
+  });
 
   document.getElementById('btn-cancel-unpaid-order')?.addEventListener('click', async () => {
     if (!actionToken) return showToast('Không tìm thấy quyền thao tác đơn hàng.', 'error');
