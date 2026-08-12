@@ -95,16 +95,6 @@ async function fetchReportData(period = 'today') {
     }
   }
 }
-      const retryBtn = document.getElementById('btn-retry-report');
-      if (retryBtn) {
-        retryBtn.addEventListener('click', () => fetchReportData(currentPeriod));
-      }
-    }
-    if (tableBody) {
-      tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-text-muted);">Lỗi dữ liệu.</td></tr>`;
-    }
-  }
-}
 
 function renderReportDashboard(report) {
   const subtitleEl = document.getElementById('report-date-range-subtitle');
