@@ -1,37 +1,40 @@
 [
   {
-    "id": "FO-REP-03",
-    "requestId": "req-rep-03",
+    "id": "FO-REP-DATE-01",
+    "requestId": "req-rep-date-01",
+    "createdAt": "2026-08-09T18:30:00+07:00",
     "isPaid": true,
-    "paidAt": "2026-08-09T12:00:00+07:00",
+    "paidAt": "2026-08-09T18:31:00+07:00",
     "items": [
       {
         "productId": "COM_GA",
-        "name": "Cơm Gà Sốt Xối Mỡ",
-        "quantity": 2,
-        "originalUnitPrice": 60000,
-        "unitPrice": 50000,
-        "discountPercent": 16.67,
-        "itemSubtotalBeforeDiscount": 120000,
-        "discountAmount": 20000,
-        "itemTotal": 100000
-      },
-      {
-        "productId": "TRA_DAO",
-        "name": "Trà Đào Cam Sả",
+        "name": "Cơm gà",
         "quantity": 1,
-        "originalUnitPrice": 30000,
-        "unitPrice": 30000,
-        "discountPercent": 0,
-        "itemSubtotalBeforeDiscount": 30000,
-        "discountAmount": 0,
-        "itemTotal": 30000
+        "unitPrice": 50000,
+        "itemTotal": 50000
       }
     ],
-    "subtotalAmount": 150000,
-    "discountAmount": 20000,
-    "totalAmount": 130000,
+    "subtotalAmount": 50000,
+    "discountAmount": 0,
+    "totalAmount": 50000,
     "fulfillmentType": "DELIVERY",
+    "paymentMethod": "CASH",
+    "paymentProvider": "MANUAL",
+    "paymentStatus": "PAID",
+    "paymentReference": null,
+    "paymentTransactionId": null,
+    "paymentAmount": 50000,
+    "paymentExpiresAt": null,
+    "paymentQrImageUrl": null,
+    "paymentLink": null,
+    "paymentMock": false,
+    "orderStatus": "CONFIRMED",
+    "cancelReason": null,
+    "cancelledAt": null,
+    "cancelledBy": null,
+    "retryOfOrderId": null,
+    "unpaidSlotReleased": false,
+    "orderActionTokenHash": null,
     "paidBy": null
   }
 ]

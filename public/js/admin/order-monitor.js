@@ -3,6 +3,7 @@
  */
 import { API } from '../common/api.js';
 import { formatVND, showToast, escapeHTML } from '../common/utils.js';
+import { setButtonLoading, restoreButton, renderSkeletonTable } from '../common/ui-state.js';
 import { renderInvoiceHTML } from './invoice-renderer.js';
 
 let adminOrdersList = [];
@@ -66,6 +67,42 @@ export async function initOrderMonitor() {
     });
   }
 
+  const searchInput = document.getElementById('search-orders-input');
+  const filterStatus = document.getElementById('filter-orders-status');
+  const filterFulfillment = document.getElementById('filter-orders-fulfillment');
+
+  const applyFilters = () => {
+    const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
+    const status = filterStatus ? filterStatus.value : 'ALL';
+    const fulfillment = filterFulfillment ? filterFulfillment.value : 'ALL';
+
+    const filtered = adminOrdersList.filter(order => {
+      // Status filter
+      if (status === 'PAID' && !(order.isPaid || order.payment?.paymentStatus === 'PAID')) return false;
+      if (status === 'PENDING' && (order.isPaid || order.payment?.paymentStatus === 'PAID' || order.orderStatus === 'CANCELLED')) return false;
+      if (status === 'CANCELLED' && order.orderStatus !== 'CANCELLED') return false;
+
+      // Fulfillment filter
+      if (fulfillment !== 'ALL' && (order.fulfillmentType || 'DELIVERY') !== fulfillment) return false;
+
+      // Search query filter
+      if (query) {
+        const orderId = String(order.id || order.orderId || '').toLowerCase();
+        const custName = String(order.customer?.name || '').toLowerCase();
+        const custPhone = String(order.customer?.phone || '').toLowerCase();
+        return orderId.includes(query) || custName.includes(query) || custPhone.includes(query);
+      }
+
+      return true;
+    });
+
+    renderOrdersTable(filtered);
+  };
+
+  if (searchInput) searchInput.addEventListener('input', applyFilters);
+  if (filterStatus) filterStatus.addEventListener('change', applyFilters);
+  if (filterFulfillment) filterFulfillment.addEventListener('change', applyFilters);
+
   bindOrderTableEvents();
   bindInvoicePreviewEvents();
   bindAfterPrintEvent();
@@ -73,7 +110,11 @@ export async function initOrderMonitor() {
 
 async function fetchOrders(page = currentPage, limit = pageSize) {
   const tableBody = document.getElementById('admin-orders-table-body');
+  const refreshBtn = document.getElementById('btn-refresh-orders');
   if (!tableBody) return;
+
+  if (refreshBtn) setButtonLoading(refreshBtn, 'Đang tải...');
+  renderSkeletonTable(tableBody, limit, 8);
 
   try {
     const data = await API.get(`/api/orders?page=${page}&limit=${limit}`);
@@ -87,6 +128,8 @@ async function fetchOrders(page = currentPage, limit = pageSize) {
     renderPaginationControls();
   } catch (error) {
     showToast('Lỗi tải danh sách đơn hàng', 'error');
+  } finally {
+    if (refreshBtn) restoreButton(refreshBtn);
   }
 }
 
@@ -161,8 +204,18 @@ function renderOrdersTable(orders) {
   const tableBody = document.getElementById('admin-orders-table-body');
   if (!tableBody) return;
 
+  const totalCountEl = document.getElementById('summary-total-count');
+  const pendingCountEl = document.getElementById('summary-pending-count');
+  const paidCountEl = document.getElementById('summary-paid-count');
+  const cancelledCountEl = document.getElementById('summary-cancelled-count');
+
+  if (totalCountEl) totalCountEl.textContent = adminOrdersList.length;
+  if (pendingCountEl) pendingCountEl.textContent = adminOrdersList.filter(o => !o.isPaid && o.payment?.paymentStatus !== 'PAID' && o.orderStatus !== 'CANCELLED').length;
+  if (paidCountEl) paidCountEl.textContent = adminOrdersList.filter(o => o.isPaid || o.payment?.paymentStatus === 'PAID').length;
+  if (cancelledCountEl) cancelledCountEl.textContent = adminOrdersList.filter(o => o.orderStatus === 'CANCELLED').length;
+
   if (orders.length === 0) {
-    tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">Chưa có đơn hàng nào được ghi nhận.</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--color-text-muted);">Chưa có đơn hàng nào khớp với bộ lọc.</td></tr>`;
     return;
   }
 

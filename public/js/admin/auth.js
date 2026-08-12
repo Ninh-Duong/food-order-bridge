@@ -1,4 +1,5 @@
 import { API } from '../common/api.js';
+import { setButtonLoading, restoreButton } from '../common/ui-state.js';
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -31,7 +32,9 @@ function bindAuthenticatedActions(user) {
   loadStaff().catch(console.error);
   $('#staff-form').addEventListener('submit', async (event) => {
     event.preventDefault();
+    const submitBtn = event.target.querySelector('button[type="submit"]');
     const message = $('#staff-message');
+    if (submitBtn) setButtonLoading(submitBtn, 'Đang tạo...');
     try {
       await API.post('/api/auth/staff', { username: $('#staff-username').value, password: $('#staff-password').value });
       event.target.reset();
@@ -39,6 +42,8 @@ function bindAuthenticatedActions(user) {
       await loadStaff();
     } catch (error) {
       message.textContent = error.message;
+    } finally {
+      if (submitBtn) restoreButton(submitBtn);
     }
   });
 }
@@ -55,13 +60,16 @@ export async function initAuth() {
 
   $('#login-form').addEventListener('submit', async (event) => {
     event.preventDefault();
+    const submitBtn = event.target.querySelector('button[type="submit"]');
     const errorBox = $('#login-error');
     errorBox.textContent = '';
+    if (submitBtn) setButtonLoading(submitBtn, 'Đang đăng nhập...');
     try {
       await API.post('/api/auth/login', { username: $('#login-username').value, password: $('#login-password').value });
       window.location.reload();
     } catch (error) {
       errorBox.textContent = error.message;
+      if (submitBtn) restoreButton(submitBtn);
     }
   });
   return null;

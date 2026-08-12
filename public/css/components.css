@@ -355,3 +355,99 @@
   color: #ffffff;
 }
 
+/* Spinner Loading Component */
+.spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-rotate 0.75s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes spinner-rotate {
+  to { transform: rotate(360deg); }
+}
+
+/* Button Loading & Disabled States */
+.btn:disabled, .btn[aria-busy="true"] {
+  opacity: 0.65;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Inline Error Banner */
+.inline-error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius-md);
+  color: #991b1b;
+  margin: var(--space-3) 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.inline-error-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.inline-error-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Empty State Panel */
+.empty-state-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--space-8) var(--space-4);
+  background-color: var(--color-bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--color-border);
+  margin: var(--space-4) 0;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: var(--space-2);
+}
+
+.empty-state-title {
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  color: var(--color-text-main);
+  margin: 0;
+}
+
+.empty-state-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* Keyboard Focus Ring (A11y) */
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible) {
+  outline: none;
+}
+
+

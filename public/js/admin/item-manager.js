@@ -3,6 +3,7 @@
  */
 import { API } from '../common/api.js';
 import { formatVND, showToast, escapeHTML } from '../common/utils.js';
+import { renderSkeletonTable } from '../common/ui-state.js';
 
 let adminMenuItems = [];
 let availableCategories = [];
@@ -78,6 +79,8 @@ async function fetchCategories() {
 async function fetchAdminMenu() {
   const tableBody = document.getElementById('admin-menu-table-body');
   if (!tableBody) return;
+
+  renderSkeletonTable(tableBody, 5, 7);
 
   try {
     const data = await API.get('/api/menu');

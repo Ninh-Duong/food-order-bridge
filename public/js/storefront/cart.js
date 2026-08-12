@@ -260,8 +260,12 @@ cart.subscribe((cartState) => {
   if (floatingBar) {
     if (count > 0) {
       floatingBar.classList.add('active');
+      floatingBar.removeAttribute('hidden');
+      floatingBar.removeAttribute('inert');
     } else {
       floatingBar.classList.remove('active');
+      floatingBar.setAttribute('hidden', '');
+      floatingBar.setAttribute('inert', '');
     }
   }
 });

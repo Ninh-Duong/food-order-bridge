@@ -2,6 +2,7 @@
  * Food Order Bridge - Bottom Sheet Drawer for Quick View & Customization Options
  */
 import { formatVND, buildAltText, escapeHTML, showToast } from '../common/utils.js';
+import { openAccessibleModal, closeAccessibleModal } from '../common/modal-helper.js';
 import { cart } from './cart.js';
 
 function calculateSalePriceClient(price, discountPercent = 0) {
@@ -28,7 +29,7 @@ export function setupQuickViewDrawer() {
 export function closeDrawer() {
   const modalOverlay = document.getElementById('modal-overlay');
   if (modalOverlay) {
-    modalOverlay.classList.remove('active');
+    closeAccessibleModal(modalOverlay);
   }
 }
 
@@ -191,5 +192,5 @@ export function openQuickView(item) {
     };
   }
 
-  modalOverlay.classList.add('active');
+  openAccessibleModal(modalOverlay, drawerContent);
 }
