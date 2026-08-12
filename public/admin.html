@@ -33,7 +33,7 @@
   <!-- Admin Navbar -->
   <header class="admin-navbar admin-protected" hidden>
     <div class="container admin-nav-content">
-      <div style="font-size: var(--font-size-xl); font-weight: 800; display: flex; align-items: center; gap: 8px;">
+      <div class="admin-brand" style="font-size: var(--font-size-xl); font-weight: 800; display: flex; align-items: center; gap: 8px;">
         <span>⚙️ Food Order Admin</span>
       </div>
       <div class="admin-user-area">
@@ -46,18 +46,17 @@
     </div>
     <div class="container">
       <div class="admin-nav-tabs" role="tablist" aria-label="Điều hướng quản trị">
-        <button class="admin-tab-btn active" role="tab" id="tab-btn-orders" aria-selected="true" aria-controls="tab-orders" data-target="tab-orders">📋 Lịch sử Đơn hàng</button>
-        <button class="admin-tab-btn" role="tab" id="tab-btn-items" aria-selected="false" aria-controls="tab-items" data-target="tab-items">🍔 Quản lý Món ăn</button>
-        <button class="admin-tab-btn" role="tab" id="tab-btn-categories" aria-selected="false" aria-controls="tab-categories" data-target="tab-categories">🗂 Quản lý Danh mục</button>
-        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-reports" aria-selected="false" aria-controls="tab-reports" data-target="tab-reports">📊 Báo cáo bán hàng</button>
-        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-accounts" aria-selected="false" aria-controls="tab-accounts" data-target="tab-accounts">👥 Tài khoản nhân viên</button>
-        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-telegram" aria-selected="false" aria-controls="tab-telegram" data-target="tab-telegram">🤖 Cấu hình Telegram</button>
+        <button class="admin-tab-btn active" role="tab" id="tab-btn-orders" aria-selected="true" aria-controls="tab-orders" data-target="tab-orders" aria-label="Lịch sử đơn hàng"><span class="admin-tab-icon">📋</span><span class="admin-tab-label-full">Lịch sử Đơn hàng</span><span class="admin-tab-label-short">Đơn hàng</span></button>
+        <button class="admin-tab-btn" role="tab" id="tab-btn-items" aria-selected="false" aria-controls="tab-items" data-target="tab-items" aria-label="Quản lý món ăn"><span class="admin-tab-icon">🍔</span><span class="admin-tab-label-full">Quản lý Món ăn</span><span class="admin-tab-label-short">Món ăn</span></button>
+        <button class="admin-tab-btn" role="tab" id="tab-btn-categories" aria-selected="false" aria-controls="tab-categories" data-target="tab-categories" aria-label="Quản lý danh mục"><span class="admin-tab-icon">🗂</span><span class="admin-tab-label-full">Quản lý Danh mục</span><span class="admin-tab-label-short">Danh mục</span></button>
+        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-reports" aria-selected="false" aria-controls="tab-reports" data-target="tab-reports" aria-label="Báo cáo bán hàng"><span class="admin-tab-icon">📊</span><span class="admin-tab-label-full">Báo cáo bán hàng</span><span class="admin-tab-label-short">Báo cáo</span></button>
+        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-accounts" aria-selected="false" aria-controls="tab-accounts" data-target="tab-accounts" aria-label="Tài khoản nhân viên"><span class="admin-tab-icon">👥</span><span class="admin-tab-label-full">Tài khoản nhân viên</span><span class="admin-tab-label-short">Nhân viên</span></button>
       </div>
     </div>
   </header>
 
   <!-- Main Admin Dashboard Content -->
-  <main class="container admin-protected" hidden style="padding-top: var(--space-6);">
+  <main class="container admin-main admin-protected" hidden style="padding-top: var(--space-6);">
 
     <!-- TAB 1: FOOD ITEMS MANAGEMENT -->
     <section id="tab-items" class="admin-tab-content">
@@ -73,7 +72,7 @@
         </div>
 
         <div class="table-responsive">
-          <table class="admin-table">
+          <table class="admin-table admin-card-table admin-menu-table">
             <thead>
               <tr>
                 <th>Hình ảnh</th>
@@ -101,7 +100,7 @@
           <button class="btn btn-primary" id="btn-open-add-category">+ Thêm danh mục mới</button>
         </div>
         <div class="table-responsive">
-          <table class="admin-table">
+          <table class="admin-table admin-card-table admin-category-table">
             <thead>
               <tr>
                 <th>Thứ tự</th>
@@ -130,7 +129,7 @@
         </form>
         <p id="staff-message" class="auth-message"></p>
         <div class="table-responsive">
-          <table class="admin-table"><thead><tr><th>Tên đăng nhập</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th></tr></thead><tbody id="staff-table-body"></tbody></table>
+          <table class="admin-table admin-card-table admin-staff-table"><thead><tr><th>Tên đăng nhập</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th></tr></thead><tbody id="staff-table-body"></tbody></table>
         </div>
       </div>
     </section>
@@ -187,7 +186,7 @@
           </select>
         </div>
         <div class="table-responsive">
-          <table class="admin-table">
+          <table class="admin-table admin-card-table admin-orders-table">
             <thead>
               <tr>
                 <th>Mã đơn</th>
@@ -250,7 +249,7 @@
 
         <!-- Product Breakdown Table -->
         <div class="table-responsive" style="margin-top: 16px;">
-          <table class="admin-table">
+          <table class="admin-table admin-card-table admin-report-table">
             <thead>
               <tr>
                 <th>Mã SP</th>
@@ -266,32 +265,6 @@
             </tbody>
           </table>
         </div>
-      </div>
-    </section>
-
-    <!-- TAB 5: TELEGRAM BOT SETTINGS (Admin Only) -->
-    <section id="tab-telegram" class="admin-tab-content admin-only" role="tabpanel" tabindex="0" style="display: none;">
-      <div class="admin-card" style="max-width: 650px; margin: 0 auto;">
-        <div class="admin-card-header">
-          <h2 style="font-size: var(--font-size-lg); font-weight: 800;">🤖 Cấu hình kết nối Telegram Bot</h2>
-        </div>
-        <p style="font-size: var(--font-size-sm); color: var(--color-text-muted); margin-bottom: 16px;">
-          Cấu hình Bot Token và Chat ID để nhận thông báo đơn hàng tức thì qua Telegram Group / Channel.
-        </p>
-        <form id="telegram-settings-form">
-          <div class="form-group">
-            <label class="form-label" for="telegram-token-input">Telegram Bot Token *</label>
-            <input type="password" id="telegram-token-input" class="form-control" placeholder="123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ" autocomplete="off" />
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="telegram-chat-id-input">Telegram Chat ID / Group ID *</label>
-            <input type="text" id="telegram-chat-id-input" class="form-control" placeholder="-1001234567890 hoặc @my_channel" autocomplete="off" />
-          </div>
-          <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
-            <button type="submit" class="btn btn-primary">💾 Lưu cấu hình Telegram</button>
-            <button type="button" class="btn btn-secondary" id="btn-test-telegram">Gửi tin nhắn thử (Test Telegram)</button>
-          </div>
-        </form>
       </div>
     </section>
 
@@ -328,7 +301,6 @@
     import { initCategoryManager } from './js/admin/category-manager.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
     import { initReportDashboard, refreshReportDashboard } from './js/admin/report-dashboard.js';
-    import { initTelegramSettings } from './js/admin/telegram-settings.js';
     import { initAuth } from './js/admin/auth.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -363,7 +335,6 @@
 
       if (user.role === 'admin') {
         initReportDashboard();
-        initTelegramSettings();
       }
     });
   </script>
