@@ -141,15 +141,15 @@ function renderMenuTable(items) {
 
     return `
       <tr>
-        <td>
+        <td data-label="Hình ảnh">
           <img src="${item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80'}" class="item-thumb" alt="${escapeHTML(item.name)}" />
         </td>
-        <td>
+        <td data-label="Món ăn">
           <strong>${escapeHTML(item.name)}</strong>
           <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">${escapeHTML(item.category || 'Món chính')}</div>
           ${customCount > 0 ? `<div style="font-size: 11px; color: var(--color-primary); margin-top: 2px;">⚙️ ${customCount} tùy chọn thành phần</div>` : ''}
         </td>
-        <td>
+        <td data-label="Giá bán">
           ${isDiscounted ? `
             <div style="font-size: var(--font-size-xs); text-decoration: line-through; color: var(--color-text-muted);">${formatVND(item.price)}</div>
             <strong style="color: var(--color-accent-spicy); font-size: var(--font-size-sm);">${formatVND(salePrice)}</strong>
@@ -158,17 +158,17 @@ function renderMenuTable(items) {
             <strong>${formatVND(item.price)}</strong>
           `}
         </td>
-        <td>${stockBadgeHtml}</td>
-        <td>
+        <td data-label="Tồn kho">${stockBadgeHtml}</td>
+        <td data-label="Bán hôm nay">
           <label class="switch" title="Bật/Tắt bán hôm nay">
             <input type="checkbox" ${isActive ? 'checked' : ''} onchange="window.toggleItemActive('${escapeHTML(item.id)}', this.checked)" />
             <span class="slider"></span>
           </label>
         </td>
-        <td>
+        <td data-label="Trạng thái">
           <span class="badge ${statusClass}">${statusText}</span>
         </td>
-        <td>
+        <td data-label="Thao tác">
           <button class="btn btn-outline" style="min-height: 32px; padding: 4px 12px;" onclick="window.openItemModal('${escapeHTML(item.id)}')">Sửa</button>
         </td>
       </tr>

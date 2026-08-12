@@ -78,20 +78,20 @@ function renderCategoryTable(categories) {
 
     return `
       <tr>
-        <td><strong>${cat.sortOrder ?? 0}</strong></td>
-        <td><code>${safeId}</code></td>
-        <td>
+        <td data-label="Thứ tự"><strong>${cat.sortOrder ?? 0}</strong></td>
+        <td data-label="Mã ID"><code>${safeId}</code></td>
+        <td data-label="Tên danh mục">
           <strong>${safeName}</strong>
           ${safeDesc ? `<div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">${safeDesc}</div>` : ''}
         </td>
-        <td><span class="badge" style="background: rgba(0,0,0,0.05); color: var(--color-text-main);">${cat.itemCount ?? 0} món</span></td>
-        <td>
+        <td data-label="Số món"><span class="badge" style="background: rgba(0,0,0,0.05); color: var(--color-text-main);">${cat.itemCount ?? 0} món</span></td>
+        <td data-label="Trạng thái">
           <label class="switch" title="Bật/Tắt hiển thị danh mục">
             <input type="checkbox" ${cat.active !== false ? 'checked' : ''} onchange="window.toggleCategoryActive('${safeId}', this.checked)" />
             <span class="slider"></span>
           </label>
         </td>
-        <td>
+        <td data-label="Thao tác">
           <button class="btn btn-outline" style="min-height: 32px; padding: 4px 12px;" onclick="window.openCategoryModal('${safeId}')">Sửa</button>
         </td>
       </tr>

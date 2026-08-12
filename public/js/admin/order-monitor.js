@@ -300,28 +300,28 @@ function renderOrdersTable(orders) {
 
     return `
       <tr>
-        <td><strong style="color: var(--color-primary);">${safeOrderId}</strong></td>
-        <td>
+        <td data-label="Mã đơn"><strong style="color: var(--color-primary);">${safeOrderId}</strong></td>
+        <td data-label="Khách hàng">
           <strong>${escapeHTML(order.customer?.name || 'Khách lẻ')}</strong>
           <div style="font-size: var(--font-size-xs); color: var(--color-text-muted);">${escapeHTML(order.customer?.phone || '')}</div>
         </td>
-        <td>${fulfillmentCellHtml}</td>
-        <td>
+        <td data-label="Nhận món">${fulfillmentCellHtml}</td>
+        <td data-label="Món đã đặt">
           <ul style="font-size: var(--font-size-xs); padding-left: 12px; margin: 0;">
             ${itemsHtml}
           </ul>
         </td>
-        <td>
+        <td data-label="Tổng tiền">
           <div style="font-weight: 800; color: var(--color-primary); font-size: var(--font-size-sm);">${formatVND(order.totalAmount)}</div>
           ${discount > 0 ? `
             <div style="font-size: 11px; color: var(--color-accent-spicy);">Giảm: -${formatVND(discount)}</div>
           ` : ''}
         </td>
-        <td>
+        <td data-label="Thanh toán">
           ${paymentBtnHtml}
         </td>
-        <td>${dateCellHtml}</td>
-        <td>
+        <td data-label="Ngày tạo">${dateCellHtml}</td>
+        <td data-label="Thao tác">
           ${printBtnHtml}
         </td>
       </tr>

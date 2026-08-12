@@ -13,7 +13,7 @@ function showDashboard(user) {
 async function loadStaff() {
   const { users } = await API.get('/api/auth/staff');
   $('#staff-table-body').innerHTML = users.length ? users.map((user) => `
-    <tr><td>${escapeHtml(user.username)}</td><td>Nhân viên</td><td>${user.active ? 'Hoạt động' : 'Đã khóa'}</td><td>${new Date(user.createdAt).toLocaleDateString('vi-VN')}</td></tr>
+    <tr><td data-label="Tên đăng nhập">${escapeHtml(user.username)}</td><td data-label="Vai trò">Nhân viên</td><td data-label="Trạng thái">${user.active ? 'Hoạt động' : 'Đã khóa'}</td><td data-label="Ngày tạo">${new Date(user.createdAt).toLocaleDateString('vi-VN')}</td></tr>
   `).join('') : '<tr><td colspan="4">Chưa có tài khoản nhân viên.</td></tr>';
 }
 

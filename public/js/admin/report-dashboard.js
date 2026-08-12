@@ -216,12 +216,12 @@ function renderReportDashboard(report) {
       const pName = escapeHTML(p.productName);
       return `
         <tr>
-          <td><strong style="color: var(--color-text-muted); font-size: 12px;">${pId}</strong></td>
-          <td><strong>${pName}</strong></td>
-          <td style="text-align: right; font-weight: 700;">${p.quantitySold}</td>
-          <td style="text-align: right; color: var(--color-text-muted);">${formatVND(p.subtotalAmount)}</td>
-          <td style="text-align: right; color: #d97706;">${p.discountAmount > 0 ? `-${formatVND(p.discountAmount)}` : '0đ'}</td>
-          <td style="text-align: right; font-weight: 800; color: #059669;">${formatVND(p.revenue)}</td>
+          <td data-label="Mã sản phẩm"><strong style="color: var(--color-text-muted); font-size: 12px;">${pId}</strong></td>
+          <td data-label="Tên sản phẩm"><strong>${pName}</strong></td>
+          <td data-label="Số lượng bán" style="text-align: right; font-weight: 700;">${p.quantitySold}</td>
+          <td data-label="Tổng giá gốc" style="text-align: right; color: var(--color-text-muted);">${formatVND(p.subtotalAmount)}</td>
+          <td data-label="Tổng giảm giá" style="text-align: right; color: #d97706;">${p.discountAmount > 0 ? `-${formatVND(p.discountAmount)}` : '0đ'}</td>
+          <td data-label="Doanh thu thực tế" style="text-align: right; font-weight: 800; color: #059669;">${formatVND(p.revenue)}</td>
         </tr>
       `;
     }).join('');
