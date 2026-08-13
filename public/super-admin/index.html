@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Super Admin Console — Food Order Bridge</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151d2a;
+      --border: #222f43;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0284c7;
+      --danger: #ef4444;
+      --success: #22c55e;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 0;
+    }
+
+    header {
+      background: #111827;
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-super {
+      background: #38bdf822;
+      color: var(--accent);
+      border: 1px solid #38bdf855;
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 24px auto;
+      padding: 0 16px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 0 0 16px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn {
+      background: var(--accent);
+      color: #000;
+      font-weight: 600;
+      border: none;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: background 0.2s;
+    }
+
+    .btn:hover {
+      background: var(--accent-hover);
+      color: #fff;
+    }
+
+    .btn-danger {
+      background: #ef444422;
+      color: #fca5a5;
+      border: 1px solid #ef444455;
+    }
+
+    .btn-danger:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+
+    th, td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .status-active {
+      background: #22c55e22;
+      color: #86efac;
+    }
+
+    .status-suspended {
+      background: #ef444422;
+      color: #fca5a5;
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+
+    .modal {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 8px 12px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      box-sizing: border-box;
+    }
+
+    /* Super Admin Login Modal Overlay */
+    #login-overlay {
+      display: flex;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      🛡️ Super Admin Console
+      <span class="badge-super">PLATFORM SYSTEM</span>
+    </div>
+    <div id="user-info" style="font-size: 0.875rem; color: var(--muted);"></div>
+  </header>
+
+  <!-- Login Modal -->
+  <div id="login-overlay" class="modal-overlay">
+    <div class="modal">
+      <h2 style="margin-top:0; font-size:1.25rem;">Đăng nhập Super Admin</h2>
+      <p style="color:var(--muted); font-size:0.85rem; margin-bottom:16px;">Vui lòng nhập tài khoản quản trị hệ thống cấp cao.</p>
+      
+      <div id="login-error" style="color:var(--danger); font-size:0.85rem; margin-bottom:12px; display:none;"></div>
+
+      <div class="form-group">
+        <label>Số điện thoại Super Admin</label>
+        <input type="text" id="sa-phone" class="form-control" placeholder="0900000000" value="0900000000">
+      </div>
+      <div class="form-group">
+        <label>Mật khẩu</label>
+        <input type="password" id="sa-password" class="form-control" placeholder="••••••••" value="SuperAdmin123!">
+      </div>
+      <button class="btn" style="width:100%; margin-top:8px;" onclick="handleSuperLogin()">Đăng nhập Console</button>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="container" id="main-content" style="display: none;">
+    
+    <!-- Header Stats -->
+    <div class="card">
+      <div class="card-title">
+        <span>Quản lý Danh sách Cửa hàng (Tenants)</span>
+        <button class="btn" onclick="openCreateStoreModal()">+ Tạo Cửa hàng mới</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Mã Cửa hàng</th>
+            <th>Tên thương hiệu</th>
+            <th>Slug</th>
+            <th>Gói dịch vụ</th>
+            <th>Trạng thái</th>
+            <th>Hành động</th>
+          </tr>
+        </thead>
+        <tbody id="store-table-body">
+          <tr><td colspan="6" style="text-align:center; color:var(--muted);">Đang tải dữ liệu...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Audit Log -->
+    <div class="card">
+      <div class="card-title">Audit Logs Hệ thống (Gần nhất)</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Thời gian</th>
+            <th>Actor</th>
+            <th>Hành động</th>
+            <th>Target</th>
+            <th>Chi tiết</th>
+          </tr>
+        </thead>
+        <tbody id="audit-table-body">
+          <tr><td colspan="5" style="text-align:center; color:var(--muted);">Đang tải...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Create Store Modal -->
+  <div id="create-store-modal" class="modal-overlay">
+    <div class="modal">
+      <h3 style="margin-top:0;">Tạo Cửa hàng (Store Tenant) mới</h3>
+      <div id="store-form-error" style="color:var(--danger); font-size:0.85rem; margin-bottom:10px; display:none;"></div>
+      <div class="form-group">
+        <label>Mã Cửa hàng (Upper case, unique)</label>
+        <input type="text" id="new-store-code" class="form-control" placeholder="PHOTHIN">
+      </div>
+      <div class="form-group">
+        <label>Tên Cửa hàng</label>
+        <input type="text" id="new-store-name" class="form-control" placeholder="Phở Thìn Hà Nội">
+      </div>
+      <div class="form-group">
+        <label>Slug URL</label>
+        <input type="text" id="new-store-slug" class="form-control" placeholder="pho-thin-ha-noi">
+      </div>
+      <div class="form-group">
+        <label>SĐT Chủ Cửa hàng (Tùy chọn tạo tài khoản Owner)</label>
+        <input type="text" id="new-owner-phone" class="form-control" placeholder="0912345678">
+      </div>
+      <div class="form-group">
+        <label>Mật khẩu Chủ Cửa hàng</label>
+        <input type="password" id="new-owner-pass" class="form-control" placeholder="••••••••">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button class="btn btn-danger" onclick="closeCreateStoreModal()">Hủy</button>
+        <button class="btn" onclick="submitCreateStore()">Khởi tạo Tenant</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let superToken = null;
+
+    async function handleSuperLogin() {
+      const phone = document.getElementById('sa-phone').value;
+      const password = document.getElementById('sa-password').value;
+      const errEl = document.getElementById('login-error');
+      errEl.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/super-admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, password })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errEl.textContent = data.error || 'Đăng nhập thất bại';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        superToken = data.token;
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('user-info').textContent = `Super Admin: ${data.superAdmin.phone}`;
+        
+        loadDashboardData();
+      } catch (err) {
+        errEl.textContent = 'Lỗi kết nối server';
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function loadDashboardData() {
+      fetchStores();
+      fetchAuditLogs();
+    }
+
+    async function fetchStores() {
+      try {
+        const res = await fetch('/api/super-admin/stores', {
+          headers: { 'x-super-admin-token': superToken }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('store-table-body');
+        tbody.innerHTML = '';
+
+        if (!data.stores || data.stores.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chưa có cửa hàng nào</td></tr>';
+          return;
+        }
+
+        data.stores.forEach(store => {
+          const tr = document.createElement('tr');
+          const isSuspended = store.status === 'SUSPENDED';
+          tr.innerHTML = `
+            <td><strong>${store.code}</strong></td>
+            <td>${store.name}</td>
+            <td><code>${store.slug}</code></td>
+            <td>${store.plan || 'FREE'} (max ${store.maxBranches || 5} branch)</td>
+            <td><span class="status-pill ${isSuspended ? 'status-suspended' : 'status-active'}">${store.status}</span></td>
+            <td>
+              <button class="btn ${isSuspended ? '' : 'btn-danger'}" onclick="toggleStoreStatus('${store.id}', '${isSuspended ? 'ACTIVE' : 'SUSPENDED'}')">
+                ${isSuspended ? 'Mở lại' : 'Khóa Store'}
+              </button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (_) {}
+    }
+
+    async function fetchAuditLogs() {
+      try {
+        const res = await fetch('/api/super-admin/audit-logs', {
+          headers: { 'x-super-admin-token': superToken }
+        });
+        const data = await res.json();
+        const tbody = document.getElementById('audit-table-body');
+        tbody.innerHTML = '';
+
+        if (!data.logs || data.logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Chưa có log</td></tr>';
+          return;
+        }
+
+        data.logs.forEach(log => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td style="font-size:0.8rem; color:var(--muted);">${new Date(log.timestamp).toLocaleString('vi-VN')}</td>
+            <td>${log.actorRole || 'System'}</td>
+            <td><strong>${log.action}</strong></td>
+            <td><code>${log.target || ''}</code></td>
+            <td style="font-size:0.8rem;">${JSON.stringify(log.details || {})}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (_) {}
+    }
+
+    async function toggleStoreStatus(storeId, newStatus) {
+      if (!confirm(`Bạn có chắc muốn chuyển trạng thái cửa hàng sang ${newStatus}?`)) return;
+
+      try {
+        await fetch(`/api/super-admin/stores/${storeId}/status`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-super-admin-token': superToken
+          },
+          body: JSON.stringify({ status: newStatus })
+        });
+        fetchStores();
+      } catch (_) {}
+    }
+
+    function openCreateStoreModal() {
+      document.getElementById('create-store-modal').style.display = 'flex';
+    }
+
+    function closeCreateStoreModal() {
+      document.getElementById('create-store-modal').style.display = 'none';
+    }
+
+    async function submitCreateStore() {
+      const code = document.getElementById('new-store-code').value;
+      const name = document.getElementById('new-store-name').value;
+      const slug = document.getElementById('new-store-slug').value;
+      const ownerPhone = document.getElementById('new-owner-phone').value;
+      const ownerPassword = document.getElementById('new-owner-pass').value;
+      const errEl = document.getElementById('store-form-error');
+
+      try {
+        const res = await fetch('/api/super-admin/stores', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-super-admin-token': superToken
+          },
+          body: JSON.stringify({ code, name, slug, ownerPhone, ownerPassword })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errEl.textContent = data.error || 'Không thể tạo store';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        closeCreateStoreModal();
+        fetchStores();
+      } catch (err) {
+        errEl.textContent = 'Lỗi kết nối server';
+        errEl.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>

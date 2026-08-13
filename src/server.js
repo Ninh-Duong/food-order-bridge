@@ -15,10 +15,16 @@ const authRoutes = require('./routes/auth-routes');
 const adminRoutes = require('./routes/admin-routes');
 const reportRoutes = require('./routes/report-routes');
 const telegramRoutes = require('./routes/telegram-routes');
+const superAdminRoutes = require('./routes/super-admin-routes');
+
 const authService = require('./services/auth-service');
+const { executeMigration } = require('./services/tenant-migration-service');
 const { startOrderExpiryJob } = require('./services/order-expiry-service');
 const { startReportScheduler } = require('./services/report-scheduler');
 const { requireAuth, requireAdmin } = require('./middleware/auth');
+const { extractTenantContext } = require('./middleware/tenant-context');
+
+const storeRoutes = require('./routes/store-routes');
 
 const app = express();
 
@@ -28,6 +34,9 @@ app.set('trust proxy', 1);
 // Security Body Limits (16-32KB max)
 app.use(express.json({ limit: '32kb' }));
 app.use(express.urlencoded({ extended: true, limit: '32kb' }));
+
+// Tenant Context Middleware
+app.use(extractTenantContext);
 
 // Rate Limiting (chống spam đơn hàng)
 const orderLimiter = rateLimit({
@@ -43,11 +52,12 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/health', healthRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/store', storeRoutes);
 
 app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api/reports', requireAuth, requireAdmin, reportRoutes);
 app.use('/api/categories', (req, res, next) => {
-
   if (req.method === 'GET') return next();
   return requireAuth(req, res, next);
 }, categoryRoutes);
@@ -64,22 +74,26 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
 });
 
-// Start Server with DB Initialization
+// Start Server with DB Initialization & Multi-Tenant Migration
 async function startServer() {
   await connectDB();
   await authService.bootstrapAdmin();
+  await executeMigration(); // Tự động backfill dữ liệu legacy sang multi-tenant
+
   startOrderExpiryJob();
   startReportScheduler();
 
   const server = app.listen(config.PORT, () => {
     console.log(`================================================`);
-    console.log(`🚀 Food Order Bridge Server is running on port ${config.PORT}`);
-    console.log(`🌐 Storefront: http://localhost:${config.PORT}`);
-    console.log(`⚙️ Admin Page: http://localhost:${config.PORT}/admin.html`);
+    console.log(`🚀 Food Order Bridge Multi-Tenant Server Active!`);
+    console.log(`🛒 Storefront:          http://localhost:${config.PORT}`);
+    console.log(`🔑 Merchant Login:       http://localhost:${config.PORT}/login.html`);
+    console.log(`⚙️ Merchant Admin POS:   http://localhost:${config.PORT}/admin.html`);
+    console.log(`🛡️ Super Admin Console:  http://localhost:${config.PORT}/super-admin/index.html`);
     console.log(`================================================`);
   });
 
-  // Graceful shutdown handling for Render
+  // Graceful shutdown handling
   const gracefulShutdown = (signal) => {
     console.log(`🛑 Received ${signal}. Shutting down HTTP server gracefully...`);
     server.close(() => {

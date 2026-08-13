@@ -17,6 +17,21 @@ function calculateSalePriceClient(price, discountPercent = 0) {
   return Math.round(numPrice * (100 - numDiscount) / 100);
 }
 
+export async function loadStoreInfo() {
+  try {
+    const res = await API.get('/api/store/info');
+    if (res && res.displayName) {
+      const brandElem = document.getElementById('brand-shop-name');
+      if (brandElem) {
+        brandElem.textContent = `🍲 ${res.displayName}`;
+      }
+      document.title = `${res.displayName} - Đặt đồ ăn nhanh`;
+    }
+  } catch (err) {
+    console.error('Error loading store info:', err);
+  }
+}
+
 export async function loadMenuCatalog() {
   const catalogContainer = document.getElementById('catalog-container');
   if (!catalogContainer) return;
@@ -25,6 +40,7 @@ export async function loadMenuCatalog() {
   renderSkeletonGrid(catalogContainer, 6);
 
   try {
+    loadStoreInfo();
     const [menuRes, catRes] = await Promise.all([
       API.get('/api/menu'),
       API.get('/api/categories')

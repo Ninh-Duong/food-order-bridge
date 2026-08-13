@@ -1,7 +1,11 @@
 const crypto = require('crypto');
 const userRepository = require('../repositories/user-repository');
+const { normalizeVNPhone, formatPhoneDisplay } = require('../utils/phone-normalizer');
+const { StoreModel, BranchModel, UserModel } = require('../models');
+const { isDBConnected } = require('../db');
 
 const TOKEN_TTL_SECONDS = 8 * 60 * 60;
+const DEFAULT_AUTH_SECRET = 'default_super_secret_auth_signing_key_32chars_minimum';
 
 function normalizeUsername(value) {
   return String(value || '').trim().toLowerCase();
@@ -26,7 +30,7 @@ function validateCredentials(username, password) {
 }
 
 function signingSecret() {
-  const secret = process.env.AUTH_SECRET;
+  const secret = process.env.AUTH_SECRET || DEFAULT_AUTH_SECRET;
   if (!secret || secret.length < 32) throw new Error('AUTH_SECRET phải được cấu hình với ít nhất 32 ký tự');
   return secret;
 }
@@ -36,7 +40,15 @@ function encode(value) {
 }
 
 function issueToken(user) {
-  const payload = encode({ sub: user.id, username: user.username, role: user.role, exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS });
+  const payload = encode({
+    sub: user.id,
+    username: user.username,
+    role: user.role,
+    storeId: user.storeId || 'legacy-store',
+    branchId: user.branchId || 'legacy-main-branch',
+    branchIds: user.branchIds || ['legacy-main-branch'],
+    exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS
+  });
   const signature = crypto.createHmac('sha256', signingSecret()).update(payload).digest('base64url');
   return `${payload}.${signature}`;
 }
@@ -71,7 +83,87 @@ async function login(rawUsername, password) {
   const username = normalizeUsername(rawUsername);
   const user = await userRepository.findByUsername(username);
   if (!user || !user.active || !verifyPassword(password, user.passwordHash)) return null;
-  return { user: { id: String(user._id || user.id), username: user.username, role: user.role }, token: issueToken({ id: String(user._id || user.id), username: user.username, role: user.role }) };
+  const userObj = {
+    id: String(user._id || user.id),
+    username: user.username,
+    role: user.role,
+    storeId: user.storeId || 'legacy-store',
+    branchId: user.branchId || 'legacy-main-branch',
+    branchIds: user.branchIds || ['legacy-main-branch']
+  };
+  return {
+    user: userObj,
+    token: issueToken(userObj)
+  };
+}
+
+async function loginByPhone(phoneInput, password) {
+  const normalizedPhone = normalizeVNPhone(phoneInput);
+  let user = null;
+
+  if (isDBConnected()) {
+    user = await UserModel.findOne({ phoneNormalized: normalizedPhone });
+  }
+
+  if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
+    return null;
+  }
+
+  let branches = [];
+  const storeId = user.storeId || 'legacy-store';
+
+  if (isDBConnected()) {
+    if (user.role === 'STORE_OWNER' || user.role === 'admin') {
+      branches = await BranchModel.find({ storeId, status: 'ACTIVE' }).lean();
+    } else {
+      branches = await BranchModel.find({ storeId, id: { $in: user.branchIds || [] }, status: 'ACTIVE' }).lean();
+    }
+  } else {
+    branches = [{ id: 'legacy-main-branch', name: 'Chi nhánh Chính', code: 'MAIN' }];
+  }
+
+  const preToken = issueToken({
+    id: String(user._id || user.id),
+    username: user.username || user.phoneNormalized,
+    role: user.role,
+    storeId,
+    branchIds: user.branchIds || ['legacy-main-branch']
+  });
+
+  return {
+    user: {
+      id: String(user._id || user.id),
+      phoneDisplay: user.phoneDisplay || formatPhoneDisplay(normalizedPhone),
+      role: user.role,
+      storeId
+    },
+    branches: branches.map(b => ({ id: b.id, name: b.name, code: b.code })),
+    preToken
+  };
+}
+
+async function selectBranch(userSession, selectedBranchId) {
+  if (!userSession || !selectedBranchId) {
+    throw new Error('Phiên đăng nhập hoặc chi nhánh được chọn không hợp lệ');
+  }
+
+  const { storeId, role, branchIds } = userSession;
+
+  if (role !== 'STORE_OWNER' && role !== 'admin') {
+    if (!Array.isArray(branchIds) || !branchIds.includes(selectedBranchId)) {
+      throw new Error('Tài khoản của bạn không có quyền truy cập chi nhánh này');
+    }
+  }
+
+  const updatedUser = {
+    ...userSession,
+    branchId: selectedBranchId
+  };
+
+  return {
+    sessionToken: issueToken(updatedUser),
+    activeBranchId: selectedBranchId
+  };
 }
 
 async function createStaff(rawUsername, password) {
@@ -81,4 +173,14 @@ async function createStaff(rawUsername, password) {
   return userRepository.create({ id: crypto.randomUUID(), username, passwordHash: hashPassword(password), role: 'staff', active: true });
 }
 
-module.exports = { TOKEN_TTL_SECONDS, bootstrapAdmin, login, createStaff, parseToken, issueToken, listStaff: userRepository.listStaff };
+module.exports = {
+  TOKEN_TTL_SECONDS,
+  bootstrapAdmin,
+  login,
+  loginByPhone,
+  selectBranch,
+  createStaff,
+  parseToken,
+  issueToken,
+  listStaff: userRepository.listStaff
+};

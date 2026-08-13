@@ -6,6 +6,7 @@
     "price": 50000,
     "discountPercent": 0,
     "stockQuantity": 99,
-    "active": true
+    "active": true,
+    "storeId": "legacy-store"
   }
 ]
