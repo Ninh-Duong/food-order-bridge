@@ -5,7 +5,8 @@
     "slug": "com-ga",
     "description": "Các món cơm gà thơm ngon giòn rụm",
     "sortOrder": 1,
-    "active": true
+    "active": true,
+    "storeId": "legacy-store"
   },
   {
     "id": "MON_NUOC",
@@ -13,7 +14,8 @@
     "slug": "mon-nuoc",
     "description": "Các món bún phở nước dùng hầm xương đậm đà",
     "sortOrder": 2,
-    "active": true
+    "active": true,
+    "storeId": "legacy-store"
   },
   {
     "id": "MON_CHINH",
@@ -21,7 +23,8 @@
     "slug": "mon-chinh",
     "description": "Các món ăn chính đa dạng",
     "sortOrder": 3,
-    "active": true
+    "active": true,
+    "storeId": "legacy-store"
   },
   {
     "id": "DO_UONG",
@@ -29,6 +32,7 @@
     "slug": "do-uong",
     "description": "Nước giải khát, trà và cà phê",
     "sortOrder": 4,
-    "active": true
+    "active": true,
+    "storeId": "legacy-store"
   }
 ]

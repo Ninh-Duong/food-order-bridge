@@ -20,6 +20,8 @@ const { startOrderExpiryJob } = require('./services/order-expiry-service');
 const { startReportScheduler } = require('./services/report-scheduler');
 const { requireAuth, requireAdmin } = require('./middleware/auth');
 
+const superAdminRoutes = require('./routes/super-admin-routes');
+
 const app = express();
 
 // Trust reverse proxy (e.g. Render, Heroku, Cloudflare) for accurate IP identification in express-rate-limit
@@ -43,6 +45,7 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/health', healthRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/super-admin', superAdminRoutes);
 
 app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api/reports', requireAuth, requireAdmin, reportRoutes);

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng nhập Hệ thống — Food Order POS Multi-Tenant</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <style>
+    body {
+      background: #0f172a;
+      color: #f8fafc;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 16px;
+    }
+    .auth-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+    }
+    .auth-header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .auth-header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #38bdf8;
+      margin: 0 0 8px 0;
+    }
+    .auth-header p {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin: 0;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 0.875rem;
+      color: #cbd5e1;
+      margin-bottom: 6px;
+    }
+    .form-input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 0.95rem;
+      box-sizing: border-box;
+    }
+    .form-input:focus {
+      outline: none;
+      border-color: #38bdf8;
+    }
+    .btn-submit {
+      width: 100%;
+      padding: 12px;
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+    .btn-submit:hover {
+      background: #0369a1;
+    }
+    .alert-error {
+      background: #7f1d1d;
+      color: #fca5a5;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .branch-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .branch-btn {
+      background: #334155;
+      border: 1px solid #475569;
+      color: #fff;
+      padding: 12px;
+      border-radius: 6px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .branch-btn:hover {
+      background: #0284c7;
+    }
+    .super-link {
+      margin-top: 20px;
+      text-align: center;
+      font-size: 0.8rem;
+    }
+    .super-link a {
+      color: #64748b;
+      text-decoration: none;
+    }
+    .super-link a:hover {
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="auth-card">
+    <div class="auth-header">
+      <h1>Food Order POS</h1>
+      <p id="sub-title">Đăng nhập tài khoản Chủ cửa hàng / Nhân viên</p>
+    </div>
+
+    <div id="alert-error" class="alert-error"></div>
+
+    <!-- Step 1: Phone / Username Login Form -->
+    <form id="login-form">
+      <div class="form-group">
+        <label for="phone-input">Số điện thoại Việt Nam</label>
+        <input type="text" id="phone-input" class="form-input" placeholder="0912 345 678 hoặc username" required autofocus>
+      </div>
+
+      <div class="form-group">
+        <label for="password-input">Mật khẩu</label>
+        <input type="password" id="password-input" class="form-input" placeholder="••••••••" required>
+      </div>
+
+      <button type="submit" class="btn-submit" id="btn-login">Đăng nhập</button>
+    </form>
+
+    <!-- Step 2: Branch Selection Container (Hidden initially) -->
+    <div id="branch-section" style="display: none;">
+      <p style="color: #cbd5e1; font-size: 0.9rem; text-align: center; margin-bottom: 12px;">Vui lòng chọn chi nhánh làm việc:</p>
+      <div id="branch-container" class="branch-list"></div>
+    </div>
+
+    <div class="super-link">
+      <a href="/super-admin/index.html">Đăng nhập Super Admin System &rarr;</a>
+    </div>
+  </div>
+
+  <script>
+    const loginForm = document.getElementById('login-form');
+    const phoneInput = document.getElementById('phone-input');
+    const passwordInput = document.getElementById('password-input');
+    const alertError = document.getElementById('alert-error');
+    const branchSection = document.getElementById('branch-section');
+    const branchContainer = document.getElementById('branch-container');
+    const subTitle = document.getElementById('sub-title');
+    let savedPreToken = null;
+
+    function showError(msg) {
+      alertError.textContent = msg;
+      alertError.style.display = 'block';
+    }
+
+    function hideError() {
+      alertError.style.display = 'none';
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideError();
+
+      const phone = phoneInput.value.trim();
+      const password = passwordInput.value;
+
+      try {
+        // Thử Phone Login trước, nếu không thành công fallback Username
+        let res = await fetch('/api/auth/phone-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, password })
+        });
+
+        let data = await res.json();
+
+        if (!res.ok) {
+          // Fallback legacy login
+          res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: phone, password })
+          });
+          data = await res.json();
+          if (!res.ok) {
+            showError(data.message || 'Đăng nhập thất bại');
+            return;
+          }
+          window.location.href = '/admin.html';
+          return;
+        }
+
+        if (!data.requiresBranchSelection) {
+          window.location.href = '/admin.html';
+          return;
+        }
+
+        // Đổ danh sách chi nhánh
+        savedPreToken = data.preToken;
+        loginForm.style.display = 'none';
+        subTitle.textContent = `Xin chào ${data.user.phoneDisplay || data.user.id}`;
+        branchSection.style.display = 'block';
+        branchContainer.innerHTML = '';
+
+        data.branches.forEach(branch => {
+          const btn = document.createElement('button');
+          btn.className = 'branch-btn';
+          btn.innerHTML = `<strong>${branch.name}</strong> <span style="font-size:0.8rem; color:#94a3b8">(${branch.code})</span>`;
+          btn.onclick = () => handleSelectBranch(branch.id);
+          branchContainer.appendChild(btn);
+        });
+
+      } catch (err) {
+        showError('Không thể kết nối tới máy chủ');
+      }
+    });
+
+    async function handleSelectBranch(branchId) {
+      hideError();
+      try {
+        const res = await fetch('/api/auth/select-branch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ preToken: savedPreToken, branchId })
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          showError(data.message || 'Lỗi chọn chi nhánh');
+          return;
+        }
+
+        window.location.href = '/admin.html';
+      } catch (err) {
+        showError('Lỗi kết nối khi chọn chi nhánh');
+      }
+    }
+  </script>
+</body>
+</html>
