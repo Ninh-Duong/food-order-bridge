@@ -18,8 +18,14 @@ const requiredFiles = [
   path.join(__dirname, 'config.js'),
   path.join(__dirname, 'db.js'),
   path.join(__dirname, 'models.js'),
+  path.join(__dirname, 'middleware', 'tenant-context.js'),
+  path.join(__dirname, 'services', 'super-admin-service.js'),
+  path.join(__dirname, 'services', 'tenant-migration-service.js'),
+  path.join(__dirname, 'utils', 'phone-normalizer.js'),
   path.join(__dirname, '..', 'public', 'index.html'),
-  path.join(__dirname, '..', 'public', 'admin.html')
+  path.join(__dirname, '..', 'public', 'login.html'),
+  path.join(__dirname, '..', 'public', 'admin.html'),
+  path.join(__dirname, '..', 'public', 'super-admin', 'index.html')
 ];
 
 for (const file of requiredFiles) {
@@ -68,6 +74,7 @@ try {
   require('./routes/settings-routes');
   require('./routes/report-routes');
   require('./routes/telegram-routes');
+  require('./routes/super-admin-routes');
   console.log('[OK] Express API Routes loaded without syntax or module errors');
 } catch (err) {
   console.error('[FAIL] Express route loading error:', err.message);
