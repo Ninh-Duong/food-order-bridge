@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { StoreModel, BranchModel, UserModel, AuditLogModel } = require('../models');
+const { StoreModel, BranchModel, UserModel, AuditLogModel, MenuItemModel, BranchInventoryModel } = require('../models');
 const { normalizeVNPhone, formatPhoneDisplay } = require('../utils/phone-normalizer');
 const { isDBConnected } = require('../db');
 
@@ -19,11 +19,18 @@ function verifyPassword(password, stored) {
 }
 
 function getSuperAdminConfig() {
-  const phone = process.env.SUPER_ADMIN_PHONE ? normalizeVNPhone(process.env.SUPER_ADMIN_PHONE) : '+84900000000';
-  const passwordHash = process.env.SUPER_ADMIN_PASSWORD_HASH || hashPassword(process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin123!');
-  const secret = process.env.SUPER_ADMIN_AUTH_SECRET || 'super_admin_secret_key_32chars_minimum_spec';
+  const production = process.env.NODE_ENV === 'production';
+  const phoneValue = process.env.SUPER_ADMIN_PHONE || (production ? '' : '0900000000');
+  const passwordHash = process.env.SUPER_ADMIN_PASSWORD_HASH
+    || (production ? '' : hashPassword(process.env.SUPER_ADMIN_PASSWORD || 'SuperAdmin123!'));
+  const secret = process.env.SUPER_ADMIN_AUTH_SECRET
+    || (production ? '' : 'local-super-admin-secret-change-me-32chars');
 
-  return { phone, passwordHash, secret };
+  if (production && (!phoneValue || !passwordHash || secret.length < 32)) {
+    throw new Error('Production requires SUPER_ADMIN_PHONE, SUPER_ADMIN_PASSWORD_HASH and SUPER_ADMIN_AUTH_SECRET (>=32 chars)');
+  }
+
+  return { phone: normalizeVNPhone(phoneValue), passwordHash, secret };
 }
 
 function issueSuperAdminToken(superAdminPhone) {
@@ -112,9 +119,13 @@ async function logAuditAction(actorId, actorRole, action, target, details, store
 
 async function listStores() {
   if (isDBConnected()) {
-    return await StoreModel.find().sort({ createdAt: -1 }).lean();
+    const stores = await StoreModel.find().sort({ createdAt: -1 }).lean();
+    return Promise.all(stores.map(async (store) => ({
+      ...store,
+      branches: await BranchModel.find({ storeId: store.id }).sort({ createdAt: 1 }).lean()
+    })));
   }
-  return [{ id: 'legacy-store', code: 'LEGACY', name: 'Cửa hàng Mặc định', status: 'ACTIVE' }];
+  return [{ id: 'legacy-store', code: 'LEGACY', name: 'Cửa hàng Mặc định', status: 'ACTIVE', branches: [{ id: 'legacy-main-branch', code: 'MAIN', name: 'Chi nhánh Chính', status: 'ACTIVE' }] }];
 }
 
 async function createStore(data) {
@@ -199,6 +210,7 @@ async function createBranch(storeId, branchData) {
   if (isDBConnected()) {
     const store = await StoreModel.findOne({ id: storeId });
     if (!store) throw new Error('Cửa hàng không tồn tại');
+    if (store.status !== 'ACTIVE') throw new Error('Không thể thêm chi nhánh cho cửa hàng đang bị khóa');
 
     const currentBranchCount = await BranchModel.countDocuments({ storeId });
     if (currentBranchCount >= store.maxBranches) {
@@ -216,6 +228,17 @@ async function createBranch(storeId, branchData) {
       phone: phone || store.phone || '',
       status: 'ACTIVE'
     });
+
+    const catalogItems = await MenuItemModel.find({ storeId }).select({ id: 1, stockQuantity: 1, active: 1 }).lean();
+    if (catalogItems.length > 0) {
+      await BranchInventoryModel.insertMany(catalogItems.map((item) => ({
+        storeId,
+        branchId,
+        menuItemId: item.id,
+        stockQuantity: item.stockQuantity || 0,
+        active: item.active !== false
+      })), { ordered: false });
+    }
 
     await logAuditAction('super_admin', 'SUPER_ADMIN', 'CREATE_BRANCH', branchId, { name, code }, storeId, branchId);
     return branch;

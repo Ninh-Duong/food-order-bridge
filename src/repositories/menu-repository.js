@@ -2,10 +2,31 @@ const fs = require('fs');
 const path = require('path');
 const { isDBConnected } = require('../db');
 const { MenuItemModel } = require('../models');
+const { assertTenantContext } = require('../middleware/tenant-context');
+const branchInventoryRepository = require('./branch-inventory-repository');
 
 const MENU_FILE = path.join(__dirname, '..', 'data', 'menu.json');
 
 class MenuRepository {
+  async getAllForTenant(tenantContext) {
+    const { storeId } = assertTenantContext(tenantContext);
+    if (isDBConnected()) {
+      const items = await MenuItemModel.find({ storeId }).lean();
+      const inventory = await branchInventoryRepository.listForTenant(tenantContext);
+      const inventoryByItem = new Map(inventory.map((record) => [record.menuItemId, record]));
+      return items.map((item) => {
+        const branchRecord = inventoryByItem.get(item.id);
+        return this.cleanItem(branchRecord ? {
+          ...item,
+          stockQuantity: branchRecord.stockQuantity,
+          active: branchRecord.active !== false,
+          ...(branchRecord.priceOverride !== null && branchRecord.priceOverride !== undefined ? { price: branchRecord.priceOverride } : {})
+        } : item);
+      });
+    }
+    return this.getFromFile().filter((item) => (item.storeId || 'legacy-store') === storeId);
+  }
+
   cleanItem(item) {
     if (!item) return null;
     const { _id, __v, ...rest } = item;
@@ -83,6 +104,16 @@ class MenuRepository {
     return items.find(i => i.id === id) || null;
   }
 
+  async getByIdForTenant(tenantContext, id) {
+    const { storeId } = assertTenantContext(tenantContext);
+    if (!id) return null;
+    if (isDBConnected()) {
+      const item = await MenuItemModel.findOne({ id, storeId }).lean();
+      return item ? this.cleanItem(item) : null;
+    }
+    return this.getFromFile().find((item) => item.id === id && (item.storeId || 'legacy-store') === storeId) || null;
+  }
+
   saveAll(items) {
     fs.mkdirSync(path.dirname(MENU_FILE), { recursive: true });
     const tempFile = `${MENU_FILE}.tmp.${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -97,12 +128,13 @@ class MenuRepository {
     return cleaned;
   }
 
-  async saveOrUpdate(itemData) {
+  async saveOrUpdate(itemData, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const cleanedData = this.cleanItem(itemData);
     if (isDBConnected()) {
       try {
         const updated = await MenuItemModel.findOneAndUpdate(
-          { id: cleanedData.id },
+          { id: cleanedData.id, ...(tenantContext ? { storeId: tenantContext.storeId } : {}) },
           { $set: cleanedData },
           { upsert: true, returnDocument: 'after', runValidators: true }
         ).lean();
@@ -113,7 +145,7 @@ class MenuRepository {
       }
     }
     const items = this.getFromFile();
-    const index = items.findIndex(i => i.id === cleanedData.id);
+    const index = items.findIndex(i => i.id === cleanedData.id && (!tenantContext || (i.storeId || 'legacy-store') === tenantContext.storeId));
     if (index >= 0) {
       items[index] = { ...items[index], ...cleanedData };
     } else {
@@ -123,11 +155,12 @@ class MenuRepository {
     return cleanedData;
   }
 
-  async toggleActive(id, activeState) {
+  async toggleActive(id, activeState, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     if (isDBConnected()) {
       try {
         const updated = await MenuItemModel.findOneAndUpdate(
-          { id },
+          { id, ...(tenantContext ? { storeId: tenantContext.storeId } : {}) },
           { $set: { active: activeState } },
           { returnDocument: 'after' }
         ).lean();
@@ -139,7 +172,7 @@ class MenuRepository {
       }
     }
     const items = this.getFromFile();
-    const item = items.find(i => i.id === id);
+    const item = items.find(i => i.id === id && (!tenantContext || (i.storeId || 'legacy-store') === tenantContext.storeId));
     if (item) {
       item.active = activeState;
       this.saveAll(items);
@@ -163,6 +196,14 @@ class MenuRepository {
     return items.filter(i => (i.categoryId || '').toUpperCase() === upperId).length;
   }
 
+  async countByCategoryIdForTenant(tenantContext, categoryId) {
+    const { storeId } = assertTenantContext(tenantContext);
+    if (!categoryId) return 0;
+    const upperId = categoryId.trim().toUpperCase();
+    if (isDBConnected()) return MenuItemModel.countDocuments({ storeId, categoryId: upperId });
+    return this.getFromFile().filter((item) => (item.storeId || 'legacy-store') === storeId && (item.categoryId || '').toUpperCase() === upperId).length;
+  }
+
   async getByCategoryId(categoryId) {
     if (!categoryId) return [];
     const upperId = categoryId.trim().toUpperCase();
@@ -179,7 +220,8 @@ class MenuRepository {
     return items.filter(i => (i.categoryId || '').toUpperCase() === upperId);
   }
 
-  async updateCategorySnapshot(categoryId, categoryName) {
+  async updateCategorySnapshot(categoryId, categoryName, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     if (!categoryId || !categoryName) return;
     const upperId = categoryId.trim().toUpperCase();
     const cleanName = categoryName.trim();
@@ -187,7 +229,7 @@ class MenuRepository {
     if (isDBConnected()) {
       try {
         await MenuItemModel.updateMany(
-          { categoryId: upperId },
+          { categoryId: upperId, ...(tenantContext ? { storeId: tenantContext.storeId } : {}) },
           { $set: { category: cleanName, updatedAt: new Date() } }
         );
       } catch (err) {
@@ -199,7 +241,7 @@ class MenuRepository {
     const items = this.getFromFile();
     let modified = false;
     items.forEach(item => {
-      if ((item.categoryId || '').toUpperCase() === upperId) {
+      if ((item.categoryId || '').toUpperCase() === upperId && (!tenantContext || (item.storeId || 'legacy-store') === tenantContext.storeId)) {
         item.category = cleanName;
         modified = true;
       }
@@ -214,7 +256,13 @@ class MenuRepository {
    * MongoDB Atomic Decrement within a Transaction session
    * Decrements stockQuantity if active !== false AND stockQuantity >= quantity
    */
-  async decrementStockInTransaction(productId, requestedQuantity, session) {
+  async decrementStockInTransaction(productId, requestedQuantity, session, tenantContext = null) {
+    if (tenantContext?.branchId && isDBConnected()) {
+      const updatedInventory = await branchInventoryRepository.decrementAtomic(tenantContext, productId, requestedQuantity, session);
+      if (!updatedInventory) return null;
+      const item = await MenuItemModel.findOne({ id: productId, storeId: tenantContext.storeId }).lean();
+      return item ? this.cleanItem({ ...item, stockQuantity: updatedInventory.stockQuantity, active: updatedInventory.active }) : null;
+    }
     const updated = await MenuItemModel.findOneAndUpdate(
       {
         id: productId,
@@ -234,7 +282,13 @@ class MenuRepository {
     return updated ? this.cleanItem(updated) : null;
   }
 
-  async decrementStockAtomic(productId, requestedQuantity) {
+  async decrementStockAtomic(productId, requestedQuantity, tenantContext = null) {
+    if (tenantContext?.branchId && isDBConnected()) {
+      const updatedInventory = await branchInventoryRepository.decrementAtomic(tenantContext, productId, requestedQuantity);
+      if (!updatedInventory) return null;
+      const item = await MenuItemModel.findOne({ id: productId, storeId: tenantContext.storeId }).lean();
+      return item ? this.cleanItem({ ...item, stockQuantity: updatedInventory.stockQuantity, active: updatedInventory.active }) : null;
+    }
     if (isDBConnected()) {
       try {
         const updated = await MenuItemModel.findOneAndUpdate(
@@ -265,7 +319,11 @@ class MenuRepository {
     return null;
   }
 
-  async incrementStockAtomic(productId, quantity) {
+  async incrementStockAtomic(productId, quantity, tenantContext = null) {
+    if (tenantContext?.branchId && isDBConnected()) {
+      await branchInventoryRepository.incrementAtomic(tenantContext, productId, quantity);
+      return;
+    }
     if (isDBConnected()) {
       try {
         await MenuItemModel.findOneAndUpdate(

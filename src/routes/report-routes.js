@@ -8,7 +8,7 @@ const config = require('../config');
 router.get('/sales.pdf', async (req, res) => {
   try {
     const period = req.query.period || 'today';
-    const report = await reportService.generateSalesReport(period);
+    const report = await reportService.generateSalesReport(period, new Date(), req.tenantContext);
     const pdfBuffer = await reportPdfService.generateSalesPDFBuffer(report, config.SHOP_NAME);
     const filename = reportPdfService.getPDFFilename(report.filter, report.from, report.to);
 
@@ -29,7 +29,7 @@ router.get('/sales.pdf', async (req, res) => {
 router.get('/sales', async (req, res) => {
   try {
     const period = req.query.period || 'today';
-    const report = await reportService.generateSalesReport(period);
+    const report = await reportService.generateSalesReport(period, new Date(), req.tenantContext);
     res.json(report);
   } catch (err) {
     if (err.status) {

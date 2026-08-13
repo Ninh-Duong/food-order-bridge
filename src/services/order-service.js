@@ -99,7 +99,7 @@ function hashOrderActionToken(token) {
 }
 
 class OrderService {
-  async processOrder(rawPayload) {
+  async processOrder(rawPayload, tenantContext = null) {
     // 1. Validate payload schema
     const parseResult = OrderSchema.safeParse(rawPayload);
     if (!parseResult.success) {
@@ -153,9 +153,9 @@ class OrderService {
       await this._expireUnpaidOrders();
       await this.assertPaymentCapacity(fulfillmentType);
       if (isDBConnected()) {
-        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod);
+        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod, tenantContext);
       }
-      return await this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod);
+      return await this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod, tenantContext);
     };
 
     // Serialize DINE_IN creation so the global three-order capacity cannot be
@@ -165,12 +165,12 @@ class OrderService {
     }
 
     if (isDBConnected()) {
-      return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod);
+      return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod, tenantContext);
     }
-    return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod));
+    return await runWithLock(() => this.processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType, paymentMethod, tenantContext));
   }
 
-  async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH') {
+  async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH', tenantContext = null) {
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -211,7 +211,9 @@ class OrderService {
       const productMenuMap = new Map();
 
       for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
-        const menuItem = await menuRepository.getById(productId);
+        const menuItem = tenantContext
+          ? await menuRepository.getByIdForTenant(tenantContext, productId)
+          : await menuRepository.getById(productId);
         if (!menuItem) {
           throw { status: 422, message: `Món ăn với mã ${productId} không tồn tại` };
         }
@@ -303,7 +305,7 @@ class OrderService {
       for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
         const menuItem = productMenuMap.get(productId);
         if (session) {
-          const updatedDoc = await menuRepository.decrementStockInTransaction(productId, totalReqQty, session);
+          const updatedDoc = await menuRepository.decrementStockInTransaction(productId, totalReqQty, session, tenantContext);
           if (!updatedDoc) {
             throw {
               status: 409,
@@ -313,10 +315,10 @@ class OrderService {
             };
           }
         } else {
-          const updatedDoc = await menuRepository.decrementStockAtomic(productId, totalReqQty);
+          const updatedDoc = await menuRepository.decrementStockAtomic(productId, totalReqQty, tenantContext);
           if (!updatedDoc) {
             for (const dec of decrementedProducts) {
-              await menuRepository.incrementStockAtomic(dec.productId, dec.quantity);
+              await menuRepository.incrementStockAtomic(dec.productId, dec.quantity, tenantContext);
             }
             throw {
               status: 409,
@@ -335,6 +337,7 @@ class OrderService {
       const newOrder = {
         id: orderId,
         requestId,
+        ...(tenantContext ? { storeId: tenantContext.storeId, branchId: tenantContext.branchId || 'legacy-main-branch' } : {}),
         fulfillmentType,
         customer,
         items: processedItems,
@@ -400,14 +403,14 @@ class OrderService {
 
       if (isTxNotSupported && allowTransaction) {
         console.warn('⚠️ MongoDB deployment does not support transactions. Falling back to non-transactional atomic operations.');
-        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, false, fulfillmentType, paymentMethod);
+        return await this.processOrderMongoDB(requestId, customer, aggregatedItems, false, fulfillmentType, paymentMethod, tenantContext);
       }
 
       throw err;
     }
   }
 
-  async processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH') {
+  async processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH', tenantContext = null) {
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -424,7 +427,9 @@ class OrderService {
       };
     }
 
-    const allItems = menuRepository.getFromFile();
+    const allItems = tenantContext
+      ? await menuRepository.getAllForTenant(tenantContext)
+      : menuRepository.getFromFile();
 
     // Calculate total required quantity per productId
     const totalProductQuantityMap = new Map();
@@ -534,6 +539,7 @@ class OrderService {
       const newOrder = {
         id: orderId,
         requestId,
+        ...(tenantContext ? { storeId: tenantContext.storeId, branchId: tenantContext.branchId || 'legacy-main-branch' } : {}),
         fulfillmentType,
         customer,
         items: processedItems,
@@ -767,7 +773,7 @@ class OrderService {
     return crypto.timingSafeEqual(Buffer.from(actual), Buffer.from(order.orderActionTokenHash));
   }
 
-  async restoreOrderStock(order) {
+  async restoreOrderStock(order, tenantContext = null) {
     const quantities = new Map();
     for (const item of (order.items || [])) {
       const productId = item.productId;
@@ -776,12 +782,14 @@ class OrderService {
       quantities.set(productId, (quantities.get(productId) || 0) + quantity);
     }
     for (const [productId, quantity] of quantities.entries()) {
-      await menuRepository.incrementStockAtomic(productId, quantity);
+      await menuRepository.incrementStockAtomic(productId, quantity, tenantContext);
     }
   }
 
   async cancelOrderInternal(orderId, options = {}) {
-    const order = await orderRepository.findById(orderId);
+    const order = options.tenantContext
+      ? await orderRepository.findByIdForTenant(options.tenantContext, orderId)
+      : await orderRepository.findById(orderId);
     if (!order) throw { status: 404, message: 'Không tìm thấy đơn hàng' };
     if (order.isPaid === true || order.paymentStatus === 'PAID') {
       if (options.reason === 'PAYMENT_TIMEOUT') return order;
@@ -804,16 +812,18 @@ class OrderService {
       cancelledBy,
       unpaidSlotReleased: true,
       updatedAt: cancelledAt
-    });
+    }, options.tenantContext);
 
     if (!updated) {
-      const latest = await orderRepository.findById(orderId);
+      const latest = options.tenantContext
+        ? await orderRepository.findByIdForTenant(options.tenantContext, orderId)
+        : await orderRepository.findById(orderId);
       if (latest?.isPaid === true) throw { status: 409, message: 'Đơn vừa được thanh toán, không thể hủy' };
       return latest || order;
     }
 
     if (order.unpaidSlotReleased !== true) {
-      await this.restoreOrderStock(order);
+      await this.restoreOrderStock(order, options.tenantContext);
     }
 
     if (options.notifyTelegram !== false && config.isTelegramOrderNotificationEnabled()) {
@@ -836,12 +846,13 @@ class OrderService {
     }));
   }
 
-  async adminCancelOrder(orderId, actor) {
+  async adminCancelOrder(orderId, actor, tenantContext = null) {
     return await runWithLock(() => this.cancelOrderInternal(orderId, {
       skipToken: true,
       actor: actor || { userId: null, username: 'admin', role: 'admin' },
       reason: 'ADMIN_CANCEL',
-      paymentStatus: 'CANCELLED'
+      paymentStatus: 'CANCELLED',
+      tenantContext
     }));
   }
 
@@ -886,12 +897,14 @@ class OrderService {
     return result;
   }
 
-  async setPaymentStatus(orderId, isPaid, actor) {
+  async setPaymentStatus(orderId, isPaid, actor, tenantContext = null) {
     if (typeof isPaid !== 'boolean') {
       throw { status: 400, message: 'Trạng thái isPaid phải là kiểu boolean' };
     }
 
-    const order = await orderRepository.findById(orderId);
+    const order = tenantContext
+      ? await orderRepository.findByIdForTenant(tenantContext, orderId)
+      : await orderRepository.findById(orderId);
     if (!order) {
       throw { status: 404, message: 'Không tìm thấy đơn hàng' };
     }
@@ -924,7 +937,7 @@ class OrderService {
           unpaidSlotReleased: false
         };
 
-    const updated = await orderRepository.updatePaymentStatus(orderId, paymentData);
+    const updated = await orderRepository.updatePaymentStatus(orderId, paymentData, tenantContext);
     return updated;
   }
 
@@ -1017,6 +1030,12 @@ class OrderService {
       ? Math.min(parsedLimit, 100)
       : 10;
 
+    // Local JSON mode is intentionally single-tenant legacy storage. Keep the
+    // legacy repository contract for that store until migration has produced
+    // explicit tenant fields; MongoDB always uses the scoped query.
+    if (options.tenantContext && !(options.tenantContext.storeId === 'legacy-store' && !isDBConnected())) {
+      return await orderRepository.getPaginatedForTenant(options.tenantContext, { page, limit });
+    }
     return await orderRepository.getPaginated({ page, limit });
   }
 }

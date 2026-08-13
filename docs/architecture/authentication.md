@@ -19,10 +19,10 @@ sequenceDiagram
     DB-->>AuthAPI: Trả về User record & Store status
     AuthAPI->>AuthAPI: Xác thực scrypt password hash
     AuthAPI->>AuthAPI: Lấy danh sách Branch khả dụng của User
-    AuthAPI-->>Front: Trả về JWT Pre-Session Token + Danh sách Branch
+    AuthAPI-->>Front: Set HttpOnly pre-session cookie + Danh sách Branch
     Front->>Merchant: Hiển thị Màn hình Chọn Chi nhánh
     Merchant->>Front: Chọn Chi nhánh X (branchId_X)
-    Front->>AuthAPI: POST /api/auth/select-branch { preToken, branchId_X }
+    Front->>AuthAPI: POST /api/auth/select-branch { branchId_X }
     AuthAPI->>AuthAPI: Verify user có quyền truy cập branchId_X
     AuthAPI-->>Front: Trả về Official Session Cookie (chứa storeId, branchId)
     Front->>Merchant: Chuyển hướng tới /pos Dashboard
@@ -38,3 +38,14 @@ Tất cả các số điện thoại đầu vào được quy chuẩn về đị
 Tài khoản Super Admin hoàn toàn tách biệt với merchant database:
 - Khu vực đăng nhập riêng: `/super-admin/login`
 - Đăng nhập sử dụng biến môi trường: `SUPER_ADMIN_PHONE`, `SUPER_ADMIN_PASSWORD_HASH`, `SUPER_ADMIN_AUTH_SECRET`.
+
+## 4. Merchant workspace bootstrap
+
+Sau khi session chính được tạo, frontend gọi `GET /api/auth/bootstrap`. API kiểm tra
+`storeId`/`branchId` từ chữ ký session rồi trả về metadata cửa hàng, các chi nhánh mà
+người dùng được phép truy cập, quyền và catalog đã lọc theo `storeId`. Frontend không
+được lấy `storeId` hoặc `branchId` từ query/body để quyết định phạm vi dữ liệu.
+
+`GET /` và `/admin.html` là merchant entry points. Nếu chưa có session, server redirect
+đến `/login.html`; static middleware không còn được phép phục vụ dashboard admin trước
+khi qua guard xác thực.

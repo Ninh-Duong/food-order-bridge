@@ -167,7 +167,14 @@
     const branchSection = document.getElementById('branch-section');
     const branchContainer = document.getElementById('branch-container');
     const subTitle = document.getElementById('sub-title');
-    let savedPreToken = null;
+    const requestedReturnUrl = new URLSearchParams(window.location.search).get('returnUrl');
+
+    function goToWorkspace() {
+      const safeReturnUrl = requestedReturnUrl && requestedReturnUrl.startsWith('/') && !requestedReturnUrl.startsWith('//')
+        ? requestedReturnUrl
+        : '/admin.html';
+      window.location.replace(safeReturnUrl);
+    }
 
     function showError(msg) {
       alertError.textContent = msg;
@@ -186,38 +193,25 @@
       const password = passwordInput.value;
 
       try {
-        // Thử Phone Login trước, nếu không thành công fallback Username
-        let res = await fetch('/api/auth/phone-login', {
+        const res = await fetch('/api/auth/phone-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ phone, password })
         });
 
-        let data = await res.json();
+        const data = await res.json();
 
         if (!res.ok) {
-          // Fallback legacy login
-          res = await fetch('/api/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: phone, password })
-          });
-          data = await res.json();
-          if (!res.ok) {
-            showError(data.message || 'Đăng nhập thất bại');
-            return;
-          }
-          window.location.href = '/admin.html';
+          showError(data.message || 'Số điện thoại hoặc mật khẩu không đúng');
           return;
         }
 
         if (!data.requiresBranchSelection) {
-          window.location.href = '/admin.html';
+          goToWorkspace();
           return;
         }
 
         // Đổ danh sách chi nhánh
-        savedPreToken = data.preToken;
         loginForm.style.display = 'none';
         subTitle.textContent = `Xin chào ${data.user.phoneDisplay || data.user.id}`;
         branchSection.style.display = 'block';
@@ -242,7 +236,7 @@
         const res = await fetch('/api/auth/select-branch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ preToken: savedPreToken, branchId })
+          body: JSON.stringify({ branchId })
         });
 
         const data = await res.json();
@@ -251,7 +245,7 @@
           return;
         }
 
-        window.location.href = '/admin.html';
+        goToWorkspace();
       } catch (err) {
         showError('Lỗi kết nối khi chọn chi nhánh');
       }

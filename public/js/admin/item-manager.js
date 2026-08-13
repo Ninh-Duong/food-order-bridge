@@ -7,6 +7,10 @@ import { renderSkeletonTable } from '../common/ui-state.js';
 
 let adminMenuItems = [];
 let availableCategories = [];
+let initialCatalog = null;
+let initialMenuLoaded = false;
+let initialCategoriesLoaded = false;
+let canCatalogWrite = false;
 
 function calculateSalePriceClient(price, discountPercent = 0) {
   const numPrice = Number(price) || 0;
@@ -27,7 +31,9 @@ function slugifyOptionId(name) {
     .substring(0, 40);
 }
 
-export async function initItemManager() {
+export async function initItemManager(workspace = window.__POS_WORKSPACE__) {
+  initialCatalog = workspace?.catalog || null;
+  canCatalogWrite = workspace?.permissions?.includes('catalog.write') || false;
   await Promise.all([
     fetchAdminMenu(),
     fetchCategories()
@@ -67,6 +73,11 @@ export async function initItemManager() {
 
 
 async function fetchCategories() {
+  if (!initialCategoriesLoaded && initialCatalog?.categories) {
+    availableCategories = initialCatalog.categories;
+    initialCategoriesLoaded = true;
+    return;
+  }
   try {
     const data = await API.get('/api/categories');
     availableCategories = data.categories || [];
@@ -83,6 +94,12 @@ async function fetchAdminMenu() {
   renderSkeletonTable(tableBody, 5, 7);
 
   try {
+    if (!initialMenuLoaded && initialCatalog?.menuItems) {
+      adminMenuItems = initialCatalog.menuItems;
+      initialMenuLoaded = true;
+      renderMenuTable(adminMenuItems);
+      return;
+    }
     const data = await API.get('/api/menu');
     adminMenuItems = data.items || [];
     renderMenuTable(adminMenuItems);
@@ -160,16 +177,16 @@ function renderMenuTable(items) {
         </td>
         <td data-label="Tồn kho">${stockBadgeHtml}</td>
         <td data-label="Bán hôm nay">
-          <label class="switch" title="Bật/Tắt bán hôm nay">
+          ${canCatalogWrite ? `<label class="switch" title="Bật/Tắt bán hôm nay">
             <input type="checkbox" ${isActive ? 'checked' : ''} onchange="window.toggleItemActive('${escapeHTML(item.id)}', this.checked)" />
             <span class="slider"></span>
-          </label>
+          </label>` : '<span style="color:var(--color-text-muted);">Chỉ xem</span>'}
         </td>
         <td data-label="Trạng thái">
           <span class="badge ${statusClass}">${statusText}</span>
         </td>
         <td data-label="Thao tác">
-          <button class="btn btn-outline" style="min-height: 32px; padding: 4px 12px;" onclick="window.openItemModal('${escapeHTML(item.id)}')">Sửa</button>
+          ${canCatalogWrite ? `<button class="btn btn-outline" style="min-height: 32px; padding: 4px 12px;" onclick="window.openItemModal('${escapeHTML(item.id)}')">Sửa</button>` : ''}
         </td>
       </tr>
     `;

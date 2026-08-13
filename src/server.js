@@ -21,7 +21,8 @@ const authService = require('./services/auth-service');
 const { executeMigration } = require('./services/tenant-migration-service');
 const { startOrderExpiryJob } = require('./services/order-expiry-service');
 const { startReportScheduler } = require('./services/report-scheduler');
-const { requireAuth, requireAdmin } = require('./middleware/auth');
+const { cookieValue, requireAuth, requirePageAuth, optionalAuth, requirePermission, requireAdmin } = require('./middleware/auth');
+const { PERMISSIONS } = require('./auth/permissions');
 const { extractTenantContext } = require('./middleware/tenant-context');
 
 const storeRoutes = require('./routes/store-routes');
@@ -45,7 +46,17 @@ const orderLimiter = rateLimit({
   message: { message: 'Bạn đang đặt hàng quá nhanh. Vui lòng thử lại sau 1 phút.' }
 });
 
-// Serve Static Frontend files from public/
+// Merchant entry points are protected before static files are served.
+app.get('/', (req, res) => {
+  const session = authService.parseToken(cookieValue(req, 'admin_session'));
+  return res.redirect(session ? '/admin.html' : '/login.html');
+});
+
+app.get('/admin.html', requirePageAuth, requirePermission('admin.access'), (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'admin.html'));
+});
+
+// Public static assets and login/storefront pages.
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
 // API Routes
@@ -58,14 +69,14 @@ app.use('/api/store', storeRoutes);
 app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api/reports', requireAuth, requireAdmin, reportRoutes);
 app.use('/api/categories', (req, res, next) => {
-  if (req.method === 'GET') return next();
-  return requireAuth(req, res, next);
+  if (req.method === 'GET') return optionalAuth(req, res, next);
+  return requireAuth(req, res, () => requirePermission(PERMISSIONS.CATALOG_WRITE)(req, res, next));
 }, categoryRoutes);
 app.use('/api/menu', (req, res, next) => {
-  if (req.method === 'GET') return next();
-  return requireAuth(req, res, next);
+  if (req.method === 'GET') return optionalAuth(req, res, next);
+  return requireAuth(req, res, () => requirePermission(PERMISSIONS.CATALOG_WRITE)(req, res, next));
 }, menuRoutes);
-app.use('/api/orders', orderLimiter, orderRoutes);
+app.use('/api/orders', orderLimiter, optionalAuth, orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/settings', requireAuth, requireAdmin, settingsRoutes);
 

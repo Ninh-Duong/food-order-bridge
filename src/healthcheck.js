@@ -60,8 +60,13 @@ if (process.env.MONGODB_URI) {
 
 // 5. Test Environment Safety Requirements
 if (process.env.NODE_ENV === 'production') {
-  if (process.env.AUTH_SECRET && process.env.AUTH_SECRET.length < 16) {
-    console.warn('[WARN] AUTH_SECRET is shorter than recommended 16+ characters in production');
+  if (!process.env.AUTH_SECRET || process.env.AUTH_SECRET.length < 32) {
+    console.error('[FAIL] AUTH_SECRET must be configured with at least 32 characters in production');
+    hasError = true;
+  }
+  if (!process.env.SUPER_ADMIN_PHONE || !process.env.SUPER_ADMIN_PASSWORD_HASH || !process.env.SUPER_ADMIN_AUTH_SECRET || process.env.SUPER_ADMIN_AUTH_SECRET.length < 32) {
+    console.error('[FAIL] SUPER_ADMIN_PHONE, SUPER_ADMIN_PASSWORD_HASH and SUPER_ADMIN_AUTH_SECRET (32+ chars) are required in production');
+    hasError = true;
   }
 }
 

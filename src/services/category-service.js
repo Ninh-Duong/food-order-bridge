@@ -49,6 +49,16 @@ class CategoryService {
     return categoriesWithCount;
   }
 
+  async getCategoriesForTenant(tenantContext) {
+    const categories = await categoryRepository.getAllForTenant(tenantContext);
+    const menuItems = await menuRepository.getAllForTenant(tenantContext);
+    const itemCounts = menuItems.reduce((counts, item) => {
+      if (item.categoryId) counts[item.categoryId] = (counts[item.categoryId] || 0) + 1;
+      return counts;
+    }, {});
+    return categories.map((category) => ({ ...category, itemCount: itemCounts[category.id] || 0 }));
+  }
+
   async getCategory(id) {
     if (!id) return null;
     const cat = await categoryRepository.getById(id);
@@ -57,7 +67,7 @@ class CategoryService {
     return { ...cat, itemCount };
   }
 
-  async createCategory(payload = {}) {
+  async createCategory(payload = {}, tenantContext = null) {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Dữ liệu danh mục không hợp lệ');
     }
@@ -100,21 +110,27 @@ class CategoryService {
     const active = payload.active !== undefined ? Boolean(payload.active) : true;
 
     // Check duplicate ID
-    const existingId = await categoryRepository.getById(id);
+    const existingId = tenantContext
+      ? await categoryRepository.getByIdForTenant(tenantContext, id)
+      : await categoryRepository.getById(id);
     if (existingId) {
       throw new Error(`Mã danh mục "${id}" đã tồn tại`);
     }
 
     // Check duplicate normalized name
     const normName = normalizeName(name);
-    const existingName = await categoryRepository.findByNormalizedName(normName);
+    const existingName = tenantContext
+      ? await categoryRepository.findByNormalizedNameForTenant(tenantContext, normName)
+      : await categoryRepository.findByNormalizedName(normName);
     if (existingName) {
       throw new Error(`Tên danh mục "${name}" đã tồn tại`);
     }
 
     // Generate slug
     let slug = generateSlug(name);
-    const existingSlug = await categoryRepository.getBySlug(slug);
+    const existingSlug = tenantContext
+      ? await categoryRepository.getBySlugForTenant(tenantContext, slug)
+      : await categoryRepository.getBySlug(slug);
     if (existingSlug) {
       slug = `${slug}-${id.toLowerCase()}`;
     }
@@ -126,18 +142,22 @@ class CategoryService {
       description,
       sortOrder,
       active
-    });
+    }, tenantContext);
 
-    const itemCount = await menuRepository.countByCategoryId(created.id);
+    const itemCount = tenantContext
+      ? await menuRepository.countByCategoryIdForTenant(tenantContext, created.id)
+      : await menuRepository.countByCategoryId(created.id);
     return { ...created, itemCount };
   }
 
-  async updateCategory(id, payload = {}) {
+  async updateCategory(id, payload = {}, tenantContext = null) {
     if (!id || typeof id !== 'string') {
       throw new Error('Mã danh mục không hợp lệ');
     }
     const upperId = id.trim().toUpperCase();
-    const existing = await categoryRepository.getById(upperId);
+    const existing = tenantContext
+      ? await categoryRepository.getByIdForTenant(tenantContext, upperId)
+      : await categoryRepository.getById(upperId);
     if (!existing) {
       throw new Error(`Không tìm thấy danh mục với mã ${upperId}`);
     }
@@ -171,14 +191,18 @@ class CategoryService {
     const newNormName = normalizeName(name);
     const oldNormName = normalizeName(existing.name);
     if (newNormName !== oldNormName) {
-      const existingName = await categoryRepository.findByNormalizedName(newNormName);
+      const existingName = tenantContext
+        ? await categoryRepository.findByNormalizedNameForTenant(tenantContext, newNormName)
+        : await categoryRepository.findByNormalizedName(newNormName);
       if (existingName && existingName.id !== upperId) {
         throw new Error(`Tên danh mục "${name}" đã tồn tại`);
       }
     }
 
     let slug = generateSlug(name);
-    const existingSlug = await categoryRepository.getBySlug(slug);
+    const existingSlug = tenantContext
+      ? await categoryRepository.getBySlugForTenant(tenantContext, slug)
+      : await categoryRepository.getBySlug(slug);
     if (existingSlug && existingSlug.id !== upperId) {
       slug = `${slug}-${upperId.toLowerCase()}`;
     }
@@ -189,29 +213,35 @@ class CategoryService {
       description,
       sortOrder,
       active
-    });
+    }, tenantContext);
 
     // Sync menu items snapshot if name changed
     if (name !== existing.name) {
-      await menuRepository.updateCategorySnapshot(upperId, name);
+      await menuRepository.updateCategorySnapshot(upperId, name, tenantContext);
     }
 
-    const itemCount = await menuRepository.countByCategoryId(upperId);
+    const itemCount = tenantContext
+      ? await menuRepository.countByCategoryIdForTenant(tenantContext, upperId)
+      : await menuRepository.countByCategoryId(upperId);
     return { ...updated, itemCount };
   }
 
-  async toggleCategoryActive(id, activeState) {
+  async toggleCategoryActive(id, activeState, tenantContext = null) {
     if (!id || typeof id !== 'string') {
       throw new Error('Mã danh mục không hợp lệ');
     }
     const upperId = id.trim().toUpperCase();
-    const existing = await categoryRepository.getById(upperId);
+    const existing = tenantContext
+      ? await categoryRepository.getByIdForTenant(tenantContext, upperId)
+      : await categoryRepository.getById(upperId);
     if (!existing) {
       throw new Error(`Không tìm thấy danh mục với mã ${upperId}`);
     }
 
-    const updated = await categoryRepository.toggleActive(upperId, Boolean(activeState));
-    const itemCount = await menuRepository.countByCategoryId(upperId);
+    const updated = await categoryRepository.toggleActive(upperId, Boolean(activeState), tenantContext);
+    const itemCount = tenantContext
+      ? await menuRepository.countByCategoryIdForTenant(tenantContext, upperId)
+      : await menuRepository.countByCategoryId(upperId);
     return { ...updated, itemCount };
   }
 }

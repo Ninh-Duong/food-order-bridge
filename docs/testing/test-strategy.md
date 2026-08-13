@@ -63,3 +63,13 @@ Tài liệu này quy định **Chiến lược Kiểm thử phòng ngừa bug (Z
 * **Mục tiêu**: Deploy Production, dry-run backfill, bật index mới, chuyển đổi hệ thống an toàn.
 * **Kịch bản Test bắt buộc**:
   - Production Healthcheck API & Sanity Smoke Test.
+
+## Kiểm thử đã bổ sung cho merchant workspace
+
+- Mỗi thay đổi chạy `npm test` và `npm run build`.
+- Auth/route test bao gồm unauthenticated redirect/401, owner access, staff permission
+  denial, branch switching và bootstrap scope.
+- Repository tenant test kiểm tra `TenantContextMissingError` khi thiếu `storeId`.
+- Production smoke test: `/` chuyển tới login khi chưa có cookie; `/admin.html` không
+  được static middleware phục vụ nếu thiếu session; `/api/auth/bootstrap` trả Store và
+  Branch đúng session.
