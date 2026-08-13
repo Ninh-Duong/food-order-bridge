@@ -35,6 +35,8 @@
     "retryOfOrderId": null,
     "unpaidSlotReleased": false,
     "orderActionTokenHash": null,
-    "paidBy": null
+    "paidBy": null,
+    "storeId": "legacy-store",
+    "branchId": "legacy-main-branch"
   }
 ]
