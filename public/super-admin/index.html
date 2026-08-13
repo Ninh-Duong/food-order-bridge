@@ -181,6 +181,26 @@
       box-sizing: border-box;
     }
 
+    .branch-list {
+      max-height: 240px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 16px;
+    }
+
+    .branch-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+
+    .branch-row:last-child { border-bottom: 0; }
+
     /* Super Admin Login Modal Overlay */
     #login-overlay {
       display: flex;
@@ -208,11 +228,11 @@
 
       <div class="form-group">
         <label>Số điện thoại Super Admin</label>
-        <input type="text" id="sa-phone" class="form-control" placeholder="0900000000" value="0900000000">
+        <input type="text" id="sa-phone" class="form-control" placeholder="Số điện thoại Super Admin">
       </div>
       <div class="form-group">
         <label>Mật khẩu</label>
-        <input type="password" id="sa-password" class="form-control" placeholder="••••••••" value="SuperAdmin123!">
+        <input type="password" id="sa-password" class="form-control" placeholder="Mật khẩu Super Admin">
       </div>
       <button class="btn" style="width:100%; margin-top:8px;" onclick="handleSuperLogin()">Đăng nhập Console</button>
     </div>
@@ -297,8 +317,35 @@
     </div>
   </div>
 
+  <!-- Branch management modal: only Super Admin can create a branch. -->
+  <div id="branch-modal" class="modal-overlay">
+    <div class="modal">
+      <h3 id="branch-modal-title" style="margin-top:0;">Quản lý chi nhánh</h3>
+      <div id="branch-form-error" style="color:var(--danger); font-size:0.85rem; margin-bottom:10px; display:none;"></div>
+      <div id="branch-list" class="branch-list"></div>
+      <div class="form-group">
+        <label>Mã chi nhánh</label>
+        <input type="text" id="new-branch-code" class="form-control" placeholder="Q1">
+      </div>
+      <div class="form-group">
+        <label>Tên chi nhánh</label>
+        <input type="text" id="new-branch-name" class="form-control" placeholder="Chi nhánh Quận 1">
+      </div>
+      <div class="form-group">
+        <label>Địa chỉ</label>
+        <input type="text" id="new-branch-address" class="form-control" placeholder="123 Nguyễn Huệ">
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+        <button class="btn btn-danger" onclick="closeBranchModal()">Đóng</button>
+        <button class="btn" onclick="submitCreateBranch()">Thêm chi nhánh</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     let superToken = null;
+    let selectedStoreId = null;
+    let storesCache = [];
 
     async function handleSuperLogin() {
       const phone = document.getElementById('sa-phone').value;
@@ -313,6 +360,7 @@
           body: JSON.stringify({ phone, password })
         });
         const data = await res.json();
+        storesCache = data.stores || [];
         if (!res.ok) {
           errEl.textContent = data.error || 'Đăng nhập thất bại';
           errEl.style.display = 'block';
@@ -363,6 +411,7 @@
               <button class="btn ${isSuspended ? '' : 'btn-danger'}" onclick="toggleStoreStatus('${store.id}', '${isSuspended ? 'ACTIVE' : 'SUSPENDED'}')">
                 ${isSuspended ? 'Mở lại' : 'Khóa Store'}
               </button>
+              <button class="btn" style="margin-left:6px;" onclick="openBranchModal('${store.id}')">Chi nhánh (${(store.branches || []).length})</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -420,6 +469,83 @@
 
     function closeCreateStoreModal() {
       document.getElementById('create-store-modal').style.display = 'none';
+    }
+
+    function openBranchModal(storeId) {
+      selectedStoreId = storeId;
+      const store = storesCache.find((item) => item.id === storeId);
+      document.getElementById('branch-modal-title').textContent = `Chi nhánh — ${store?.name || storeId}`;
+      document.getElementById('branch-form-error').style.display = 'none';
+      renderBranchList(store?.branches || []);
+      document.getElementById('branch-modal').style.display = 'flex';
+    }
+
+    function closeBranchModal() {
+      document.getElementById('branch-modal').style.display = 'none';
+      selectedStoreId = null;
+    }
+
+    function renderBranchList(branches) {
+      const list = document.getElementById('branch-list');
+      if (!branches.length) {
+        list.innerHTML = '<div style="padding:14px; color:var(--muted);">Chưa có chi nhánh.</div>';
+        return;
+      }
+      list.innerHTML = branches.map((branch) => `
+        <div class="branch-row">
+          <span><strong>${branch.code}</strong> — ${branch.name}<br><small style="color:var(--muted);">${branch.address || ''}</small></span>
+          <button class="btn ${branch.status === 'ACTIVE' ? 'btn-danger' : ''}" onclick="toggleBranchStatus('${branch.id}', '${branch.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'}')">
+            ${branch.status === 'ACTIVE' ? 'Khóa' : 'Mở lại'}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function submitCreateBranch() {
+      if (!selectedStoreId) return;
+      const errEl = document.getElementById('branch-form-error');
+      errEl.style.display = 'none';
+      try {
+        const res = await fetch(`/api/super-admin/stores/${selectedStoreId}/branches`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-super-admin-token': superToken },
+          body: JSON.stringify({
+            code: document.getElementById('new-branch-code').value,
+            name: document.getElementById('new-branch-name').value,
+            address: document.getElementById('new-branch-address').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Không thể tạo chi nhánh');
+        document.getElementById('new-branch-code').value = '';
+        document.getElementById('new-branch-name').value = '';
+        document.getElementById('new-branch-address').value = '';
+        await fetchStores();
+        const store = storesCache.find((item) => item.id === selectedStoreId);
+        renderBranchList(store?.branches || []);
+      } catch (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+      }
+    }
+
+    async function toggleBranchStatus(branchId, status) {
+      try {
+        const res = await fetch(`/api/super-admin/branches/${branchId}/status`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-super-admin-token': superToken },
+          body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Không thể cập nhật chi nhánh');
+        await fetchStores();
+        const store = storesCache.find((item) => item.id === selectedStoreId);
+        renderBranchList(store?.branches || []);
+      } catch (error) {
+        const errEl = document.getElementById('branch-form-error');
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+      }
     }
 
     async function submitCreateStore() {

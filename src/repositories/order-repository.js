@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { isDBConnected } = require('../db');
 const { OrderModel, CounterModel } = require('../models');
+const { assertTenantContext } = require('../middleware/tenant-context');
 
 const ORDERS_FILE = path.join(__dirname, '..', 'data', 'orders.json');
 
@@ -84,6 +85,20 @@ class OrderRepository {
     return this.formatMemoryOrder(this.orders.get(orderId)) || null;
   }
 
+  async findByIdForTenant(tenantContext, orderId) {
+    const { storeId, branchId } = assertTenantContext(tenantContext);
+    if (!orderId) return null;
+    const query = { id: orderId, storeId };
+    if (branchId) query.branchId = branchId;
+    if (isDBConnected()) {
+      const doc = await OrderModel.findOne(query).lean();
+      return doc ? this.formatDoc(doc) : null;
+    }
+    const order = this.orders.get(orderId);
+    if (!order || (order.storeId || 'legacy-store') !== storeId || (branchId && (order.branchId || 'legacy-main-branch') !== branchId)) return null;
+    return this.formatMemoryOrder(order);
+  }
+
   async getPaginated({ page = 1, limit = 10 }) {
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.max(1, parseInt(limit, 10) || 10);
@@ -140,6 +155,33 @@ class OrderRepository {
         totalOrders,
         totalPages
       }
+    };
+  }
+
+  async getPaginatedForTenant(tenantContext, { page = 1, limit = 10 } = {}) {
+    const { storeId, branchId } = assertTenantContext(tenantContext);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.max(1, parseInt(limit, 10) || 10);
+    const skip = (pageNum - 1) * limitNum;
+    const query = { storeId };
+    if (branchId) query.branchId = branchId;
+    if (isDBConnected()) {
+      const [docs, totalOrders] = await Promise.all([
+        OrderModel.find(query).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limitNum).lean(),
+        OrderModel.countDocuments(query)
+      ]);
+      return {
+        orders: (docs || []).map((doc) => this.formatDoc(doc)),
+        pagination: { page: pageNum, limit: limitNum, totalOrders, totalPages: Math.max(1, Math.ceil(totalOrders / limitNum)) }
+      };
+    }
+    const list = Array.from(this.orders.values())
+      .filter((order) => (order.storeId || 'legacy-store') === storeId && (!branchId || (order.branchId || 'legacy-main-branch') === branchId))
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0) || String(b.id || '').localeCompare(String(a.id || '')));
+    const totalOrders = list.length;
+    return {
+      orders: list.slice(skip, skip + limitNum).map((order) => this.formatMemoryOrder(order)),
+      pagination: { page: pageNum, limit: limitNum, totalOrders, totalPages: Math.max(1, Math.ceil(totalOrders / limitNum)) }
     };
   }
 
@@ -203,6 +245,8 @@ class OrderRepository {
         const docData = {
           id: order.id,
           requestId: order.requestId,
+          storeId: order.storeId || 'legacy-store',
+          branchId: order.branchId || 'legacy-main-branch',
           fulfillmentType: order.fulfillmentType || 'DELIVERY',
           customerName: order.customer ? order.customer.name : (order.customerName || ''),
           phone: order.customer ? order.customer.phone : (order.phone || ''),
@@ -310,12 +354,13 @@ class OrderRepository {
     return null;
   }
 
-  async updatePaymentStatus(orderId, paymentData) {
+  async updatePaymentStatus(orderId, paymentData, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     let updatedOrder = null;
     if (isDBConnected()) {
       try {
         const doc = await OrderModel.findOneAndUpdate(
-          { id: orderId },
+          { id: orderId, ...(tenantContext ? { storeId: tenantContext.storeId, ...(tenantContext.branchId ? { branchId: tenantContext.branchId } : {}) } : {}) },
           { $set: paymentData },
           { returnDocument: 'after', new: true }
         ).lean();
@@ -328,7 +373,11 @@ class OrderRepository {
     }
 
     const existing = this.orders.get(orderId);
-    if (!updatedOrder && !existing) return null;
+    const tenantMismatch = tenantContext && (
+      (existing?.storeId || 'legacy-store') !== tenantContext.storeId
+      || (tenantContext.branchId && (existing?.branchId || 'legacy-main-branch') !== tenantContext.branchId)
+    );
+    if (!updatedOrder && (!existing || tenantMismatch)) return null;
 
     const memoryUpdated = {
       ...(existing || updatedOrder),
@@ -341,7 +390,8 @@ class OrderRepository {
     return updatedOrder || memoryUpdated;
   }
 
-  async getPaidOrdersByRange({ from, to }) {
+  async getPaidOrdersByRange({ from, to, tenantContext = null }) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const fromDate = new Date(from);
     const toDate = new Date(to);
 
@@ -349,7 +399,8 @@ class OrderRepository {
       try {
         const docs = await OrderModel.find({
           isPaid: true,
-          paidAt: { $gte: fromDate, $lt: toDate }
+          paidAt: { $gte: fromDate, $lt: toDate },
+          ...(tenantContext ? { storeId: tenantContext.storeId, ...(tenantContext.branchId ? { branchId: tenantContext.branchId } : {}) } : {})
         }).sort({ paidAt: 1 }).lean();
         return (docs || []).map(d => this.formatDoc(d));
       } catch (err) {
@@ -362,7 +413,9 @@ class OrderRepository {
     for (const order of this.orders.values()) {
       if (order.isPaid === true && order.paidAt) {
         const pDate = new Date(order.paidAt);
-        if (pDate >= fromDate && pDate < toDate) {
+        if (pDate >= fromDate && pDate < toDate
+          && (!tenantContext || ((order.storeId || 'legacy-store') === tenantContext.storeId
+            && (!tenantContext.branchId || (order.branchId || 'legacy-main-branch') === tenantContext.branchId)))) {
           paidOrders.push(order);
         }
       }
@@ -370,14 +423,16 @@ class OrderRepository {
     return paidOrders.sort((a, b) => new Date(a.paidAt) - new Date(b.paidAt));
   }
 
-  async getOrdersByCreatedRange({ from, to }) {
+  async getOrdersByCreatedRange({ from, to, tenantContext = null }) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const fromDate = new Date(from);
     const toDate = new Date(to);
 
     if (isDBConnected()) {
       try {
         const docs = await OrderModel.find({
-          createdAt: { $gte: fromDate, $lt: toDate }
+          createdAt: { $gte: fromDate, $lt: toDate },
+          ...(tenantContext ? { storeId: tenantContext.storeId, ...(tenantContext.branchId ? { branchId: tenantContext.branchId } : {}) } : {})
         }).sort({ createdAt: 1 }).lean();
         return (docs || []).map(d => this.formatDoc(d));
       } catch (err) {
@@ -389,13 +444,16 @@ class OrderRepository {
     return Array.from(this.orders.values())
       .filter(order => {
         const created = new Date(order.createdAt || 0);
-        return created >= fromDate && created < toDate;
+        return created >= fromDate && created < toDate
+          && (!tenantContext || ((order.storeId || 'legacy-store') === tenantContext.storeId
+            && (!tenantContext.branchId || (order.branchId || 'legacy-main-branch') === tenantContext.branchId)));
       })
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
       .map(order => this.formatMemoryOrder(order));
   }
 
-  async getCancelledOrdersByRange({ from, to }) {
+  async getCancelledOrdersByRange({ from, to, tenantContext = null }) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const fromDate = new Date(from);
     const toDate = new Date(to);
 
@@ -403,7 +461,8 @@ class OrderRepository {
       try {
         const docs = await OrderModel.find({
           orderStatus: 'CANCELLED',
-          cancelledAt: { $gte: fromDate, $lt: toDate }
+          cancelledAt: { $gte: fromDate, $lt: toDate },
+          ...(tenantContext ? { storeId: tenantContext.storeId, ...(tenantContext.branchId ? { branchId: tenantContext.branchId } : {}) } : {})
         }).sort({ cancelledAt: 1 }).lean();
         return (docs || []).map(d => this.formatDoc(d));
       } catch (err) {
@@ -415,7 +474,9 @@ class OrderRepository {
     return Array.from(this.orders.values())
       .filter(order => {
         const cancelled = new Date(order.cancelledAt || 0);
-        return order.orderStatus === 'CANCELLED' && cancelled >= fromDate && cancelled < toDate;
+        return order.orderStatus === 'CANCELLED' && cancelled >= fromDate && cancelled < toDate
+          && (!tenantContext || ((order.storeId || 'legacy-store') === tenantContext.storeId
+            && (!tenantContext.branchId || (order.branchId || 'legacy-main-branch') === tenantContext.branchId)));
       })
       .sort((a, b) => new Date(a.cancelledAt) - new Date(b.cancelledAt))
       .map(order => this.formatMemoryOrder(order));
@@ -466,12 +527,14 @@ class OrderRepository {
     return pending.length;
   }
 
-  async transitionPendingOrder(orderId, fields) {
+  async transitionPendingOrder(orderId, fields, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     if (isDBConnected()) {
       try {
         const doc = await OrderModel.findOneAndUpdate(
           {
             id: orderId,
+            ...(tenantContext ? { storeId: tenantContext.storeId, ...(tenantContext.branchId ? { branchId: tenantContext.branchId } : {}) } : {}),
             isPaid: false,
             orderStatus: { $ne: 'CANCELLED' },
             paymentStatus: { $in: ['UNPAID', 'PENDING'] }
@@ -487,7 +550,7 @@ class OrderRepository {
     }
 
     const existing = this.orders.get(orderId);
-    if (!existing || existing.isPaid === true || existing.orderStatus === 'CANCELLED'
+    if (!existing || (tenantContext && ((existing.storeId || 'legacy-store') !== tenantContext.storeId || (tenantContext.branchId && (existing.branchId || 'legacy-main-branch') !== tenantContext.branchId))) || existing.isPaid === true || existing.orderStatus === 'CANCELLED'
       || !['UNPAID', 'PENDING'].includes(existing.paymentStatus || 'UNPAID')) {
       return null;
     }

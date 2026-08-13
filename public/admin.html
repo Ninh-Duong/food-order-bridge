@@ -13,21 +13,12 @@
 <body class="admin-layout">
 
   <div class="auth-screen" id="auth-screen">
-    <form class="auth-card" id="login-form">
+    <div class="auth-card">
       <div class="auth-logo">⚙️</div>
-      <h1>Đăng nhập quản trị</h1>
-      <p>Dùng tài khoản admin hoặc nhân viên để tiếp tục.</p>
-      <div class="form-group">
-        <label class="form-label" for="login-username">Tên đăng nhập</label>
-        <input class="form-control" id="login-username" autocomplete="username" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="login-password">Mật khẩu</label>
-        <input class="form-control" id="login-password" type="password" autocomplete="current-password" required>
-      </div>
+      <h1>Đang tải cửa hàng</h1>
+      <p>Đang xác minh phiên đăng nhập và tải workspace của cửa hàng...</p>
       <div class="auth-error" id="login-error" role="alert"></div>
-      <button class="btn btn-primary" type="submit">Đăng nhập</button>
-    </form>
+    </div>
   </div>
 
   <!-- Admin Navbar -->
@@ -38,9 +29,11 @@
       </div>
       <div class="admin-user-area">
         <span id="current-tenant-badge" style="background:#334155; color:#38bdf8; font-size:0.8rem; font-weight:600; padding:4px 8px; border-radius:4px; border:1px solid #475569;">📍 Legacy Branch</span>
+        <label for="branch-switcher" class="sr-only">Chuyển chi nhánh</label>
+        <select id="branch-switcher" class="form-control" hidden style="width:auto; min-width:170px; min-height:38px; padding:4px 8px;"></select>
         <span id="current-user"></span>
-        <a href="index.html" class="btn btn-primary" style="min-height: 38px; padding: 4px 16px;">
-          🛒 Xem trang bán hàng
+        <a href="/login.html" class="btn btn-primary" style="min-height: 38px; padding: 4px 16px;">
+          🔁 Đổi tài khoản
         </a>
         <button class="btn btn-secondary" id="btn-logout">Đăng xuất</button>
       </div>
@@ -50,8 +43,8 @@
         <button class="admin-tab-btn active" role="tab" id="tab-btn-orders" aria-selected="true" aria-controls="tab-orders" data-target="tab-orders" aria-label="Lịch sử đơn hàng"><span class="admin-tab-icon">📋</span><span class="admin-tab-label-full">Lịch sử Đơn hàng</span><span class="admin-tab-label-short">Đơn hàng</span></button>
         <button class="admin-tab-btn" role="tab" id="tab-btn-items" aria-selected="false" aria-controls="tab-items" data-target="tab-items" aria-label="Quản lý món ăn"><span class="admin-tab-icon">🍔</span><span class="admin-tab-label-full">Quản lý Món ăn</span><span class="admin-tab-label-short">Món ăn</span></button>
         <button class="admin-tab-btn" role="tab" id="tab-btn-categories" aria-selected="false" aria-controls="tab-categories" data-target="tab-categories" aria-label="Quản lý danh mục"><span class="admin-tab-icon">🗂</span><span class="admin-tab-label-full">Quản lý Danh mục</span><span class="admin-tab-label-short">Danh mục</span></button>
-        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-reports" aria-selected="false" aria-controls="tab-reports" data-target="tab-reports" aria-label="Báo cáo bán hàng"><span class="admin-tab-icon">📊</span><span class="admin-tab-label-full">Báo cáo bán hàng</span><span class="admin-tab-label-short">Báo cáo</span></button>
-        <button class="admin-tab-btn admin-only" role="tab" id="tab-btn-accounts" aria-selected="false" aria-controls="tab-accounts" data-target="tab-accounts" aria-label="Tài khoản nhân viên"><span class="admin-tab-icon">👥</span><span class="admin-tab-label-full">Tài khoản nhân viên</span><span class="admin-tab-label-short">Nhân viên</span></button>
+        <button class="admin-tab-btn admin-only" data-permission="reports.read.store" role="tab" id="tab-btn-reports" aria-selected="false" aria-controls="tab-reports" data-target="tab-reports" aria-label="Báo cáo bán hàng"><span class="admin-tab-icon">📊</span><span class="admin-tab-label-full">Báo cáo bán hàng</span><span class="admin-tab-label-short">Báo cáo</span></button>
+        <button class="admin-tab-btn admin-only" data-permission="staff.manage" role="tab" id="tab-btn-accounts" aria-selected="false" aria-controls="tab-accounts" data-target="tab-accounts" aria-label="Tài khoản nhân viên"><span class="admin-tab-icon">👥</span><span class="admin-tab-label-full">Tài khoản nhân viên</span><span class="admin-tab-label-short">Nhân viên</span></button>
       </div>
     </div>
   </header>
@@ -65,10 +58,10 @@
         <div class="admin-card-header">
           <h2 style="font-size: var(--font-size-lg); font-weight: 800;">Danh sách món ăn hiện tại</h2>
           <div style="display: flex; gap: var(--space-2); flex-wrap: wrap;">
-            <button class="btn btn-secondary admin-only" id="btn-reset-data" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" title="Khôi phục thực đơn & danh mục về bộ dữ liệu chuẩn">
+            <button class="btn btn-secondary admin-only" id="btn-reset-data" data-permission="catalog.write" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3);" title="Khôi phục thực đơn & danh mục về bộ dữ liệu chuẩn">
               ♻️ Reset Dữ Liệu Chuẩn
             </button>
-            <button class="btn btn-primary" id="btn-open-add-item">+ Thêm món mới</button>
+            <button class="btn btn-primary" id="btn-open-add-item" data-permission="catalog.write">+ Thêm món mới</button>
           </div>
         </div>
 
@@ -98,7 +91,7 @@
       <div class="admin-card">
         <div class="admin-card-header">
           <h2 style="font-size: var(--font-size-lg); font-weight: 800;">Danh sách danh mục món ăn</h2>
-          <button class="btn btn-primary" id="btn-open-add-category">+ Thêm danh mục mới</button>
+          <button class="btn btn-primary" id="btn-open-add-category" data-permission="catalog.write">+ Thêm danh mục mới</button>
         </div>
         <div class="table-responsive">
           <table class="admin-table admin-card-table admin-category-table">
@@ -120,7 +113,7 @@
       </div>
     </section>
 
-    <section id="tab-accounts" class="admin-tab-content admin-only" style="display: none;">
+    <section id="tab-accounts" class="admin-tab-content admin-only" data-permission="staff.manage" style="display: none;">
       <div class="admin-card">
         <div class="admin-card-header"><h2>Tài khoản nhân viên</h2></div>
         <form id="staff-form" class="staff-form">
@@ -218,7 +211,7 @@
     </section>
 
     <!-- TAB 4: SALES REPORTS DASHBOARD (Admin Only) -->
-    <section id="tab-reports" class="admin-tab-content admin-only" style="display: none;">
+    <section id="tab-reports" class="admin-tab-content admin-only" data-permission="reports.read.store" style="display: none;">
       <div class="admin-card">
         <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; align-items: center;">
           <div>
@@ -307,6 +300,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const user = await initAuth();
       if (!user) return;
+      const workspace = window.__POS_WORKSPACE__;
       
       // Tab Navigation with ARIA State Management
       const tabs = document.querySelectorAll('.admin-tab-btn');
@@ -330,11 +324,11 @@
         });
       });
 
-      initCategoryManager();
-      initItemManager();
+      initCategoryManager(workspace);
+      initItemManager(workspace);
       initOrderMonitor();
 
-      if (user.role === 'admin') {
+      if (Array.isArray(user.permissions) && user.permissions.includes('reports.read.store')) {
         initReportDashboard();
       }
     });

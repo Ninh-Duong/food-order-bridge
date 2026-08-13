@@ -35,3 +35,13 @@ Nếu `tenantCtx` rỗng hoặc thiếu `storeId`, `assertTenantContext` ném l�
 ## 3. Session-Bound Context
 - Context của request đăng nhập được lưu trong JWT Token đã ký HMAC.
 - Không nhận `storeId` hoặc `branchId` từ request body như nguồn tin cậy.
+
+## 4. Trạng thái triển khai hiện tại
+
+- Merchant catalog (`/api/menu`, `/api/categories`) và merchant order listing/report đã
+  có các repository method scoped theo `storeId`; tồn kho MongoDB dùng
+  `BranchInventory(storeId, branchId, menuItemId)` khi session có Branch.
+- Chế độ JSON legacy vẫn là single-tenant fallback (`legacy-store`) để giữ tương thích dữ
+  liệu cũ; không dùng chế độ này làm backend production cho nhiều Store.
+- Các method legacy không nhận context chỉ được giữ cho storefront/migration và test tương
+  thích. Tính năng mới phải dùng method `*ForTenant` và fail-fast bằng `assertTenantContext`.

@@ -29,6 +29,11 @@ async function findByUsername(username) {
   return readFileUsers().find((user) => user.username === username) || null;
 }
 
+async function findByPhone(phoneNormalized) {
+  if (isDBConnected()) return UserModel.findOne({ phoneNormalized }).lean();
+  return readFileUsers().find((user) => user.phoneNormalized === phoneNormalized || user.username === phoneNormalized) || null;
+}
+
 async function findAdmin() {
   if (isDBConnected()) return UserModel.findOne({ role: 'admin' }).lean();
   return readFileUsers().find((user) => user.role === 'admin') || null;
@@ -43,11 +48,12 @@ async function create(user) {
   return safeUser(stored);
 }
 
-async function listStaff() {
+async function listStaff(tenantContext = null) {
+  const query = { role: 'staff', ...(tenantContext?.storeId ? { storeId: tenantContext.storeId } : {}) };
   const users = isDBConnected()
-    ? await UserModel.find({ role: 'staff' }).sort({ createdAt: -1 }).lean()
-    : readFileUsers().filter((user) => user.role === 'staff');
+    ? await UserModel.find(query).sort({ createdAt: -1 }).lean()
+    : readFileUsers().filter((user) => user.role === 'staff' && (!tenantContext?.storeId || (user.storeId || 'legacy-store') === tenantContext.storeId));
   return users.map(safeUser);
 }
 
-module.exports = { findByUsername, findAdmin, create, listStaff };
+module.exports = { findByUsername, findByPhone, findAdmin, create, listStaff };

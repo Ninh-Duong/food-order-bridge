@@ -38,7 +38,7 @@ class ReportService {
     throw { status: 400, message: 'Bộ lọc báo cáo không hợp lệ' };
   }
 
-  async generateSalesReport(period = 'today', referenceDate = new Date()) {
+  async generateSalesReport(period = 'today', referenceDate = new Date(), tenantContext = null) {
     if (!['today', 'date', 'week', 'month'].includes(period)) {
       throw { status: 400, message: 'Bộ lọc báo cáo không hợp lệ' };
     }
@@ -48,9 +48,9 @@ class ReportService {
     const toJS = to.toJSDate();
 
     const [paidOrders, createdOrders, cancelledOrders] = await Promise.all([
-      orderRepository.getPaidOrdersByRange({ from: fromJS, to: toJS }),
-      orderRepository.getOrdersByCreatedRange({ from: fromJS, to: toJS }),
-      orderRepository.getCancelledOrdersByRange({ from: fromJS, to: toJS })
+      orderRepository.getPaidOrdersByRange({ from: fromJS, to: toJS, tenantContext }),
+      orderRepository.getOrdersByCreatedRange({ from: fromJS, to: toJS, tenantContext }),
+      orderRepository.getCancelledOrdersByRange({ from: fromJS, to: toJS, tenantContext })
     ]);
 
     const summary = {

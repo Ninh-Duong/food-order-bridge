@@ -6,8 +6,13 @@ import { showToast, escapeHTML } from '../common/utils.js';
 import { renderSkeletonTable } from '../common/ui-state.js';
 
 let adminCategories = [];
+let initialCatalog = null;
+let initialCategoriesLoaded = false;
+let canCatalogWrite = false;
 
-export async function initCategoryManager() {
+export async function initCategoryManager(workspace = window.__POS_WORKSPACE__) {
+  initialCatalog = workspace?.catalog || null;
+  canCatalogWrite = workspace?.permissions?.includes('catalog.write') || false;
   await fetchCategories();
 
   const addBtn = document.getElementById('btn-open-add-category');
@@ -23,6 +28,12 @@ export async function fetchCategories() {
   renderSkeletonTable(tableBody, 4, 6);
 
   try {
+    if (!initialCategoriesLoaded && initialCatalog?.categories) {
+      adminCategories = initialCatalog.categories;
+      initialCategoriesLoaded = true;
+      renderCategoryTable(adminCategories);
+      return adminCategories;
+    }
     const data = await API.get('/api/categories');
     adminCategories = data.categories || [];
     renderCategoryTable(adminCategories);
@@ -86,13 +97,13 @@ function renderCategoryTable(categories) {
         </td>
         <td data-label="Số món"><span class="badge" style="background: rgba(0,0,0,0.05); color: var(--color-text-main);">${cat.itemCount ?? 0} món</span></td>
         <td data-label="Trạng thái">
-          <label class="switch" title="Bật/Tắt hiển thị danh mục">
+          ${canCatalogWrite ? `<label class="switch" title="Bật/Tắt hiển thị danh mục">
             <input type="checkbox" ${cat.active !== false ? 'checked' : ''} onchange="window.toggleCategoryActive('${safeId}', this.checked)" />
             <span class="slider"></span>
-          </label>
+          </label>` : '<span style="color:var(--color-text-muted);">Chỉ xem</span>'}
         </td>
         <td data-label="Thao tác">
-          <button class="btn btn-outline" style="min-height: 32px; padding: 4px 12px;" onclick="window.openCategoryModal('${safeId}')">Sửa</button>
+          ${canCatalogWrite ? `<button class="btn btn-outline" style="min-height: 32px; padding: 4px 12px;" onclick="window.openCategoryModal('${safeId}')">Sửa</button>` : ''}
         </td>
       </tr>
     `;

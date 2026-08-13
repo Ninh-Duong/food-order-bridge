@@ -37,3 +37,4 @@ Tài liệu quy định chi tiết quyền hạn giữa các vai trò trong hệ
 
 1. **Owner không tự tạo Branch**: Để kiểm soát tài nguyên và tính phí gói dịch vụ, chỉ `SUPER_ADMIN` mới có quyền khởi tạo Chi nhánh mới. Khi Owner cần thêm chi nhánh, UI hiển thị thông báo: *"Cần thêm chi nhánh? Vui lòng liên hệ Super Admin"*.
 2. **Staff Scope Containment**: Staff chỉ có quyền trên các `branchIds` được Store Owner gán trực tiếp. Mọi API call của Staff ngoài danh sách chi nhánh này đều bị ném lỗi `403 Forbidden`.
+3. **POS access vs owner admin**: `admin.access` chỉ quyết định tài khoản được mở POS; `owner.admin` là quyền riêng cho các API quản trị Store Owner (nhân viên, reset, báo cáo toàn Store, settings). Staff có thể vào POS nhưng không vượt qua `owner.admin`.

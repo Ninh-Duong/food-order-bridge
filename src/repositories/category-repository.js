@@ -2,10 +2,20 @@ const fs = require('fs');
 const path = require('path');
 const { isDBConnected } = require('../db');
 const { CategoryModel } = require('../models');
+const { assertTenantContext } = require('../middleware/tenant-context');
 
 const CATEGORY_FILE = path.join(__dirname, '..', 'data', 'categories.json');
 
 class CategoryRepository {
+  async getAllForTenant(tenantContext) {
+    const { storeId } = assertTenantContext(tenantContext);
+    if (isDBConnected()) {
+      const categories = await CategoryModel.find({ storeId }).lean();
+      return this.sortCategories(categories.map((category) => this.cleanCategory(category)));
+    }
+    return this.sortCategories(this.getFromFile().filter((category) => (category.storeId || 'legacy-store') === storeId));
+  }
+
   async getAll() {
     let categories = [];
     if (isDBConnected()) {
@@ -89,6 +99,17 @@ class CategoryRepository {
     return categories.find(c => c.id === upperId) || null;
   }
 
+  async getByIdForTenant(tenantContext, id) {
+    const { storeId } = assertTenantContext(tenantContext);
+    if (!id) return null;
+    const upperId = id.trim().toUpperCase();
+    if (isDBConnected()) {
+      const item = await CategoryModel.findOne({ id: upperId, storeId }).lean();
+      return item ? this.cleanCategory(item) : null;
+    }
+    return this.getFromFile().find((category) => (category.storeId || 'legacy-store') === storeId && category.id === upperId) || null;
+  }
+
   async getBySlug(slug) {
     if (!slug) return null;
     const cleanSlug = slug.trim().toLowerCase();
@@ -113,10 +134,28 @@ class CategoryRepository {
     }) || null;
   }
 
-  async create(categoryData) {
+  async getBySlugForTenant(tenantContext, slug) {
+    const { storeId } = assertTenantContext(tenantContext);
+    if (!slug) return null;
+    const cleanSlug = slug.trim().toLowerCase();
+    if (isDBConnected()) {
+      const item = await CategoryModel.findOne({ slug: cleanSlug, storeId }).lean();
+      return item ? this.cleanCategory(item) : null;
+    }
+    return this.getFromFile().find((category) => (category.storeId || 'legacy-store') === storeId && category.slug === cleanSlug) || null;
+  }
+
+  async findByNormalizedNameForTenant(tenantContext, normalizedName) {
+    const all = await this.getAllForTenant(tenantContext);
+    return all.find((category) => (category.name || '').trim().replace(/\s+/g, ' ').toLowerCase() === normalizedName) || null;
+  }
+
+  async create(categoryData, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const now = new Date();
     const payload = {
       ...categoryData,
+      ...(tenantContext ? { storeId: tenantContext.storeId } : {}),
       id: categoryData.id.trim().toUpperCase(),
       name: categoryData.name.trim(),
       slug: categoryData.slug.trim().toLowerCase(),
@@ -142,7 +181,8 @@ class CategoryRepository {
     return payload;
   }
 
-  async update(id, categoryData) {
+  async update(id, categoryData, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const upperId = id.trim().toUpperCase();
     const now = new Date();
     const updatePayload = {
@@ -157,7 +197,7 @@ class CategoryRepository {
     if (isDBConnected()) {
       try {
         const updated = await CategoryModel.findOneAndUpdate(
-          { id: upperId },
+          { id: upperId, ...(tenantContext ? { storeId: tenantContext.storeId } : {}) },
           { $set: updatePayload },
           { returnDocument: 'after', runValidators: true }
         ).lean();
@@ -168,7 +208,7 @@ class CategoryRepository {
     }
 
     const categories = this.getFromFile();
-    const index = categories.findIndex(c => c.id === upperId);
+    const index = categories.findIndex(c => c.id === upperId && (!tenantContext || (c.storeId || 'legacy-store') === tenantContext.storeId));
     if (index >= 0) {
       categories[index] = { ...categories[index], ...updatePayload };
       this.saveAllToFile(categories);
@@ -177,13 +217,14 @@ class CategoryRepository {
     return null;
   }
 
-  async toggleActive(id, activeState) {
+  async toggleActive(id, activeState, tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const upperId = id.trim().toUpperCase();
     const now = new Date();
     if (isDBConnected()) {
       try {
         const updated = await CategoryModel.findOneAndUpdate(
-          { id: upperId },
+          { id: upperId, ...(tenantContext ? { storeId: tenantContext.storeId } : {}) },
           { $set: { active: activeState, updatedAt: now } },
           { returnDocument: 'after' }
         ).lean();
@@ -194,7 +235,7 @@ class CategoryRepository {
     }
 
     const categories = this.getFromFile();
-    const category = categories.find(c => c.id === upperId);
+    const category = categories.find(c => c.id === upperId && (!tenantContext || (c.storeId || 'legacy-store') === tenantContext.storeId));
     if (category) {
       category.active = activeState;
       category.updatedAt = now;

@@ -1,12 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const orderService = require('../services/order-service');
-const { requireAuth } = require('../middleware/auth');
+const { requireAuth, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../auth/permissions');
 
 // POST /api/orders - Submit order
 router.post('/', async (req, res) => {
   try {
-    const { statusCode, result } = await orderService.processOrder(req.body);
+    const { statusCode, result } = await orderService.processOrder(req.body, req.tenantContext);
     res.status(statusCode).json(result);
   } catch (err) {
     if (err.status) {
@@ -23,10 +24,10 @@ router.post('/', async (req, res) => {
 });
 
 // GET /api/orders - List all orders with pagination (Admin/Staff)
-router.get('/', requireAuth, async (req, res) => {
+router.get('/', requireAuth, requirePermission(PERMISSIONS.ORDERS_READ), async (req, res) => {
   try {
     const { page, limit } = req.query;
-    const data = await orderService.getAllOrders({ page, limit });
+    const data = await orderService.getAllOrders({ page, limit, tenantContext: req.tenantContext });
     res.json(data);
   } catch (err) {
     console.error('Unhandled Get Orders Error:', err);
@@ -69,9 +70,9 @@ router.post('/:orderId/cancel', async (req, res) => {
 });
 
 // POST /api/orders/:orderId/admin-cancel - Admin/Staff cancellation before payment
-router.post('/:orderId/admin-cancel', requireAuth, async (req, res) => {
+router.post('/:orderId/admin-cancel', requireAuth, requirePermission(PERMISSIONS.ORDERS_WRITE), async (req, res) => {
   try {
-    const order = await orderService.adminCancelOrder(req.params.orderId, req.user);
+    const order = await orderService.adminCancelOrder(req.params.orderId, req.user, req.tenantContext);
     res.json({ order });
   } catch (err) {
     if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
@@ -97,13 +98,13 @@ router.post('/:orderId/retry', async (req, res) => {
 });
 
 // PUT /api/orders/:orderId/payment - Update payment status (Staff/Admin)
-router.put('/:orderId/payment', requireAuth, async (req, res) => {
+router.put('/:orderId/payment', requireAuth, requirePermission(PERMISSIONS.ORDERS_WRITE), async (req, res) => {
   try {
     const { isPaid } = req.body;
     if (typeof isPaid !== 'boolean') {
       return res.status(400).json({ message: 'Trạng thái isPaid phải là kiểu boolean' });
     }
-    const updatedOrder = await orderService.setPaymentStatus(req.params.orderId, isPaid, req.user);
+    const updatedOrder = await orderService.setPaymentStatus(req.params.orderId, isPaid, req.user, req.tenantContext);
     res.json({ order: updatedOrder });
   } catch (err) {
     if (err.status) {

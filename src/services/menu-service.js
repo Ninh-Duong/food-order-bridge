@@ -44,13 +44,18 @@ class MenuService {
     return rawItems.map(i => this.serializeMenuItem(i));
   }
 
+  async getMenuForTenant(tenantContext) {
+    const rawItems = await menuRepository.getAllForTenant(tenantContext);
+    return rawItems.map(i => this.serializeMenuItem(i));
+  }
+
   async getMenuItem(id) {
     if (!id) return null;
     const rawItem = await menuRepository.getById(id);
     return this.serializeMenuItem(rawItem);
   }
 
-  async saveMenuItem(itemData = {}) {
+  async saveMenuItem(itemData = {}, tenantContext = null) {
     if (!itemData || typeof itemData !== 'object') {
       throw new Error('Dữ liệu món ăn không hợp lệ');
     }
@@ -90,7 +95,9 @@ class MenuService {
     let categoryId = itemData.categoryId;
     if (!categoryId || typeof categoryId !== 'string' || !categoryId.trim()) {
       if (itemData.category && typeof itemData.category === 'string') {
-        const catByName = await categoryRepository.findByNormalizedName(itemData.category.trim().toLowerCase());
+        const catByName = tenantContext
+          ? await categoryRepository.findByNormalizedNameForTenant(tenantContext, itemData.category.trim().toLowerCase())
+          : await categoryRepository.findByNormalizedName(itemData.category.trim().toLowerCase());
         if (catByName) {
           categoryId = catByName.id;
         }
@@ -102,12 +109,16 @@ class MenuService {
     }
 
     const upperCatId = String(categoryId).trim().toUpperCase();
-    const categoryObj = await categoryRepository.getById(upperCatId);
+    const categoryObj = tenantContext
+      ? await categoryRepository.getByIdForTenant(tenantContext, upperCatId)
+      : await categoryRepository.getById(upperCatId);
     if (!categoryObj) {
       throw new Error(`Danh mục với mã "${upperCatId}" không tồn tại trong hệ thống`);
     }
 
-    const existingItem = await menuRepository.getById(itemId);
+    const existingItem = tenantContext
+      ? await menuRepository.getByIdForTenant(tenantContext, itemId)
+      : await menuRepository.getById(itemId);
     const isNewItem = !existingItem;
 
     if (isNewItem && categoryObj.active === false) {
@@ -199,14 +210,15 @@ class MenuService {
       description: itemData.description ? String(itemData.description).trim() : '',
       isBestseller: Boolean(itemData.isBestseller),
       isSpicy: Boolean(itemData.isSpicy),
-      active: itemData.active !== undefined ? Boolean(itemData.active) : (existingItem ? existingItem.active : true)
-    });
+      active: itemData.active !== undefined ? Boolean(itemData.active) : (existingItem ? existingItem.active : true),
+      ...(tenantContext ? { storeId: tenantContext.storeId } : {})
+    }, tenantContext);
 
     return this.serializeMenuItem(saved);
   }
 
-  async toggleItemActive(id, activeState) {
-    const updated = await menuRepository.toggleActive(id, activeState);
+  async toggleItemActive(id, activeState, tenantContext = null) {
+    const updated = await menuRepository.toggleActive(id, activeState, tenantContext);
     if (!updated) {
       throw new Error(`Không tìm thấy món ăn với mã ${id}`);
     }
