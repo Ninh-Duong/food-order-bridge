@@ -24,6 +24,8 @@ const { startReportScheduler } = require('./services/report-scheduler');
 const { requireAuth, requireAdmin } = require('./middleware/auth');
 const { extractTenantContext } = require('./middleware/tenant-context');
 
+const storeRoutes = require('./routes/store-routes');
+
 const app = express();
 
 // Trust reverse proxy (e.g. Render, Heroku, Cloudflare) for accurate IP identification in express-rate-limit
@@ -51,6 +53,7 @@ app.use('/health', healthRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/super-admin', superAdminRoutes);
+app.use('/api/store', storeRoutes);
 
 app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 app.use('/api/reports', requireAuth, requireAdmin, reportRoutes);
