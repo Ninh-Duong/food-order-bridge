@@ -2,7 +2,8 @@
 
 ## Session
 
-- `POST /api/auth/phone-login`: nhận `{ phone, password }`; trả về user và danh sách Branch.
+- `POST /api/auth/phone-login`: nhận `{ phone, password }`, trong đó `phone` có thể là
+  số điện thoại Việt Nam hoặc username của tài khoản nhân viên; trả về user và danh sách Branch.
   Với nhiều Branch, token tạm được giữ trong HttpOnly cookie `merchant_pre_session`.
 - `POST /api/auth/select-branch`: nhận `{ branchId }`, tạo `admin_session` HttpOnly.
 - `POST /api/auth/switch-branch`: yêu cầu `admin_session`, đổi Branch trong cùng Store.

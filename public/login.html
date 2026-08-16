@@ -136,8 +136,8 @@
     <!-- Step 1: Phone / Username Login Form -->
     <form id="login-form">
       <div class="form-group">
-        <label for="phone-input">Số điện thoại Việt Nam</label>
-        <input type="text" id="phone-input" class="form-input" placeholder="0912 345 678 hoặc username" required autofocus>
+        <label for="phone-input">Tên đăng nhập hoặc số điện thoại</label>
+        <input type="text" id="phone-input" class="form-input" placeholder="username hoặc 0912 345 678" autocomplete="username" required autofocus>
       </div>
 
       <div class="form-group">
@@ -189,20 +189,20 @@
       e.preventDefault();
       hideError();
 
-      const phone = phoneInput.value.trim();
+      const loginValue = phoneInput.value.trim();
       const password = passwordInput.value;
 
       try {
         const res = await fetch('/api/auth/phone-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ phone, password })
+          body: JSON.stringify({ phone: loginValue, password })
         });
 
         const data = await res.json();
 
         if (!res.ok) {
-          showError(data.message || 'Số điện thoại hoặc mật khẩu không đúng');
+          showError(data.message || 'Tên đăng nhập/số điện thoại hoặc mật khẩu không đúng');
           return;
         }
 

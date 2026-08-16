@@ -3,8 +3,8 @@
 ## Merchant
 
 1. Truy cập `/` hoặc `/admin.html` và được chuyển tới `/login.html` nếu chưa có session.
-2. Nhập số điện thoại di động Việt Nam và mật khẩu.
-3. Server chuẩn hóa số điện thoại, xác thực mật khẩu, kiểm tra Store đang `ACTIVE`.
+2. Nhập username do chủ cửa hàng cấp (hoặc số điện thoại di động Việt Nam đối với tài khoản cũ) và mật khẩu.
+3. Server tìm tài khoản theo username hoặc chuẩn hóa số điện thoại, xác thực mật khẩu, kiểm tra Store đang `ACTIVE`.
 4. Nếu tài khoản có nhiều chi nhánh, chọn một chi nhánh trong danh sách được cấp; lựa chọn được xác minh lại theo `storeId` trong session.
 5. Server tạo HttpOnly session chứa `storeId`, `branchId`, role và permissions.
 6. Frontend gọi `/api/auth/bootstrap`, tải metadata và catalog thuộc Store hiện tại, rồi mở POS.

@@ -1,6 +1,6 @@
 # 🍜 Food Order Bridge — Multi-Tenant Food POS System
 
-> **Smart Multi-Tenant Food Ordering & POS Management System (Store → Branch)** with real-time Telegram integration, E.164 phone authentication, multi-branch context switcher, and Super Admin Console, built with Express.js and hybrid data storage (MongoDB Cloud / Local JSON Fallback).
+> **Smart Multi-Tenant Food Ordering & POS Management System (Store → Branch)** with real-time Telegram integration, username/phone authentication, multi-branch context switcher, and Super Admin Console, built with Express.js and hybrid data storage (MongoDB Cloud / Local JSON Fallback).
 
 ---
 
@@ -31,7 +31,7 @@ flowchart TD
     S1 --> B2["📍 Branch A2 (Chi nhánh 2)"]
     S2 --> B3["📍 Branch B1 (Chi nhánh 1)"]
 
-    O["👤 Store Owner / Staff<br/>(Đăng nhập SĐT E.164)"] --> LOGIN["🔑 Đăng nhập /login.html"]
+    O["👤 Store Owner / Staff<br/>(Đăng nhập username hoặc SĐT)"] --> LOGIN["🔑 Đăng nhập /login.html"]
     LOGIN --> SELECT["📌 Chọn Chi nhánh"]
     SELECT --> POS["⚙️ POS / Admin Dashboard<br/>(Session-Bound Branch Context)"]
 
@@ -57,7 +57,7 @@ flowchart TD
 
 ## 🔄 System Workflow
 
-1. **Merchant Login & Branch Context**: Store Owners and Staff log in via SĐT E.164 (`/login.html`), select an active Branch, and receive an HMAC-signed JWT session bound to their `storeId` and `branchId`.
+1. **Merchant Login & Branch Context**: Store Owners and Staff log in via username or SĐT E.164 (`/login.html`), select an active Branch, and receive an HMAC-signed JWT session bound to their `storeId` and `branchId`.
 2. **Fail-Fast Tenant Context Guard**: All repository methods enforce `tenantContext = { storeId, branchId }` validation. Queries missing `storeId` fail immediately (`TenantContextMissingError`), guaranteeing zero cross-tenant data leaks.
 3. **Customer Order Placement**: Customers order through the storefront. The backend performs atomic stock deduction, calculates prices server-side, and enforces idempotency via unique `requestId`.
 4. **Super Admin Management**: Super Admins manage stores, branch limits, and audit logs via `/super-admin/index.html`.

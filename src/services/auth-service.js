@@ -105,9 +105,23 @@ async function login(rawUsername, password) {
 }
 
 async function loginByPhone(phoneInput, password) {
-  const normalizedPhone = normalizeVNPhone(phoneInput);
-  const user = await userRepository.findByPhone(normalizedPhone)
-    || await userRepository.findByUsername(normalizedPhone);
+  const loginValue = String(phoneInput || '').trim();
+  let normalizedPhone = null;
+
+  // Staff accounts are created with a username, while older merchant accounts
+  // can still log in with a Vietnamese mobile number. Try phone normalization
+  // only when the input is a phone number so usernames are not rejected by the
+  // phone validator before authentication is attempted.
+  try {
+    normalizedPhone = normalizeVNPhone(loginValue);
+  } catch (_) {
+    // A non-phone value is handled as a username below.
+  }
+
+  const user = (normalizedPhone
+    ? await userRepository.findByPhone(normalizedPhone)
+    : null)
+    || await userRepository.findByUsername(normalizedPhone || normalizeUsername(loginValue));
 
   if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
     return null;
@@ -140,7 +154,8 @@ async function loginByPhone(phoneInput, password) {
   return {
     user: {
       id: String(user._id || user.id),
-      phoneDisplay: user.phoneDisplay || formatPhoneDisplay(normalizedPhone),
+      phoneDisplay: user.phoneDisplay || (normalizedPhone ? formatPhoneDisplay(normalizedPhone) : null),
+      username: user.username,
       role: user.role,
       storeId,
       permissions: permissionsForRole(user.role)

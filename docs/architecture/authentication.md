@@ -12,10 +12,10 @@ sequenceDiagram
     participant AuthAPI as Auth Service
     participant DB as Mongo DB
 
-    Merchant->>Front: Nhập SĐT (e.g. 0912345678) & Mật khẩu
-    Front->>AuthAPI: POST /api/auth/login { phone, password }
-    AuthAPI->>AuthAPI: Chuẩn hóa SĐT về E.164 (+84912345678)
-    AuthAPI->>DB: Tìm User theo phoneNormalized
+Merchant->>Front: Nhập username hoặc SĐT (e.g. 0912345678) & Mật khẩu
+Front->>AuthAPI: POST /api/auth/phone-login { phone, password }
+AuthAPI->>AuthAPI: Nếu là SĐT, chuẩn hóa về E.164; nếu không, giữ username
+AuthAPI->>DB: Tìm User theo phoneNormalized hoặc username
     DB-->>AuthAPI: Trả về User record & Store status
     AuthAPI->>AuthAPI: Xác thực scrypt password hash
     AuthAPI->>AuthAPI: Lấy danh sách Branch khả dụng của User
@@ -28,18 +28,25 @@ sequenceDiagram
     Front->>Merchant: Chuyển hướng tới /pos Dashboard
 ```
 
-## 2. Chuẩn hóa Số điện thoại E.164
+## 2. Thông tin đăng nhập merchant
+
+Tài khoản nhân viên do chủ cửa hàng tạo dùng `username` và `password`. Nhân viên
+đăng nhập tại `/login.html` (hoặc truy cập `/admin.html` để được chuyển hướng),
+nhập username được cấp và mật khẩu. Tài khoản merchant cũ vẫn có thể đăng nhập
+bằng số điện thoại Việt Nam.
+
+## 3. Chuẩn hóa Số điện thoại E.164
 Tất cả các số điện thoại đầu vào được quy chuẩn về định dạng E.164 trước khi lưu vào DB hoặc tìm kiếm:
 - `0912345678` -> `+84912345678`
 - `84912345678` -> `+84912345678`
 - `+84912345678` -> `+84912345678`
 
-## 3. Super Admin Dedicated Auth Realm
+## 4. Super Admin Dedicated Auth Realm
 Tài khoản Super Admin hoàn toàn tách biệt với merchant database:
 - Khu vực đăng nhập riêng: `/super-admin/login`
 - Đăng nhập sử dụng biến môi trường: `SUPER_ADMIN_PHONE`, `SUPER_ADMIN_PASSWORD_HASH`, `SUPER_ADMIN_AUTH_SECRET`.
 
-## 4. Merchant workspace bootstrap
+## 5. Merchant workspace bootstrap
 
 Sau khi session chính được tạo, frontend gọi `GET /api/auth/bootstrap`. API kiểm tra
 `storeId`/`branchId` từ chữ ký session rồi trả về metadata cửa hàng, các chi nhánh mà
