@@ -52,6 +52,10 @@ Tất cả các số điện thoại đầu vào được quy chuẩn về đị
 Tài khoản Super Admin hoàn toàn tách biệt với merchant database:
 - Khu vực đăng nhập riêng: `/super-admin/login`
 - Đăng nhập sử dụng biến môi trường: `SUPER_ADMIN_PHONE`, `SUPER_ADMIN_PASSWORD_HASH`, `SUPER_ADMIN_AUTH_SECRET`.
+- Sau khi đăng nhập, server tạo HttpOnly cookie `super_admin_session` với `Path=/` để session dùng được xuyên suốt `/super-admin/*` và `/api/super-admin/*`.
+- API vẫn chấp nhận header `x-super-admin-token` cho backward compatibility với dashboard hiện tại.
+- Không lưu Super Admin token vào `localStorage` hoặc `sessionStorage`.
+- Không có cookie hợp lệ hoặc token hợp lệ thì API trả HTTP `401`.
 
 ## 5. Merchant workspace bootstrap
 

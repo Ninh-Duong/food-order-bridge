@@ -1,10 +1,10 @@
 const authService = require('../services/auth-service');
 const userRepository = require('../repositories/user-repository');
 const { hasPermission, getEffectivePermissions, PERMISSIONS } = require('../auth/permissions');
+const { getCookieValue } = require('../utils/cookie');
 
 function cookieValue(req, name) {
-  const cookie = String(req.headers.cookie || '').split(';').map((part) => part.trim()).find((part) => part.startsWith(`${name}=`));
-  return cookie ? decodeURIComponent(cookie.slice(name.length + 1)) : '';
+  return getCookieValue(req, name);
 }
 
 async function resolveUserFromToken(tokenUser) {

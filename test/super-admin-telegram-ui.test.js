@@ -18,4 +18,6 @@ it('Super Admin Telegram page có đủ scope Store/Branch, cảnh báo, report 
     'register-webhook',
     'resetBranch'
   ]) assert.ok(html.includes(marker), `missing UI marker: ${marker}`);
+  assert.match(html, /credentials:\s*['"]same-origin['"]/, 'Telegram page must use the cross-page Super Admin cookie');
+  assert.match(html, /res\.status\s*===\s*401/, 'Telegram page must handle an expired Super Admin session');
 });

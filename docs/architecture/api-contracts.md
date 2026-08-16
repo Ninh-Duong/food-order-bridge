@@ -26,7 +26,7 @@ Tài liệu đặc tả toàn bộ các chuẩn giao tiếp RESTful API trong h�
 
 ## 2. Super Admin Dedicated APIs (`/api/super-admin`)
 
-*Bảo vệ bởi `SUPER_ADMIN_AUTH_SECRET` và header `x-super-admin-token`.*
+*Bảo vệ bởi `SUPER_ADMIN_AUTH_SECRET` và một trong hai cơ chế session: HttpOnly cookie `super_admin_session` với `Path=/` hoặc header `x-super-admin-token`.* Header được giữ để tương thích với dashboard hiện tại; các page Super Admin nhiều trang phải dùng cookie same-origin, không lưu token vào `localStorage`.
 
 - `POST /api/super-admin/login`: Nhận `{ phone, password }`, trả về Super Admin JWT token.
 - `GET /api/super-admin/stores`: Danh sách toàn bộ các Cửa hàng trên nền tảng.

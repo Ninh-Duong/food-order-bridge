@@ -34,11 +34,19 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, error: 'Số điện thoại hoặc mật khẩu Super Admin không đúng' });
     }
 
+    // Remove the legacy path-scoped cookie before issuing the cross-page session cookie.
+    res.clearCookie('super_admin_session', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/api/super-admin'
+    });
     res.cookie('super_admin_session', result.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 4 * 60 * 60 * 1000
+      maxAge: 4 * 60 * 60 * 1000,
+      path: '/'
     });
 
     return res.json({

@@ -38,6 +38,7 @@ describe('POST & GET /api/super-admin HTTP Integration Tests', () => {
     const body = await res.json();
     assert.equal(body.success, true);
     assert.ok(body.token);
+    assert.match(res.headers.get('set-cookie') || '', /Path=\/(?:;|$)/, 'Super Admin cookie must be available to all pages');
   });
 
   it('GET /api/super-admin/stores: Từ chối 401 khi không gửi token', async () => {
@@ -55,5 +56,25 @@ describe('POST & GET /api/super-admin HTTP Integration Tests', () => {
     const body = await res.json();
     assert.equal(body.success, true);
     assert.ok(Array.isArray(body.stores));
+  });
+
+  it('GET /api/super-admin/stores: Cho phép truy cập bằng HttpOnly session cookie khi chuyển page', async () => {
+    const token = issueSuperAdminToken('+84900000000');
+    const res = await fetch(`http://localhost:${port}/api/super-admin/stores`, {
+      headers: { cookie: `super_admin_session=${encodeURIComponent(token)}` }
+    });
+
+    assert.equal(res.status, 200);
+    const body = await res.json();
+    assert.equal(body.success, true);
+    assert.ok(Array.isArray(body.stores));
+  });
+
+  it('GET /api/super-admin/stores: Từ chối cookie Super Admin không hợp lệ', async () => {
+    const res = await fetch(`http://localhost:${port}/api/super-admin/stores`, {
+      headers: { cookie: 'super_admin_session=invalid-token' }
+    });
+
+    assert.equal(res.status, 401);
   });
 });
