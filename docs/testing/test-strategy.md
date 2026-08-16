@@ -47,6 +47,8 @@ Tài liệu này quy định **Chiến lược Kiểm thử phòng ngừa bug (Z
 * **Mục tiêu**: Trang đăng nhập SĐT, Branch Selector, Header Switcher, Responsive Super Admin Dashboard.
 * **Kịch bản Test mới**:
   - E2E / In-App Browser Test: Thao tác đăng nhập -> chọn chi nhánh -> đổi chi nhánh trên Header -> verify session payload trên UI.
+  - Super Admin cross-page session: Đăng nhập tại `/super-admin/index.html` -> mở `/super-admin/telegram.html` -> danh sách Store/Branch tải thành công bằng HttpOnly cookie -> refresh page vẫn giữ phiên.
+  - Super Admin auth negative cases: Không có cookie/header hoặc cookie hết hạn phải trả HTTP `401` và UI chuyển về trang đăng nhập.
 
 ### Phase 6: Refactor Scoping Nghiệp vụ Chi tiết
 * **Mục tiêu**: Chuyển Menu, Kho, Order, Payment Webhook, Telegram, Job hết hạn sang Tenant Scope.

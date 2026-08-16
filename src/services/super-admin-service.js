@@ -14,6 +14,7 @@ const {
   TelegramDeliveryLogModel
 } = require('../models');
 const { normalizeVNPhone, formatPhoneDisplay } = require('../utils/phone-normalizer');
+const { getCookieValue } = require('../utils/cookie');
 const { isDBConnected } = require('../db');
 
 const TOKEN_TTL = 4 * 60 * 60; // 4 hours
@@ -78,7 +79,7 @@ function parseSuperAdminToken(token) {
 }
 
 function requireSuperAdmin(req, res, next) {
-  const token = req.cookies?.super_admin_session || req.headers['x-super-admin-token'];
+  const token = getCookieValue(req, 'super_admin_session') || req.headers['x-super-admin-token'];
   const decoded = parseSuperAdminToken(token);
 
   if (!decoded) {
