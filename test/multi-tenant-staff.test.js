@@ -101,7 +101,7 @@ test('Multi-Tenant Store-Scoped Staff Creation and Login Tests', async (t) => {
       async () => {
         await authService.createStaff('ddn', 'anotherPass123', { storeId: 'store-a' });
       },
-      (err) => err.message.includes('đã tồn tại trong cửa hàng của bạn')
+      (err) => err.message.includes('đã tồn tại trong cửa hàng')
     );
   });
 

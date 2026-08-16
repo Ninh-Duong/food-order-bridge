@@ -14,6 +14,8 @@ Tài liệu đặc tả toàn bộ các chuẩn giao tiếp RESTful API trong h�
 - `POST /api/auth/switch-branch`: Yêu cầu `admin_session`, chuyển đổi chi nhánh đang làm việc trong cùng Cửa hàng.
 - `GET /api/auth/bootstrap`: Yêu cầu `admin_session`; trả về `user`, `store`, `branches`, `activeBranch`, `permissions`, `catalog`.
 - `POST /api/auth/staff`: Yêu cầu `staff.manage`. Tạo tài khoản nhân viên mới trong phạm vi Cửa hàng hiện tại.
+  - Thành công: HTTP `201 Created` `{ user: { id, username, role, storeId, ... } }`
+  - Trùng username trong cùng Store: HTTP `409 Conflict` `{ code: "STAFF_USERNAME_EXISTS", message: "Tên đăng nhập này đã tồn tại trong cửa hàng hiện tại." }`
 - `GET /api/auth/staff`: Yêu cầu `staff.manage` hoặc `staff.rules.manage`. Trả về danh sách nhân viên của cửa hàng.
 - `GET /api/auth/permissions/catalog`: Yêu cầu `staff.rules.manage`. Trả về danh mục permission được phép gán cho staff.
 - `PUT /api/auth/staff/:id/permissions`: Yêu cầu `staff.rules.manage`. Nhận `{ permissionMode: 'DEFAULT'|'CUSTOM', permissions: [...] }`.

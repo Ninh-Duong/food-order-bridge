@@ -161,9 +161,16 @@ router.get('/staff', requireAuth, (req, res, next) => {
 
 router.post('/staff', requireAuth, requirePermission(PERMISSIONS.STAFF_MANAGE), async (req, res) => {
   try {
-    res.status(201).json({ user: await authService.createStaff(req.body.username, req.body.password, req.tenantContext) });
+    const user = await authService.createStaff(req.body.username, req.body.password, req.tenantContext);
+    res.status(201).json({ user });
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    const isConflict = err.code === 'STAFF_USERNAME_EXISTS' || err.status === 409 || err.code === 11000 || err.message?.includes('duplicate key') || err.message?.includes('E11000') || err.message?.includes('đã tồn tại');
+    const status = isConflict ? 409 : (err.status || 400);
+    const code = isConflict ? 'STAFF_USERNAME_EXISTS' : (err.code || 'BAD_REQUEST');
+    const message = isConflict
+      ? 'Tên đăng nhập này đã tồn tại trong cửa hàng hiện tại.'
+      : (err.message || 'Không thể tạo nhân viên');
+    res.status(status).json({ code, message });
   }
 });
 

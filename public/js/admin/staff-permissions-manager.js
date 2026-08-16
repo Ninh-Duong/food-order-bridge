@@ -21,7 +21,7 @@ export async function initStaffPermissionsManager(workspace) {
   await loadStaffList();
 
   if (hasPermission('staff.rules.manage')) {
-    loadPermissionCatalog().catch(console.error);
+    await loadPermissionCatalog().catch(console.error);
   }
 }
 
@@ -111,12 +111,12 @@ function renderStaffTable() {
         <td data-label="Hành động">
           <div style="display:flex; gap: 6px; flex-wrap: wrap;">
             ${canManageRules ? `
-              <button class="btn btn-secondary btn-sm btn-edit-permissions" data-staff-id="${escapeHTML(user.id)}" style="font-size: 12px; padding: 4px 8px;">
+              <button type="button" class="btn btn-secondary btn-sm btn-edit-permissions" data-staff-id="${escapeHTML(user.id)}" style="font-size: 12px; padding: 4px 8px;">
                 🔑 Phân quyền
               </button>
             ` : ''}
             ${canManageStatus ? `
-              <button class="btn ${user.active ? 'btn-secondary' : 'btn-primary'} btn-sm btn-toggle-status" data-staff-id="${escapeHTML(user.id)}" data-active="${user.active}" style="font-size: 12px; padding: 4px 8px; ${user.active ? 'color:#ef4444; border-color:rgba(239,68,68,0.3);' : ''}">
+              <button type="button" class="btn ${user.active ? 'btn-secondary' : 'btn-primary'} btn-sm btn-toggle-status" data-staff-id="${escapeHTML(user.id)}" data-active="${user.active}" style="font-size: 12px; padding: 4px 8px; ${user.active ? 'color:#ef4444; border-color:rgba(239,68,68,0.3);' : ''}">
                 ${user.active ? '🔒 Khóa' : '🔓 Mở khóa'}
               </button>
             ` : ''}
@@ -125,20 +125,27 @@ function renderStaffTable() {
       </tr>
     `;
   }).join('');
+}
 
-  // Bind row action events
-  tbody.querySelectorAll('.btn-edit-permissions').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const staffId = btn.dataset.staffId;
+let staffTableEventsBound = false;
+function bindStaffTableDelegation() {
+  if (staffTableEventsBound) return;
+  const tbody = document.getElementById('staff-table-body');
+  if (!tbody) return;
+
+  tbody.addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('.btn-edit-permissions');
+    if (editBtn) {
+      const staffId = editBtn.dataset.staffId;
       const staff = staffList.find(s => String(s.id) === String(staffId));
-      if (staff) openPermissionModal(staff);
-    });
-  });
+      if (staff) await openPermissionModal(staff);
+      return;
+    }
 
-  tbody.querySelectorAll('.btn-toggle-status').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const staffId = btn.dataset.staffId;
-      const currentActive = btn.dataset.active === 'true';
+    const toggleBtn = e.target.closest('.btn-toggle-status');
+    if (toggleBtn) {
+      const staffId = toggleBtn.dataset.staffId;
+      const currentActive = toggleBtn.dataset.active === 'true';
       const staff = staffList.find(s => String(s.id) === String(staffId));
       if (!staff) return;
 
@@ -147,7 +154,7 @@ function renderStaffTable() {
         return;
       }
 
-      setButtonLoading(btn, 'Đang lưu...');
+      setButtonLoading(toggleBtn, 'Đang lưu...');
       try {
         await API.patch(`/api/auth/staff/${staffId}/status`, { active: !currentActive });
         showToast(`Đã ${actionText} tài khoản "${staff.username}" thành công`, 'success');
@@ -155,13 +162,20 @@ function renderStaffTable() {
       } catch (err) {
         showToast(err.message || `Không thể ${actionText} tài khoản`, 'error');
       } finally {
-        restoreButton(btn);
+        restoreButton(toggleBtn);
       }
-    });
+    }
   });
+
+  staffTableEventsBound = true;
 }
 
+let staffFormEventsBound = false;
 function bindStaffEvents() {
+  bindStaffTableDelegation();
+
+  if (staffFormEventsBound) return;
+
   const staffForm = document.getElementById('staff-form');
   if (staffForm) {
     staffForm.addEventListener('submit', async (e) => {
@@ -178,11 +192,19 @@ function bindStaffEvents() {
           password: passwordInput.value
         });
         staffForm.reset();
-        if (msgBox) msgBox.textContent = 'Đã tạo tài khoản nhân viên thành công!';
+        if (msgBox) {
+          msgBox.dataset.state = 'success';
+          msgBox.style.color = '#10b981';
+          msgBox.textContent = 'Đã tạo tài khoản nhân viên thành công!';
+        }
         showToast('Tạo tài khoản nhân viên thành công', 'success');
         await loadStaffList();
       } catch (err) {
-        if (msgBox) msgBox.textContent = err.message || 'Không thể tạo nhân viên';
+        if (msgBox) {
+          msgBox.dataset.state = 'error';
+          msgBox.style.color = '#dc2626';
+          msgBox.textContent = err.message || 'Không thể tạo nhân viên';
+        }
         showToast(err.message || 'Lỗi tạo nhân viên', 'error');
       } finally {
         if (submitBtn) restoreButton(submitBtn);
@@ -199,9 +221,33 @@ function bindStaffEvents() {
   if (statusFilter) {
     statusFilter.addEventListener('change', () => renderStaffTable());
   }
+
+  const btnCloseModal = document.getElementById('btn-close-staff-permission-modal');
+  if (btnCloseModal) {
+    btnCloseModal.addEventListener('click', closePermissionModal);
+  }
+
+  const modal = document.getElementById('staff-permission-modal');
+  if (modal) {
+    const modeRadios = modal.querySelectorAll('input[name="permissionMode"]');
+    modeRadios.forEach(radio => {
+      radio.addEventListener('change', () => {
+        const isCustom = document.getElementById('perm-mode-custom')?.checked;
+        const groupsContainer = document.getElementById('perm-groups-container');
+        if (groupsContainer) {
+          groupsContainer.style.opacity = isCustom ? '1' : '0.5';
+          groupsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+            cb.disabled = !isCustom;
+          });
+        }
+      });
+    });
+  }
+
+  staffFormEventsBound = true;
 }
 
-export function openPermissionModal(staff) {
+export async function openPermissionModal(staff) {
   currentEditingStaff = staff;
   selectedPermissionsSet = new Set(
     staff.permissionMode === 'CUSTOM'
@@ -224,22 +270,11 @@ export function openPermissionModal(staff) {
     if (modeDefaultRadio) modeDefaultRadio.checked = true;
   }
 
-  renderPermissionGroupsUI();
+  if (!permissionCatalog || permissionCatalog.length === 0) {
+    await loadPermissionCatalog();
+  }
 
-  // Mode radio toggle event
-  const modeRadios = modal.querySelectorAll('input[name="permissionMode"]');
-  modeRadios.forEach(radio => {
-    radio.addEventListener('change', () => {
-      const isCustom = document.getElementById('perm-mode-custom').checked;
-      const groupsContainer = document.getElementById('perm-groups-container');
-      if (groupsContainer) {
-        groupsContainer.style.opacity = isCustom ? '1' : '0.5';
-        groupsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-          cb.disabled = !isCustom;
-        });
-      }
-    });
-  });
+  renderPermissionGroupsUI();
 
   modal.hidden = false;
   modal.style.display = 'flex';
