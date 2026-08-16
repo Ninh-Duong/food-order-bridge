@@ -45,8 +45,9 @@ function encode(value) {
 }
 
 function issueToken(user) {
+  const userId = user?.id || user?.sub || user?._id;
   const payload = encode({
-    sub: user.id,
+    sub: userId ? String(userId) : undefined,
     username: user.username,
     role: user.role,
     storeId: user.storeId || 'legacy-store',

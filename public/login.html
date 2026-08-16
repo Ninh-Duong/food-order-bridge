@@ -168,6 +168,7 @@
     const branchContainer = document.getElementById('branch-container');
     const subTitle = document.getElementById('sub-title');
     const requestedReturnUrl = new URLSearchParams(window.location.search).get('returnUrl');
+    const urlErrorMsg = new URLSearchParams(window.location.search).get('error');
 
     function goToWorkspace() {
       const safeReturnUrl = requestedReturnUrl && requestedReturnUrl.startsWith('/') && !requestedReturnUrl.startsWith('//')
@@ -183,6 +184,10 @@
 
     function hideError() {
       alertError.style.display = 'none';
+    }
+
+    if (urlErrorMsg) {
+      showError(urlErrorMsg);
     }
 
     loginForm.addEventListener('submit', async (e) => {

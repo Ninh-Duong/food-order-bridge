@@ -75,3 +75,33 @@ test('Merchant login keeps accepting Vietnamese mobile numbers', async (t) => {
   assert.equal(result.user.phoneDisplay, '0912 345 678');
   assert.equal(result.user.username, 'owner01');
 });
+
+test('selectBranch preserves sub from preToken in final sessionToken', async (t) => {
+  const originalSecret = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = 'test-auth-secret-that-is-at-least-32-chars';
+
+  t.after(() => {
+    if (originalSecret === undefined) delete process.env.AUTH_SECRET;
+    else process.env.AUTH_SECRET = originalSecret;
+  });
+
+  const preToken = authService.issueToken({
+    id: 'user-sub-12345',
+    username: 'owner01',
+    role: 'STORE_OWNER',
+    storeId: 'store-1',
+    branchIds: ['branch-1', 'branch-2']
+  });
+
+  const parsedPre = authService.parseToken(preToken);
+  assert.equal(parsedPre.sub, 'user-sub-12345');
+
+  const selected = await authService.selectBranch(parsedPre, 'branch-1');
+  assert.ok(selected.sessionToken);
+  assert.equal(selected.activeBranchId, 'branch-1');
+
+  const parsedFinal = authService.parseToken(selected.sessionToken);
+  assert.equal(parsedFinal.sub, 'user-sub-12345');
+  assert.equal(parsedFinal.branchId, 'branch-1');
+  assert.equal(parsedFinal.storeId, 'store-1');
+});

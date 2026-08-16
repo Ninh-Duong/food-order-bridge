@@ -12,7 +12,7 @@ router.post('/login', loginLimiter, async (req, res) => {
   try {
     const result = await authService.login(req.body.username, req.body.password);
     if (!result) return res.status(401).json({ message: 'Tên đăng nhập hoặc mật khẩu không đúng' });
-    res.cookie('admin_session', result.token, { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', maxAge: authService.TOKEN_TTL_SECONDS * 1000, path: '/' });
+    res.cookie('admin_session', result.token, { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: authService.TOKEN_TTL_SECONDS * 1000, path: '/' });
     res.json({ user: result.user, token: result.token });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -40,7 +40,7 @@ router.post('/phone-login', loginLimiter, async (req, res) => {
 
       res.cookie('admin_session', sessionResult.sessionToken, {
         httpOnly: true,
-        sameSite: 'strict',
+        sameSite: 'lax',
         secure: process.env.NODE_ENV === 'production',
         maxAge: authService.TOKEN_TTL_SECONDS * 1000,
         path: '/'
@@ -55,7 +55,7 @@ router.post('/phone-login', loginLimiter, async (req, res) => {
 
     res.cookie('merchant_pre_session', result.preToken, {
       httpOnly: true,
-      sameSite: 'strict',
+      sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       maxAge: 10 * 60 * 1000,
       path: '/api/auth'
@@ -89,12 +89,12 @@ router.post('/select-branch', async (req, res) => {
 
     res.cookie('admin_session', sessionResult.sessionToken, {
       httpOnly: true,
-      sameSite: 'strict',
+      sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       maxAge: authService.TOKEN_TTL_SECONDS * 1000,
       path: '/'
     });
-    res.clearCookie('merchant_pre_session', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', path: '/api/auth' });
+    res.clearCookie('merchant_pre_session', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/api/auth' });
 
     return res.json({
       success: true,
@@ -114,7 +114,7 @@ router.post('/switch-branch', requireAuth, async (req, res) => {
 
     res.cookie('admin_session', sessionResult.sessionToken, {
       httpOnly: true,
-      sameSite: 'strict',
+      sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
       maxAge: authService.TOKEN_TTL_SECONDS * 1000,
       path: '/'
@@ -128,8 +128,8 @@ router.post('/switch-branch', requireAuth, async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('admin_session', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', path: '/' });
-  res.clearCookie('merchant_pre_session', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', path: '/api/auth' });
+  res.clearCookie('admin_session', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' });
+  res.clearCookie('merchant_pre_session', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/api/auth' });
   res.clearCookie('super_admin_session', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/' });
   res.json({ message: 'Đã đăng xuất' });
 });
