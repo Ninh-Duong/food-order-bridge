@@ -1,5 +1,15 @@
 const crypto = require('crypto');
-const { StoreModel, BranchModel, UserModel, AuditLogModel, MenuItemModel, BranchInventoryModel } = require('../models');
+const {
+  StoreModel,
+  BranchModel,
+  UserModel,
+  AuditLogModel,
+  MenuItemModel,
+  BranchInventoryModel,
+  CategoryModel,
+  OrderModel,
+  SettingsModel
+} = require('../models');
 const { normalizeVNPhone, formatPhoneDisplay } = require('../utils/phone-normalizer');
 const { isDBConnected } = require('../db');
 
@@ -268,6 +278,53 @@ async function updateBranchStatus(branchId, status) {
   return { branchId, status };
 }
 
+async function deleteStore(storeId) {
+  if (!storeId) throw new Error('ID cửa hàng là bắt buộc');
+
+  let storeInfo = { id: storeId };
+  if (isDBConnected()) {
+    const store = await StoreModel.findOne({ id: storeId }).lean();
+    if (!store) throw new Error('Cửa hàng không tồn tại');
+    storeInfo = store;
+
+    await Promise.all([
+      StoreModel.deleteOne({ id: storeId }),
+      BranchModel.deleteMany({ storeId }),
+      BranchInventoryModel.deleteMany({ storeId }),
+      UserModel.deleteMany({ storeId }),
+      CategoryModel.deleteMany({ storeId }),
+      MenuItemModel.deleteMany({ storeId }),
+      OrderModel.deleteMany({ storeId }),
+      SettingsModel.deleteMany({ storeId })
+    ]);
+  } else {
+    try {
+      const store = await StoreModel.findOne({ id: storeId });
+      if (store) {
+        storeInfo = typeof store.lean === 'function' ? await store.lean() : store;
+      }
+      await Promise.all([
+        StoreModel.deleteOne({ id: storeId }),
+        BranchModel.deleteMany({ storeId }),
+        BranchInventoryModel.deleteMany({ storeId }),
+        UserModel.deleteMany({ storeId }),
+        CategoryModel.deleteMany({ storeId }),
+        MenuItemModel.deleteMany({ storeId }),
+        OrderModel.deleteMany({ storeId }),
+        SettingsModel.deleteMany({ storeId })
+      ]);
+    } catch (_) {}
+  }
+
+  await logAuditAction('super_admin', 'SUPER_ADMIN', 'DELETE_STORE', storeId, {
+    name: storeInfo.name,
+    code: storeInfo.code,
+    deletedAt: new Date()
+  });
+
+  return { success: true, message: `Đã xóa vĩnh viễn cửa hàng "${storeInfo.name || storeId}" và toàn bộ dữ liệu liên quan.`, storeId };
+}
+
 module.exports = {
   getSuperAdminConfig,
   issueSuperAdminToken,
@@ -277,6 +334,7 @@ module.exports = {
   listStores,
   createStore,
   updateStoreStatus,
+  deleteStore,
   createBranch,
   updateBranchStatus,
   logAuditAction

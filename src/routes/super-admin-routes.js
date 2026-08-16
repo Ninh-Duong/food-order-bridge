@@ -6,6 +6,7 @@ const {
   listStores,
   createStore,
   updateStoreStatus,
+  deleteStore,
   createBranch,
   updateBranchStatus
 } = require('../services/super-admin-service');
@@ -70,6 +71,17 @@ router.put('/stores/:id/status', async (req, res) => {
     return res.json({ success: true, ...result });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/super-admin/stores/:id
+router.delete('/stores/:id', async (req, res) => {
+  try {
+    const result = await deleteStore(req.params.id);
+    return res.json(result);
+  } catch (err) {
+    const status = err.message?.includes('không tồn tại') ? 404 : 400;
+    return res.status(status).json({ success: false, error: err.message });
   }
 });
 

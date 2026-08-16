@@ -401,6 +401,7 @@
         data.stores.forEach(store => {
           const tr = document.createElement('tr');
           const isSuspended = store.status === 'SUSPENDED';
+          const safeName = (store.name || store.code || '').replace(/'/g, "\\'");
           tr.innerHTML = `
             <td><strong>${store.code}</strong></td>
             <td>${store.name}</td>
@@ -412,6 +413,7 @@
                 ${isSuspended ? 'Mở lại' : 'Khóa Store'}
               </button>
               <button class="btn" style="margin-left:6px;" onclick="openBranchModal('${store.id}')">Chi nhánh (${(store.branches || []).length})</button>
+              <button class="btn btn-danger" style="margin-left:6px; background:#7f1d1d; color:#fca5a5; border-color:#991b1b;" onclick="deleteStore('${store.id}', '${safeName}')">🗑️ Xóa</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -460,7 +462,32 @@
           body: JSON.stringify({ status: newStatus })
         });
         fetchStores();
+        fetchAuditLogs();
       } catch (_) {}
+    }
+
+    async function deleteStore(storeId, storeName) {
+      const confirmMsg = `⚠️ CẢNH BÁO NGUY HIỂM:\n\nBạn có chắc chắn muốn XÓA VĨNH VIỄN cửa hàng "${storeName}"?\n\nThao tác này sẽ XÓA TOÀN BỘ dữ liệu liên quan bao gồm:\n- Tất cả Chi nhánh\n- Tất cả Tài khoản Chủ quán & Nhân viên\n- Toàn bộ Thực đơn & Danh mục\n- Toàn bộ Lịch sử Đơn hàng & Báo cáo Doanh thu\n\nDữ liệu sau khi xóa sẽ KHÔNG THỂ khôi phục!`;
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        const res = await fetch(`/api/super-admin/stores/${storeId}`, {
+          method: 'DELETE',
+          headers: {
+            'x-super-admin-token': superToken
+          }
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(data.error || 'Lỗi khi xóa cửa hàng');
+          return;
+        }
+        alert(data.message || 'Đã xóa cửa hàng thành công');
+        fetchStores();
+        fetchAuditLogs();
+      } catch (err) {
+        alert('Lỗi kết nối khi xóa cửa hàng');
+      }
     }
 
     function openCreateStoreModal() {
