@@ -138,7 +138,7 @@ function bindStaffTableDelegation() {
     if (editBtn) {
       const staffId = editBtn.dataset.staffId;
       const staff = staffList.find(s => String(s.id) === String(staffId));
-      if (staff) await openPermissionModal(staff);
+      if (staff) await openPermissionModal(staff, editBtn);
       return;
     }
 
@@ -248,7 +248,10 @@ function bindStaffEvents() {
   staffFormEventsBound = true;
 }
 
-export async function openPermissionModal(staff) {
+let lastActiveTriggerElement = null;
+
+export async function openPermissionModal(staff, triggerElement = null) {
+  lastActiveTriggerElement = triggerElement || document.activeElement;
   currentEditingStaff = staff;
   selectedPermissionsSet = new Set(
     staff.permissionMode === 'CUSTOM'
@@ -279,6 +282,12 @@ export async function openPermissionModal(staff) {
 
   modal.hidden = false;
   modal.style.display = 'flex';
+  modal.setAttribute('aria-hidden', 'false');
+
+  const closeBtn = document.getElementById('btn-close-staff-permission-modal');
+  if (closeBtn && typeof closeBtn.focus === 'function') {
+    closeBtn.focus();
+  }
 }
 
 function renderPermissionGroupsUI() {
@@ -483,6 +492,24 @@ export function closePermissionModal() {
   if (modal) {
     modal.hidden = true;
     modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
   }
   currentEditingStaff = null;
+  if (lastActiveTriggerElement && typeof lastActiveTriggerElement.focus === 'function') {
+    try {
+      lastActiveTriggerElement.focus();
+    } catch (_) {}
+  }
+  lastActiveTriggerElement = null;
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('staff-permission-modal');
+      if (modal && !modal.hidden && modal.style.display !== 'none') {
+        closePermissionModal();
+      }
+    }
+  });
 }
