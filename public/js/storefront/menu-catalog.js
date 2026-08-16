@@ -51,7 +51,7 @@ export async function loadMenuCatalog() {
 
     const rawItems = menuRes.items || [];
     menuItems = rawItems.filter(item => {
-      if (item.active === false) return false;
+      if (item.deletedAt != null) return false;
 
       if (item.categoryId) {
         const upperId = String(item.categoryId).trim().toUpperCase();
@@ -236,11 +236,15 @@ function createCardHtml(item) {
   const savings = price - salePrice;
 
   const stock = item.stockQuantity ?? 0;
-  const isOutOfStock = stock <= 0;
+  const isLocked = item.active === false;
+  const isOutOfStock = stock <= 0 && !isLocked;
 
   let stockText = '';
   let stockStyle = '';
-  if (isOutOfStock) {
+  if (isLocked) {
+    stockText = 'Tạm ngưng bán';
+    stockStyle = 'color: #64748b; font-weight: 700;';
+  } else if (isOutOfStock) {
     stockText = 'Hết hàng';
     stockStyle = 'color: #ef4444; font-weight: 700;';
   } else if (stock <= 3) {
@@ -257,35 +261,39 @@ function createCardHtml(item) {
     const names = activeOpts.slice(0, 3).map(o => escapeHTML(o.name));
     const extraCount = activeOpts.length - names.length;
     const label = `Tùy chọn: ${names.join(', ')}${extraCount > 0 ? ` +${extraCount}` : ''}`;
+    const clickHandler = isLocked ? '' : `onclick="window.triggerQuickView('${escapeHTML(item.id)}')"` ;
     customHintHtml = `
-      <div class="custom-options-hint" onclick="window.triggerQuickView('${escapeHTML(item.id)}')" title="Bấm để chọn thành phần">
+      <div class="custom-options-hint" ${clickHandler} title="${isLocked ? 'Món hiện đang tạm ngưng bán' : 'Bấm để chọn thành phần'}">
         <span class="custom-hint-badge">⚙️ ${label}</span>
       </div>
     `;
   }
 
   const imageUrl = item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80';
+  const imgClickHandler = isLocked ? '' : `onclick="window.triggerQuickView('${escapeHTML(item.id)}')"` ;
 
   return `
-    <article class="food-card ${isOutOfStock ? 'out-of-stock' : ''}" data-item-id="${escapeHTML(item.id)}">
-      <div class="food-card-img-wrapper" onclick="window.triggerQuickView('${escapeHTML(item.id)}')">
+    <article class="food-card ${isLocked ? 'is-locked out-of-stock' : (isOutOfStock ? 'out-of-stock' : '')}" data-item-id="${escapeHTML(item.id)}" ${isLocked ? 'aria-disabled="true" title="Món hiện đang tạm ngưng bán"' : ''}>
+      <div class="food-card-img-wrapper" ${imgClickHandler}>
         <img src="${imageUrl}" 
              alt="${altText}" 
              class="food-card-img" 
              loading="lazy" 
+             style="${isLocked ? 'filter: grayscale(80%) opacity(0.6);' : ''}"
              onerror="this.onerror=null;this.src='${FALLBACK_FOOD_IMAGE}';" />
         
         <div class="food-card-badges">
           ${hasDiscount ? `<span class="badge badge-discount">-${discountPercent}%</span>` : ''}
           ${item.isBestseller ? `<span class="badge badge-bestseller">Bán chạy</span>` : ''}
           ${item.isSpicy ? `<span class="badge badge-spicy">🌶 Spicy</span>` : ''}
+          ${isLocked ? `<span class="badge badge-locked" style="background:#475569; color:#fff;">Tạm ngưng</span>` : ''}
         </div>
 
-        ${isOutOfStock ? `<div class="out-of-stock-overlay"><span>Hết hàng</span></div>` : ''}
+        ${isLocked ? `<div class="out-of-stock-overlay locked-overlay" style="background: rgba(15, 23, 42, 0.65);"><span style="color:#f8fafc; font-weight:700;">Tạm ngưng bán</span></div>` : (isOutOfStock ? `<div class="out-of-stock-overlay"><span>Hết hàng</span></div>` : '')}
       </div>
 
       <div class="food-card-body">
-        <h3 class="food-card-title line-clamp-1" onclick="window.triggerQuickView('${escapeHTML(item.id)}')">${safeName}</h3>
+        <h3 class="food-card-title line-clamp-1" ${imgClickHandler}>${safeName}</h3>
         <p class="food-card-desc line-clamp-2">${safeDesc}</p>
         
         ${customHintHtml}
@@ -320,6 +328,15 @@ function renderActionBtn(item, qty) {
   const safeId = escapeHTML(item.id);
   const safeName = escapeHTML(item.name);
   const stock = item.stockQuantity ?? 0;
+  const isLocked = item.active === false;
+
+  if (isLocked) {
+    return `
+      <button class="btn-quick-add disabled" disabled aria-disabled="true" title="Món hiện đang tạm ngưng bán">
+        +
+      </button>
+    `;
+  }
 
   if (stock <= 0) {
     return `
@@ -348,6 +365,7 @@ function renderActionBtn(item, qty) {
       +
     </button>
   `;
+
 }
 
 function bindCardEvents() {

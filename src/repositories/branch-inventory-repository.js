@@ -21,15 +21,26 @@ class BranchInventoryRepository {
     return updated || null;
   }
 
-  async incrementAtomic(tenantContext, menuItemId, quantity) {
+  async updateStock(tenantContext, menuItemId, stockQuantity) {
     const { storeId, branchId } = assertTenantContext(tenantContext);
     if (!branchId || !isDBConnected()) return null;
     return BranchInventoryModel.findOneAndUpdate(
       { storeId, branchId, menuItemId },
-      { $inc: { stockQuantity: quantity }, $set: { updatedAt: new Date() } },
-      { returnDocument: 'after' }
+      { $set: { stockQuantity, updatedAt: new Date() } },
+      { upsert: true, returnDocument: 'after' }
+    ).lean();
+  }
+
+  async updateActive(tenantContext, menuItemId, active) {
+    const { storeId, branchId } = assertTenantContext(tenantContext);
+    if (!branchId || !isDBConnected()) return null;
+    return BranchInventoryModel.findOneAndUpdate(
+      { storeId, branchId, menuItemId },
+      { $set: { active: Boolean(active), updatedAt: new Date() } },
+      { upsert: true, returnDocument: 'after' }
     ).lean();
   }
 }
 
 module.exports = new BranchInventoryRepository();
+

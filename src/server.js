@@ -67,18 +67,13 @@ app.use('/api/super-admin', superAdminRoutes);
 app.use('/api/store', storeRoutes);
 
 app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
-app.use('/api/reports', requireAuth, requireAdmin, reportRoutes);
-app.use('/api/categories', (req, res, next) => {
-  if (req.method === 'GET') return optionalAuth(req, res, next);
-  return requireAuth(req, res, () => requirePermission(PERMISSIONS.CATALOG_WRITE)(req, res, next));
-}, categoryRoutes);
-app.use('/api/menu', (req, res, next) => {
-  if (req.method === 'GET') return optionalAuth(req, res, next);
-  return requireAuth(req, res, () => requirePermission(PERMISSIONS.CATALOG_WRITE)(req, res, next));
-}, menuRoutes);
-app.use('/api/orders', orderLimiter, optionalAuth, orderRoutes);
+app.use('/api/reports', requireAuth, reportRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/menu', menuRoutes);
+app.use('/api/orders', orderLimiter, orderRoutes);
 app.use('/api/payments', paymentRoutes);
-app.use('/api/settings', requireAuth, requireAdmin, settingsRoutes);
+app.use('/api/settings', settingsRoutes);
+
 
 // Fallback to index.html for SPA routing
 app.get('*', (req, res) => {

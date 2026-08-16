@@ -115,18 +115,47 @@
 
     <section id="tab-accounts" class="admin-tab-content admin-only" data-permission="staff.manage" style="display: none;">
       <div class="admin-card">
-        <div class="admin-card-header"><h2>Tài khoản nhân viên</h2></div>
-        <form id="staff-form" class="staff-form">
-          <input class="form-control" id="staff-username" placeholder="Tên đăng nhập" required>
-          <input class="form-control" id="staff-password" type="password" placeholder="Mật khẩu (ít nhất 8 ký tự)" minlength="8" required>
-          <button class="btn btn-primary" type="submit">+ Tạo nhân viên</button>
+        <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; align-items: center;">
+          <h2 style="font-size: var(--font-size-lg); font-weight: 800; margin: 0;">👥 Nhân viên & Phân quyền</h2>
+        </div>
+
+        <form id="staff-form" class="staff-form" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
+          <input class="form-control" id="staff-username" placeholder="Tên đăng nhập mới" required style="flex: 1; min-width: 180px;">
+          <input class="form-control" id="staff-password" type="password" placeholder="Mật khẩu (ít nhất 8 ký tự)" minlength="8" required style="flex: 1; min-width: 200px;">
+          <button class="btn btn-primary" type="submit">+ Tạo nhân viên mới</button>
         </form>
-        <p id="staff-message" class="auth-message"></p>
+        <p id="staff-message" class="auth-message" style="margin-bottom: 12px;"></p>
+
+        <!-- Staff Search & Filter Bar -->
+        <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
+          <input type="search" id="search-staff-input" class="form-control" placeholder="🔍 Tìm kiếm theo tên đăng nhập..." style="flex: 1; min-width: 200px; font-size: 13px;" />
+          <select id="filter-staff-status" class="form-control" style="width: auto; font-size: 13px;">
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="ACTIVE">Đang hoạt động</option>
+            <option value="LOCKED">Đã khóa</option>
+          </select>
+        </div>
+
         <div class="table-responsive">
-          <table class="admin-table admin-card-table admin-staff-table"><thead><tr><th>Tên đăng nhập</th><th>Vai trò</th><th>Trạng thái</th><th>Ngày tạo</th></tr></thead><tbody id="staff-table-body"></tbody></table>
+          <table class="admin-table admin-card-table admin-staff-table">
+            <thead>
+              <tr>
+                <th>Tên đăng nhập</th>
+                <th>Chi nhánh</th>
+                <th>Trạng thái</th>
+                <th>Chế độ quyền</th>
+                <th>Ngày cập nhật</th>
+                <th>Hành động</th>
+              </tr>
+            </thead>
+            <tbody id="staff-table-body">
+              <!-- Rendered via staff-permissions-manager.js -->
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
+
 
     <!-- TAB 3: ORDERS HISTORY MONITOR -->
     <section id="tab-orders" class="admin-tab-content" style="display: none;">
@@ -288,6 +317,61 @@
         <button type="button" class="btn btn-primary" id="btn-confirm-invoice-print">🖨 In ngay</button>
       </footer>
     </section>
+  <!-- STAFF PERMISSION MODAL DRAWER -->
+  <div id="staff-permission-modal" class="modal-backdrop" hidden style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; padding: 16px;">
+    <div class="modal-content" style="background: #0f172a; color: #f8fafc; border: 1px solid #334155; border-radius: 12px; width: 100%; max-width: 680px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+      
+      <!-- Modal Header -->
+      <div style="padding: 16px 20px; border-bottom: 1px solid #334155; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: #38bdf8;">🔑 Phân quyền cho: <span id="perm-modal-staff-name" style="color:#fff;">staff01</span></h2>
+          <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Tùy chỉnh quyền truy cập & thao tác riêng cho nhân viên</div>
+        </div>
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('staff-permission-modal').style.display='none';" style="min-height: 32px; padding: 2px 10px;">✕ Close</button>
+      </div>
+
+      <!-- Modal Body -->
+      <div style="padding: 16px 20px; overflow-y: auto; flex: 1;">
+        
+        <!-- Mode Switcher -->
+        <div style="background: #1e293b; padding: 12px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #334155;">
+          <div style="font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 8px;">CHẾ ĐỘ QUYỀN:</div>
+          <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+            <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="permissionMode" id="perm-mode-default" value="DEFAULT" checked /> 
+              <span>Sử dụng Quyền Mặc định theo Role</span>
+            </label>
+            <label style="font-size: 13px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+              <input type="radio" name="permissionMode" id="perm-mode-custom" value="CUSTOM" /> 
+              <span style="color: #c084fc;">Sử dụng Quyền Tùy chỉnh (Custom)</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Selected Count Badge -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-size: 13px; font-weight: 700;">Danh sách Nhóm Quyền:</span>
+          <span id="perm-selected-count-badge" class="badge" style="background:#0284c7; color:#fff; font-size:12px;">Đã chọn: 0 quyền</span>
+        </div>
+
+        <!-- Permission Groups Container -->
+        <div id="perm-groups-container">
+          <!-- Rendered via staff-permissions-manager.js -->
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div style="padding: 12px 20px; border-top: 1px solid #334155; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; background: #0f172a;">
+        <button type="button" class="btn btn-secondary" id="btn-reset-default-permissions" style="font-size: 12px; background: rgba(239,68,68,0.1); color: #f87171; border-color: rgba(239,68,68,0.3);">
+          🔄 Dùng quyền Mặc định
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-permissions">Hủy</button>
+          <button type="button" class="btn btn-primary" id="btn-save-permissions">💾 Lưu thay đổi</button>
+        </div>
+      </div>
+
+    </div>
   </div>
 
   <script type="module">
@@ -295,6 +379,7 @@
     import { initCategoryManager } from './js/admin/category-manager.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
     import { initReportDashboard, refreshReportDashboard } from './js/admin/report-dashboard.js';
+    import { initStaffPermissionsManager } from './js/admin/staff-permissions-manager.js';
     import { initAuth } from './js/admin/auth.js';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -327,6 +412,7 @@
       initCategoryManager(workspace);
       initItemManager(workspace);
       initOrderMonitor();
+      initStaffPermissionsManager(workspace);
 
       if (Array.isArray(user.permissions) && user.permissions.includes('reports.read.store')) {
         initReportDashboard();
@@ -335,3 +421,4 @@
   </script>
 </body>
 </html>
+

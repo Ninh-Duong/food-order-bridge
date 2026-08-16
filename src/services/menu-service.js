@@ -1,5 +1,6 @@
 const menuRepository = require('../repositories/menu-repository');
 const categoryRepository = require('../repositories/category-repository');
+const auditLogRepository = require('../repositories/audit-log-repository');
 const { calculateSalePrice } = require('../utils/price-calculator');
 
 class MenuService {
@@ -14,7 +15,7 @@ class MenuService {
     const active = item.active !== false;
 
     const salePrice = calculateSalePrice(price, discountPercent);
-    const available = active && stockQuantity > 0;
+    const available = active && stockQuantity > 0 && !item.deletedAt;
 
     const rawOptions = Array.isArray(item.customizationOptions) ? item.customizationOptions : [];
     const customizationOptions = rawOptions
@@ -35,7 +36,9 @@ class MenuService {
       stockQuantity,
       customizationOptions,
       available,
-      active
+      active,
+      deletedAt: item.deletedAt || null,
+      deletedBy: item.deletedBy || null
     };
   }
 
@@ -44,8 +47,8 @@ class MenuService {
     return rawItems.map(i => this.serializeMenuItem(i));
   }
 
-  async getMenuForTenant(tenantContext) {
-    const rawItems = await menuRepository.getAllForTenant(tenantContext);
+  async getMenuForTenant(tenantContext, options = {}) {
+    const rawItems = await menuRepository.getAllForTenant(tenantContext, options);
     return rawItems.map(i => this.serializeMenuItem(i));
   }
 
@@ -117,7 +120,7 @@ class MenuService {
     }
 
     const existingItem = tenantContext
-      ? await menuRepository.getByIdForTenant(tenantContext, itemId)
+      ? await menuRepository.getByIdForTenant(tenantContext, itemId, { includeDeleted: true })
       : await menuRepository.getById(itemId);
     const isNewItem = !existingItem;
 
@@ -174,7 +177,7 @@ class MenuService {
 
         const defaultIncluded = opt.defaultIncluded !== undefined ? Boolean(opt.defaultIncluded) : true;
         const active = opt.active !== undefined ? Boolean(opt.active) : true;
-        
+
         let sortOrder = 0;
         if (opt.sortOrder !== undefined && opt.sortOrder !== null) {
           if (typeof opt.sortOrder !== 'number' || !Number.isInteger(opt.sortOrder) || opt.sortOrder < 0) {
@@ -217,13 +220,99 @@ class MenuService {
     return this.serializeMenuItem(saved);
   }
 
-  async toggleItemActive(id, activeState, tenantContext = null) {
-    const updated = await menuRepository.toggleActive(id, activeState, tenantContext);
-    if (!updated) {
-      throw new Error(`Không tìm thấy món ăn với mã ${id}`);
+  async updateInventory(id, stockQuantity, tenantContext = null, actorUser = null) {
+    if (!id) throw new Error('Mã món ăn không được để trống');
+    if (typeof stockQuantity !== 'number' || !Number.isInteger(stockQuantity) || stockQuantity < 0) {
+      throw new Error('Số lượng tồn kho phải là số nguyên không âm');
     }
+
+    const upperId = id.trim().toUpperCase();
+    const updated = tenantContext
+      ? await menuRepository.updateInventoryForTenant(tenantContext, upperId, stockQuantity)
+      : await menuRepository.updateInventoryForTenant({ storeId: 'legacy-store' }, upperId, stockQuantity);
+
+    if (!updated) {
+      throw new Error(`Không tìm thấy món ăn với mã ${upperId}`);
+    }
+
+    await auditLogRepository.recordLog({
+      actorId: actorUser?.id || actorUser?.sub || null,
+      actorRole: actorUser?.role || null,
+      storeId: tenantContext?.storeId || null,
+      branchId: tenantContext?.branchId || null,
+      action: 'MENU_STOCK_UPDATED',
+      target: `MenuItem:${upperId}`,
+      details: { stockQuantity }
+    });
+
+    return this.serializeMenuItem(updated);
+  }
+
+  async toggleItemActive(id, activeState, tenantContext = null, actorUser = null) {
+    const upperId = String(id || '').trim().toUpperCase();
+    const updated = await menuRepository.toggleActive(upperId, Boolean(activeState), tenantContext);
+    if (!updated) {
+      throw new Error(`Không tìm thấy món ăn với mã ${upperId}`);
+    }
+
+    await auditLogRepository.recordLog({
+      actorId: actorUser?.id || actorUser?.sub || null,
+      actorRole: actorUser?.role || null,
+      storeId: tenantContext?.storeId || null,
+      branchId: tenantContext?.branchId || null,
+      action: 'MENU_STATUS_CHANGED',
+      target: `MenuItem:${upperId}`,
+      details: { active: Boolean(activeState) }
+    });
+
+    return this.serializeMenuItem(updated);
+  }
+
+  async softDeleteMenuItem(id, tenantContext = null, actorUser = null) {
+    if (!tenantContext?.storeId) throw new Error('Thiếu tenant context');
+    const upperId = String(id || '').trim().toUpperCase();
+    const actorUserId = actorUser?.id || actorUser?.sub || null;
+
+    const updated = await menuRepository.softDeleteForTenant(tenantContext, upperId, actorUserId);
+    if (!updated) {
+      throw new Error(`Không tìm thấy món ăn với mã ${upperId}`);
+    }
+
+    await auditLogRepository.recordLog({
+      actorId: actorUserId,
+      actorRole: actorUser?.role || null,
+      storeId: tenantContext.storeId,
+      branchId: tenantContext.branchId || null,
+      action: 'MENU_SOFT_DELETED',
+      target: `MenuItem:${upperId}`,
+      details: { itemName: updated.name }
+    });
+
+    return this.serializeMenuItem(updated);
+  }
+
+  async restoreMenuItem(id, tenantContext = null, actorUser = null) {
+    if (!tenantContext?.storeId) throw new Error('Thiếu tenant context');
+    const upperId = String(id || '').trim().toUpperCase();
+
+    const updated = await menuRepository.restoreForTenant(tenantContext, upperId);
+    if (!updated) {
+      throw new Error(`Không tìm thấy món ăn với mã ${upperId}`);
+    }
+
+    await auditLogRepository.recordLog({
+      actorId: actorUser?.id || actorUser?.sub || null,
+      actorRole: actorUser?.role || null,
+      storeId: tenantContext.storeId,
+      branchId: tenantContext.branchId || null,
+      action: 'MENU_RESTORED',
+      target: `MenuItem:${upperId}`,
+      details: { itemName: updated.name }
+    });
+
     return this.serializeMenuItem(updated);
   }
 }
 
 module.exports = new MenuService();
+

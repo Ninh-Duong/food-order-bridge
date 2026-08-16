@@ -1,7 +1,8 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const authService = require('../services/auth-service');
-const { cookieValue, requireAuth, requireAdmin } = require('../middleware/auth');
+const { cookieValue, requireAuth, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../auth/permissions');
 
 const router = express.Router();
 const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { message: 'Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau.' } });
@@ -134,6 +135,7 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', requireAuth, (req, res) => res.json({ user: req.user }));
+
 router.get('/bootstrap', requireAuth, async (req, res) => {
   try {
     res.json(await authService.getBootstrap(req.user));
@@ -142,8 +144,22 @@ router.get('/bootstrap', requireAuth, async (req, res) => {
     res.status(status).json({ message: err.message || 'Không thể tải dữ liệu cửa hàng' });
   }
 });
-router.get('/staff', requireAuth, requireAdmin, async (req, res) => res.json({ users: await authService.listStaff(req.tenantContext) }));
-router.post('/staff', requireAuth, requireAdmin, async (req, res) => {
+
+// Staff Management Routes
+router.get('/staff', requireAuth, (req, res, next) => {
+  if (req.user.permissions.includes(PERMISSIONS.STAFF_MANAGE) || req.user.permissions.includes(PERMISSIONS.STAFF_RULES_MANAGE)) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Bạn không có quyền xem danh sách nhân viên' });
+}, async (req, res) => {
+  try {
+    res.json({ users: await authService.listStaff(req.tenantContext) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+router.post('/staff', requireAuth, requirePermission(PERMISSIONS.STAFF_MANAGE), async (req, res) => {
   try {
     res.status(201).json({ user: await authService.createStaff(req.body.username, req.body.password, req.tenantContext) });
   } catch (err) {
@@ -151,4 +167,32 @@ router.post('/staff', requireAuth, requireAdmin, async (req, res) => {
   }
 });
 
+router.get('/permissions/catalog', requireAuth, requirePermission(PERMISSIONS.STAFF_RULES_MANAGE), (req, res) => {
+  res.json({ catalog: authService.getPermissionCatalog() });
+});
+
+router.put('/staff/:id/permissions', requireAuth, requirePermission(PERMISSIONS.STAFF_RULES_MANAGE), async (req, res) => {
+  try {
+    const updated = await authService.updateStaffPermissions(req.tenantContext, req.params.id, req.body || {}, req.user);
+    res.json({ user: updated });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+router.patch('/staff/:id/status', requireAuth, (req, res, next) => {
+  if (req.user.permissions.includes(PERMISSIONS.STAFF_MANAGE) || req.user.permissions.includes(PERMISSIONS.STAFF_RULES_MANAGE)) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Bạn không có quyền khóa / mở khóa tài khoản' });
+}, async (req, res) => {
+  try {
+    const updated = await authService.updateStaffStatus(req.tenantContext, req.params.id, req.body || {}, req.user);
+    res.json({ user: updated });
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
 module.exports = router;
+

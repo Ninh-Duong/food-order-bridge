@@ -98,6 +98,8 @@ const menuItemSchema = new mongoose.Schema({
   isBestseller: { type: Boolean, default: false },
   isSpicy: { type: Boolean, default: false },
   active: { type: Boolean, default: true },
+  deletedAt: { type: Date, default: null, index: true },
+  deletedBy: { type: String, default: null },
   updatedAt: { type: Date, default: Date.now }
 });
 
@@ -184,6 +186,7 @@ const settingsSchema = new mongoose.Schema({
 });
 
 const userSchema = new mongoose.Schema({
+  id: { type: String, sparse: true, index: true },
   storeId: { type: String, default: 'legacy-store', index: true, trim: true },
   username: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phoneNormalized: { type: String, default: null, sparse: true, index: true },
@@ -191,6 +194,10 @@ const userSchema = new mongoose.Schema({
   passwordHash: { type: String, required: true },
   role: { type: String, required: true, enum: ['admin', 'staff', 'STORE_OWNER', 'STAFF'] },
   branchIds: [{ type: String }],
+  permissionMode: { type: String, enum: ['DEFAULT', 'CUSTOM'], default: 'DEFAULT' },
+  assignedPermissions: { type: [String], default: [] },
+  permissionUpdatedAt: { type: Date, default: null },
+  permissionUpdatedBy: { type: String, default: null },
   active: { type: Boolean, default: true },
   lastLoginAt: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now },

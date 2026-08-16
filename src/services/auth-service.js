@@ -277,6 +277,9 @@ async function getBootstrap(userSession) {
   };
 }
 
+const auditLogRepository = require('../repositories/audit-log-repository');
+const { PERMISSIONS, STAFF_ASSIGNABLE_PERMISSIONS, expandPermissionDependencies } = require('../auth/permissions');
+
 async function createStaff(rawUsername, password, tenantContext = null) {
   const username = normalizeUsername(rawUsername);
   validateCredentials(username, password);
@@ -296,6 +299,136 @@ async function listStaff(tenantContext = null) {
   return userRepository.listStaff(tenantContext);
 }
 
+function getPermissionCatalog() {
+  return [
+    {
+      groupKey: 'ORDERS',
+      groupName: 'Đơn hàng',
+      permissions: [
+        { key: PERMISSIONS.ORDERS_READ, label: 'Xem đơn hàng', description: 'Xem danh sách & chi tiết đơn hàng', defaultForStaff: true },
+        { key: PERMISSIONS.ORDERS_WRITE, label: 'Xử lý đơn hàng', description: 'Chấp nhận, hủy, cập nhật trạng thái đơn', dependencies: [PERMISSIONS.ORDERS_READ], defaultForStaff: true }
+      ]
+    },
+    {
+      groupKey: 'MENU',
+      groupName: 'Món ăn',
+      permissions: [
+        { key: PERMISSIONS.CATALOG_READ, label: 'Xem danh sách món', description: 'Xem thực đơn trong admin', defaultForStaff: true },
+        { key: PERMISSIONS.CATALOG_WRITE, label: 'Sửa thông tin món', description: 'Tên, giá, mô tả, ảnh, tùy chọn', dependencies: [PERMISSIONS.CATALOG_READ], defaultForStaff: false },
+        { key: PERMISSIONS.INVENTORY_READ, label: 'Xem tồn kho', description: 'Xem số lượng tồn kho', defaultForStaff: true },
+        { key: PERMISSIONS.INVENTORY_WRITE, label: 'Cập nhật tồn kho', description: 'Thay đổi số lượng tồn kho', dependencies: [PERMISSIONS.INVENTORY_READ], defaultForStaff: true },
+        { key: PERMISSIONS.MENU_STATUS_WRITE, label: 'Khóa / mở bán món', description: 'Bật / tắt trạng thái bán hôm nay', dependencies: [PERMISSIONS.CATALOG_READ], defaultForStaff: false },
+        { key: PERMISSIONS.CATALOG_DELETE, label: 'Xóa món ăn', description: 'Soft delete & khôi phục món ăn', dependencies: [PERMISSIONS.CATALOG_READ], sensitive: true, defaultForStaff: false }
+      ]
+    },
+    {
+      groupKey: 'CATEGORIES',
+      groupName: 'Danh mục',
+      permissions: [
+        { key: PERMISSIONS.CATEGORIES_READ, label: 'Xem danh mục', description: 'Xem danh sách danh mục', defaultForStaff: true },
+        { key: PERMISSIONS.CATEGORIES_WRITE, label: 'Thêm / sửa danh mục', description: 'Tạo mới, sửa tên, bật / tắt danh mục', dependencies: [PERMISSIONS.CATEGORIES_READ, PERMISSIONS.CATALOG_READ], defaultForStaff: false }
+      ]
+    },
+    {
+      groupKey: 'REPORTS',
+      groupName: 'Báo cáo',
+      permissions: [
+        { key: PERMISSIONS.REPORTS_READ_BRANCH, label: 'Xem báo cáo chi nhánh', description: 'Xem doanh thu chi nhánh được gán', defaultForStaff: true }
+      ]
+    },
+    {
+      groupKey: 'STAFF',
+      groupName: 'Tài khoản nhân viên',
+      permissions: [
+        { key: PERMISSIONS.STAFF_MANAGE, label: 'Tạo tài khoản nhân viên', description: 'Tạo tài khoản nhân viên mới', defaultForStaff: false },
+        { key: PERMISSIONS.STAFF_RULES_MANAGE, label: 'Phân quyền nhân viên', description: 'Cấu hình quyền cho nhân viên khác', sensitive: true, lockedForStaff: true, defaultForStaff: false }
+      ]
+    }
+  ];
+}
+
+async function updateStaffPermissions(tenantContext, staffId, { permissionMode, permissions }, actorUser) {
+  if (!tenantContext?.storeId) throw new Error('Thiếu tenant context (storeId)');
+  if (!staffId) throw new Error('Thiếu ID nhân viên cần phân quyền');
+
+  const targetUser = await userRepository.findByIdForTenant(tenantContext, staffId);
+  if (!targetUser) throw new Error('Không tìm thấy tài khoản nhân viên trong cửa hàng của bạn');
+
+  if (targetUser.role === 'STORE_OWNER' || targetUser.role === 'admin') {
+    throw new Error('Không thể tùy chỉnh quyền của tài khoản Admin / Chủ cửa hàng');
+  }
+
+  const mode = permissionMode === 'CUSTOM' ? 'CUSTOM' : 'DEFAULT';
+  let assignedPermissions = [];
+
+  if (mode === 'CUSTOM') {
+    if (!Array.isArray(permissions)) throw new Error('Danh sách quyền phải là một mảng');
+
+    // Check against whitelist guard
+    const invalidPerms = permissions.filter(p => !STAFF_ASSIGNABLE_PERMISSIONS.includes(p));
+    if (invalidPerms.length > 0) {
+      throw new Error(`Các quyền sau không thể cấp cho nhân viên: ${invalidPerms.join(', ')}`);
+    }
+
+    assignedPermissions = expandPermissionDependencies(permissions).filter(p => STAFF_ASSIGNABLE_PERMISSIONS.includes(p));
+  }
+
+  const updatedUser = await userRepository.updatePermissions(tenantContext, staffId, {
+    permissionMode: mode,
+    assignedPermissions,
+    updatedBy: actorUser?.id || actorUser?.sub || 'system'
+  });
+
+  await auditLogRepository.recordLog({
+    actorId: actorUser?.id || actorUser?.sub || null,
+    actorRole: actorUser?.role || null,
+    storeId: tenantContext.storeId,
+    branchId: tenantContext.branchId || null,
+    action: 'STAFF_PERMISSIONS_UPDATED',
+    target: `User:${staffId}`,
+    details: {
+      targetUsername: targetUser.username,
+      permissionMode: mode,
+      assignedPermissions
+    }
+  });
+
+  return updatedUser;
+}
+
+async function updateStaffStatus(tenantContext, staffId, { active }, actorUser) {
+  if (!tenantContext?.storeId) throw new Error('Thiếu tenant context (storeId)');
+  if (!staffId) throw new Error('Thiếu ID nhân viên');
+
+  const targetUser = await userRepository.findByIdForTenant(tenantContext, staffId);
+  if (!targetUser) throw new Error('Không tìm thấy tài khoản nhân viên trong cửa hàng của bạn');
+
+  if (targetUser.role === 'STORE_OWNER' || targetUser.role === 'admin') {
+    throw new Error('Không thể khóa tài khoản Admin / Chủ cửa hàng');
+  }
+
+  const isActive = Boolean(active);
+  const updatedUser = await userRepository.updateStatus(tenantContext, staffId, {
+    active: isActive,
+    updatedBy: actorUser?.id || actorUser?.sub || 'system'
+  });
+
+  await auditLogRepository.recordLog({
+    actorId: actorUser?.id || actorUser?.sub || null,
+    actorRole: actorUser?.role || null,
+    storeId: tenantContext.storeId,
+    branchId: tenantContext.branchId || null,
+    action: isActive ? 'STAFF_ACCOUNT_UNLOCKED' : 'STAFF_ACCOUNT_LOCKED',
+    target: `User:${staffId}`,
+    details: {
+      targetUsername: targetUser.username,
+      active: isActive
+    }
+  });
+
+  return updatedUser;
+}
+
 module.exports = {
   TOKEN_TTL_SECONDS,
   bootstrapAdmin,
@@ -306,5 +439,9 @@ module.exports = {
   createStaff,
   parseToken,
   issueToken,
-  listStaff
+  listStaff,
+  getPermissionCatalog,
+  updateStaffPermissions,
+  updateStaffStatus
 };
+
