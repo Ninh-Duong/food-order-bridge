@@ -74,16 +74,30 @@ function parseToken(token) {
 }
 
 async function bootstrapAdmin() {
-  if (await userRepository.findAdmin()) return;
   const username = normalizeUsername(process.env.ADMIN_USERNAME);
   const password = process.env.ADMIN_PASSWORD;
   if (!username || !password) {
-    console.warn('⚠️ Chưa có admin. Hãy cấu hình ADMIN_USERNAME và ADMIN_PASSWORD rồi khởi động lại.');
     return;
   }
+  if (await userRepository.findByUsername(username) || await userRepository.findAdmin()) return;
   validateCredentials(username, password);
-  await userRepository.create({ id: crypto.randomUUID(), username, passwordHash: hashPassword(password), role: 'admin', active: true });
-  console.log(`✅ Đã khởi tạo tài khoản admin: ${username}`);
+  try {
+    await userRepository.create({
+      id: crypto.randomUUID(),
+      username,
+      passwordHash: hashPassword(password),
+      role: 'admin',
+      storeId: 'legacy-store',
+      branchIds: ['legacy-main-branch'],
+      active: true
+    });
+    console.log(`✅ Đã khởi tạo tài khoản admin: ${username}`);
+  } catch (err) {
+    if (err.code === 11000 || err.message?.includes('duplicate key')) {
+      return;
+    }
+    throw err;
+  }
 }
 
 async function login(rawUsername, password) {
@@ -105,27 +119,102 @@ async function login(rawUsername, password) {
   };
 }
 
-async function loginByPhone(phoneInput, password) {
-  const loginValue = String(phoneInput || '').trim();
-  let normalizedPhone = null;
+function parseLoginIdentifier(input) {
+  const raw = String(input || '').trim();
 
-  // Staff accounts are created with a username, while older merchant accounts
-  // can still log in with a Vietnamese mobile number. Try phone normalization
-  // only when the input is a phone number so usernames are not rejected by the
-  // phone validator before authentication is attempted.
+  // 1. Check if it is a Vietnamese mobile phone number
   try {
-    normalizedPhone = normalizeVNPhone(loginValue);
+    const normalizedPhone = normalizeVNPhone(raw);
+    return { type: 'PHONE', normalizedPhone, raw };
   } catch (_) {
-    // A non-phone value is handled as a username below.
+    // Not a valid mobile number -> handle as username / store scoped username
   }
 
-  const user = (normalizedPhone
-    ? await userRepository.findByPhone(normalizedPhone)
-    : null)
-    || await userRepository.findByUsername(normalizedPhone || normalizeUsername(loginValue));
+  // 2. Check for Store Key separator: "STORE_KEY/username", "STORE_KEY:username", "username@STORE_KEY"
+  if (raw.includes('/') || raw.includes(':')) {
+    const sep = raw.includes('/') ? '/' : ':';
+    const parts = raw.split(sep);
+    const storeKey = parts[0].trim();
+    const username = parts.slice(1).join(sep).trim();
+    if (storeKey && username) {
+      return { type: 'STORE_SCOPED', storeKey, username: normalizeUsername(username), raw };
+    }
+  } else if (raw.includes('@')) {
+    const parts = raw.split('@');
+    const username = parts[0].trim();
+    const storeKey = parts.slice(1).join('@').trim();
+    if (storeKey && username) {
+      return { type: 'STORE_SCOPED', storeKey, username: normalizeUsername(username), raw };
+    }
+  }
 
-  if (!user || !user.active || !verifyPassword(password, user.passwordHash)) {
+  // 3. Simple username without store prefix
+  return { type: 'USERNAME', username: normalizeUsername(raw), raw };
+}
+
+async function loginByPhone(phoneInput, password) {
+  const loginValue = String(phoneInput || '').trim();
+  const parsed = parseLoginIdentifier(loginValue);
+  let user = null;
+  let normalizedPhone = null;
+
+  if (parsed.type === 'PHONE') {
+    normalizedPhone = parsed.normalizedPhone;
+    user = await userRepository.findByPhone(normalizedPhone);
+    if (!user) {
+      user = await userRepository.findByUsername(normalizedPhone)
+        || await userRepository.findByUsername(parsed.raw);
+    }
+  } else if (parsed.type === 'STORE_SCOPED') {
+    let targetStore = null;
+    const storeQuery = {
+      $or: [
+        { code: parsed.storeKey.toUpperCase() },
+        { slug: parsed.storeKey.toLowerCase() },
+        { id: parsed.storeKey }
+      ]
+    };
+
+    if (isDBConnected()) {
+      targetStore = await StoreModel.findOne(storeQuery).lean();
+    } else {
+      try {
+        targetStore = await StoreModel.findOne(storeQuery).lean();
+      } catch (_) {}
+      if (!targetStore && (parsed.storeKey.toUpperCase() === 'LEGACY' || parsed.storeKey === 'legacy-store' || parsed.storeKey.toLowerCase() === 'cua-hang-mac-dinh')) {
+        targetStore = { id: 'legacy-store', code: 'LEGACY', slug: 'cua-hang-mac-dinh', status: 'ACTIVE' };
+      }
+    }
+
+    if (!targetStore) {
+      const error = new Error(`Không tìm thấy cửa hàng với mã "${parsed.storeKey}"`);
+      error.status = 404;
+      throw error;
+    }
+
+    user = await userRepository.findByUsernameForTenant({ storeId: targetStore.id }, parsed.username);
+  } else {
+    // Simple USERNAME without prefix
+    const matches = await userRepository.findAllByUsername(parsed.username);
+    if (matches.length === 1) {
+      user = matches[0];
+    } else if (matches.length > 1) {
+      const error = new Error(`Tên đăng nhập "${parsed.username}" tồn tại ở nhiều cửa hàng. Vui lòng nhập theo định dạng: MãQuán/${parsed.username} (ví dụ: CAFE_A/${parsed.username}) để đăng nhập.`);
+      error.status = 400;
+      throw error;
+    } else {
+      user = await userRepository.findByUsername(parsed.username);
+    }
+  }
+
+  if (!user || !verifyPassword(password, user.passwordHash)) {
     return null;
+  }
+
+  if (user.active === false) {
+    const error = new Error('Tài khoản đã bị khóa. Vui lòng liên hệ quản lý cửa hàng.');
+    error.status = 403;
+    throw error;
   }
 
   let branches = [];
@@ -140,7 +229,14 @@ async function loginByPhone(phoneInput, password) {
       branches = await BranchModel.find({ storeId, id: { $in: user.branchIds || [] }, status: 'ACTIVE' }).lean();
     }
   } else {
-    branches = [{ id: 'legacy-main-branch', name: 'Chi nhánh Chính', code: 'MAIN' }];
+    try {
+      const store = await StoreModel.findOne({ id: storeId }).lean();
+      if (store && store.status !== 'ACTIVE') return null;
+      branches = await BranchModel.find({ storeId, status: 'ACTIVE' }).lean();
+    } catch (_) {}
+    if (!branches || branches.length === 0) {
+      branches = [{ id: 'legacy-main-branch', name: 'Chi nhánh Chính', code: 'MAIN' }];
+    }
   }
 
   const preToken = issueToken({
@@ -284,13 +380,15 @@ const { PERMISSIONS, STAFF_ASSIGNABLE_PERMISSIONS, expandPermissionDependencies 
 async function createStaff(rawUsername, password, tenantContext = null) {
   const username = normalizeUsername(rawUsername);
   validateCredentials(username, password);
-  if (await userRepository.findByUsername(username)) throw new Error('Tên đăng nhập đã tồn tại');
+  const storeId = tenantContext?.storeId || 'legacy-store';
+  const existing = await userRepository.findByUsernameForTenant({ storeId }, username);
+  if (existing) throw new Error('Tên đăng nhập này đã tồn tại trong cửa hàng của bạn');
   return userRepository.create({
     id: crypto.randomUUID(),
     username,
     passwordHash: hashPassword(password),
     role: 'staff',
-    storeId: tenantContext?.storeId || 'legacy-store',
+    storeId,
     branchIds: tenantContext?.branchId ? [tenantContext.branchId] : ['legacy-main-branch'],
     active: true
   });

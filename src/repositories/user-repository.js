@@ -43,8 +43,24 @@ function safeUser(user) {
 }
 
 async function findByUsername(username) {
-  if (isDBConnected()) return UserModel.findOne({ username }).lean();
-  return readFileUsers().find((user) => user.username === username) || null;
+  const normalized = String(username || '').toLowerCase().trim();
+  if (isDBConnected()) return UserModel.findOne({ username: normalized }).lean();
+  return readFileUsers().find((user) => user.username === normalized) || null;
+}
+
+async function findByUsernameForTenant(tenantContext, username) {
+  const { storeId } = assertTenantContext(tenantContext);
+  const normalized = String(username || '').toLowerCase().trim();
+  if (!normalized) return null;
+  if (isDBConnected()) return UserModel.findOne({ storeId, username: normalized }).lean();
+  return readFileUsers().find((user) => (user.storeId || 'legacy-store') === storeId && user.username === normalized) || null;
+}
+
+async function findAllByUsername(username) {
+  const normalized = String(username || '').toLowerCase().trim();
+  if (!normalized) return [];
+  if (isDBConnected()) return UserModel.find({ username: normalized }).lean();
+  return readFileUsers().filter((user) => user.username === normalized);
 }
 
 async function findByPhone(phoneNormalized) {
@@ -53,8 +69,8 @@ async function findByPhone(phoneNormalized) {
 }
 
 async function findAdmin() {
-  if (isDBConnected()) return UserModel.findOne({ role: 'admin' }).lean();
-  return readFileUsers().find((user) => user.role === 'admin') || null;
+  if (isDBConnected()) return UserModel.findOne({ role: { $in: ['admin', 'STORE_OWNER'] } }).lean();
+  return readFileUsers().find((user) => user.role === 'admin' || user.role === 'STORE_OWNER') || null;
 }
 
 async function findByIdForTenant(tenantContext, userId) {
@@ -178,6 +194,8 @@ async function updateStatus(tenantContext, userId, { active, updatedBy }) {
 module.exports = {
   safeUser,
   findByUsername,
+  findByUsernameForTenant,
+  findAllByUsername,
   findByPhone,
   findAdmin,
   findByIdForTenant,

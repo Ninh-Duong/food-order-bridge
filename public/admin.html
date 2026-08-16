@@ -116,11 +116,16 @@
     <section id="tab-accounts" class="admin-tab-content admin-only" data-permission="staff.manage" style="display: none;">
       <div class="admin-card">
         <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; align-items: center;">
-          <h2 style="font-size: var(--font-size-lg); font-weight: 800; margin: 0;">👥 Nhân viên & Phân quyền</h2>
+          <div>
+            <h2 style="font-size: var(--font-size-lg); font-weight: 800; margin: 0;">👥 Nhân viên & Phân quyền</h2>
+            <div id="staff-store-code-hint" style="font-size: var(--font-size-xs); color: var(--color-text-muted); margin-top: 4px;">
+              Mã đăng nhập của nhân viên: <code>[MÃ_QUÁN]/tên_đăng_nhập</code>
+            </div>
+          </div>
         </div>
 
         <form id="staff-form" class="staff-form" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;">
-          <input class="form-control" id="staff-username" placeholder="Tên đăng nhập mới" required style="flex: 1; min-width: 180px;">
+          <input class="form-control" id="staff-username" placeholder="Tên đăng nhập mới (vd: ddn)" required style="flex: 1; min-width: 180px;">
           <input class="form-control" id="staff-password" type="password" placeholder="Mật khẩu (ít nhất 8 ký tự)" minlength="8" required style="flex: 1; min-width: 200px;">
           <button class="btn btn-primary" type="submit">+ Tạo nhân viên mới</button>
         </form>

@@ -11,5 +11,8 @@
    nhập tại `/login.html`, chọn Branch và kiểm tra badge Store/Branch trên POS.
 6. Khi khóa Store hoặc Branch, session cũ sẽ không thể chọn lại Branch đó; kiểm tra
    `/api/auth/bootstrap` sau khi thay đổi trạng thái.
+7. **Xóa Cửa hàng (Cascade Delete)**: Super Admin có thể nhấn nút **🗑️ Xóa** trên hàng cửa hàng
+   tương ứng để xóa vĩnh viễn cửa hàng và toàn bộ dữ liệu phụ thuộc (Chi nhánh, Nhân viên, Thực đơn,
+   Tồn kho, Đơn hàng, Cài đặt). Thao tác này được ghi nhận vào Audit Log hệ thống (`DELETE_STORE`).
 
 Không dùng tài khoản mặc định trong source hoặc commit password/hash thật vào repository.
