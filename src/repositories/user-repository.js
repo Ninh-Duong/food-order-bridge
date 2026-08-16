@@ -53,8 +53,8 @@ async function findByPhone(phoneNormalized) {
 }
 
 async function findAdmin() {
-  if (isDBConnected()) return UserModel.findOne({ role: 'admin' }).lean();
-  return readFileUsers().find((user) => user.role === 'admin') || null;
+  if (isDBConnected()) return UserModel.findOne({ role: { $in: ['admin', 'STORE_OWNER'] } }).lean();
+  return readFileUsers().find((user) => user.role === 'admin' || user.role === 'STORE_OWNER') || null;
 }
 
 async function findByIdForTenant(tenantContext, userId) {

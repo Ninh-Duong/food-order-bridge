@@ -74,16 +74,30 @@ function parseToken(token) {
 }
 
 async function bootstrapAdmin() {
-  if (await userRepository.findAdmin()) return;
   const username = normalizeUsername(process.env.ADMIN_USERNAME);
   const password = process.env.ADMIN_PASSWORD;
   if (!username || !password) {
-    console.warn('⚠️ Chưa có admin. Hãy cấu hình ADMIN_USERNAME và ADMIN_PASSWORD rồi khởi động lại.');
     return;
   }
+  if (await userRepository.findByUsername(username) || await userRepository.findAdmin()) return;
   validateCredentials(username, password);
-  await userRepository.create({ id: crypto.randomUUID(), username, passwordHash: hashPassword(password), role: 'admin', active: true });
-  console.log(`✅ Đã khởi tạo tài khoản admin: ${username}`);
+  try {
+    await userRepository.create({
+      id: crypto.randomUUID(),
+      username,
+      passwordHash: hashPassword(password),
+      role: 'admin',
+      storeId: 'legacy-store',
+      branchIds: ['legacy-main-branch'],
+      active: true
+    });
+    console.log(`✅ Đã khởi tạo tài khoản admin: ${username}`);
+  } catch (err) {
+    if (err.code === 11000 || err.message?.includes('duplicate key')) {
+      return;
+    }
+    throw err;
+  }
 }
 
 async function login(rawUsername, password) {

@@ -140,6 +140,16 @@ async function createStore(data) {
   if (normalizedPhone && ownerPassword) {
     ownerId = `usr_${crypto.randomBytes(4).toString('hex')}`;
     if (isDBConnected()) {
+      const existingUser = await UserModel.findOne({
+        $or: [
+          { phoneNormalized: normalizedPhone },
+          { username: normalizedPhone }
+        ]
+      }).lean();
+      if (existingUser) {
+        throw new Error(`Số điện thoại ${ownerPhone} đã được đăng ký cho tài khoản khác.`);
+      }
+
       await UserModel.create({
         id: ownerId,
         storeId,
