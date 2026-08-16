@@ -9,6 +9,7 @@ const paymentService = require('./payment-service');
 const { calculateSalePrice } = require('../utils/price-calculator');
 const { isDBConnected } = require('../db');
 const config = require('../config');
+const { getEffectiveSettings } = require('./tenant-telegram-settings-service');
 
 const OrderSchema = z.object({
   requestId: z.string().min(1, 'requestId là bắt buộc'),
@@ -108,6 +109,7 @@ class OrderService {
     }
 
     const { requestId, fulfillmentType, paymentMethod, customer, items: rawItems } = parseResult.data;
+    const tenantSettings = tenantContext?.storeId ? await getEffectiveSettings(tenantContext) : null;
 
     // 2. Aggregate duplicate (productId + sorted excludedOptionIds) in payload
     const configMap = new Map();
@@ -150,8 +152,8 @@ class OrderService {
     }
 
     const createOrder = async () => {
-      await this._expireUnpaidOrders();
-      await this.assertPaymentCapacity(fulfillmentType);
+      await this._expireUnpaidOrders(tenantContext);
+      await this.assertPaymentCapacity(fulfillmentType, tenantContext);
       if (isDBConnected()) {
         return await this.processOrderMongoDB(requestId, customer, aggregatedItems, true, fulfillmentType, paymentMethod, tenantContext);
       }
@@ -160,7 +162,7 @@ class OrderService {
 
     // Serialize DINE_IN creation so the global three-order capacity cannot be
     // exceeded by concurrent requests in the same application instance.
-    if (fulfillmentType === 'DINE_IN' || config.getPaymentPendingScope() === 'ALL') {
+    if (fulfillmentType === 'DINE_IN' || (tenantSettings?.pendingScope || config.getPaymentPendingScope()) === 'ALL') {
       return await runWithLock(createOrder);
     }
 
@@ -171,6 +173,7 @@ class OrderService {
   }
 
   async processOrderMongoDB(requestId, customer, aggregatedItems, allowTransaction = true, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH', tenantContext = null) {
+    const tenantSettings = tenantContext?.storeId ? await getEffectiveSettings(tenantContext) : null;
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -356,8 +359,8 @@ class OrderService {
         paymentReference: null,
         paymentTransactionId: null,
         paymentAmount: totalAmount,
-        paymentExpiresAt: (fulfillmentType === 'DINE_IN' || config.getPaymentPendingScope() === 'ALL')
-          ? new Date(Date.now() + config.getPaymentPendingTimeoutMinutes() * 60 * 1000).toISOString()
+        paymentExpiresAt: (fulfillmentType === 'DINE_IN' || (tenantSettings?.pendingScope || config.getPaymentPendingScope()) === 'ALL')
+          ? new Date(Date.now() + (tenantSettings?.pendingTimeoutMinutes || config.getPaymentPendingTimeoutMinutes()) * 60 * 1000).toISOString()
           : null,
         paymentQrImageUrl: null,
         paymentLink: null,
@@ -382,7 +385,7 @@ class OrderService {
         session.endSession();
       }
 
-      return await this.preparePaymentAndNotify(newOrder);
+      return await this.preparePaymentAndNotify(newOrder, tenantContext);
 
     } catch (err) {
       if (session) {
@@ -411,6 +414,7 @@ class OrderService {
   }
 
   async processOrderJSON(requestId, customer, aggregatedItems, fulfillmentType = 'DELIVERY', paymentMethod = 'CASH', tenantContext = null) {
+    const tenantSettings = tenantContext?.storeId ? await getEffectiveSettings(tenantContext) : null;
     const existingOrder = await orderRepository.findByRequestId(requestId);
     if (existingOrder) {
       return {
@@ -558,8 +562,8 @@ class OrderService {
         paymentReference: null,
         paymentTransactionId: null,
         paymentAmount: totalAmount,
-        paymentExpiresAt: (fulfillmentType === 'DINE_IN' || config.getPaymentPendingScope() === 'ALL')
-          ? new Date(Date.now() + config.getPaymentPendingTimeoutMinutes() * 60 * 1000).toISOString()
+        paymentExpiresAt: (fulfillmentType === 'DINE_IN' || (tenantSettings?.pendingScope || config.getPaymentPendingScope()) === 'ALL')
+          ? new Date(Date.now() + (tenantSettings?.pendingTimeoutMinutes || config.getPaymentPendingTimeoutMinutes()) * 60 * 1000).toISOString()
           : null,
         paymentQrImageUrl: null,
         paymentLink: null,
@@ -579,7 +583,7 @@ class OrderService {
 
       await orderRepository.save(newOrder);
 
-      return await this.preparePaymentAndNotify(newOrder);
+      return await this.preparePaymentAndNotify(newOrder, tenantContext);
 
     } catch (err) {
       menuRepository.saveAll(menuBackup);
@@ -604,7 +608,7 @@ class OrderService {
     };
   }
 
-  async preparePaymentAndNotify(newOrder) {
+  async preparePaymentAndNotify(newOrder, tenantContext = null) {
     const payment = await paymentService.createPaymentForOrder({
       orderId: newOrder.id,
       amount: newOrder.totalAmount,
@@ -625,7 +629,7 @@ class OrderService {
     };
 
     await orderRepository.update(newOrder.id, paymentFields);
-    const response = await this.sendNotificationAndRespond({ ...newOrder, ...paymentFields });
+    const response = await this.sendNotificationAndRespond({ ...newOrder, ...paymentFields }, tenantContext);
     response.result.payment = { ...payment, paymentExpiresAt: paymentFields.paymentExpiresAt };
     response.result.paymentStatus = payment.paymentStatus;
     response.result.isPaid = payment.paymentStatus === 'PAID';
@@ -633,8 +637,11 @@ class OrderService {
     return response;
   }
 
-  async sendNotificationAndRespond(newOrder) {
-    if (!config.isTelegramOrderNotificationEnabled()) {
+  async sendNotificationAndRespond(newOrder, tenantContext = null) {
+    const telegramSettings = tenantContext?.storeId ? await getEffectiveSettings(tenantContext) : null;
+    if (telegramSettings
+      ? telegramSettings.enabled === false || telegramSettings.orderCreatedEnabled === false
+      : !config.isTelegramOrderNotificationEnabled()) {
       return {
         statusCode: 201,
         result: {
@@ -648,7 +655,7 @@ class OrderService {
     }
 
     try {
-      const result = await telegramService.notifyNewOrder(newOrder);
+      const result = await telegramService.notifyNewOrder(newOrder, tenantContext);
       await orderRepository.update(newOrder.id, {
         notificationStatus: 'SENT',
         telegramMessageId: result.messageId,
@@ -689,18 +696,20 @@ class OrderService {
     }
   }
 
-  isPaymentCapacityScopeMatch(fulfillmentType) {
-    return config.getPaymentPendingScope() === 'ALL' || fulfillmentType === 'DINE_IN';
+  isPaymentCapacityScopeMatch(fulfillmentType, scope = config.getPaymentPendingScope()) {
+    return scope === 'ALL' || fulfillmentType === 'DINE_IN';
   }
 
-  async assertPaymentCapacity(fulfillmentType) {
-    if (!this.isPaymentCapacityScopeMatch(fulfillmentType)) return;
+  async assertPaymentCapacity(fulfillmentType, tenantContext = null) {
+    const settings = tenantContext?.storeId ? await getEffectiveSettings(tenantContext) : null;
+    const scope = settings?.pendingScope || config.getPaymentPendingScope();
+    if (!this.isPaymentCapacityScopeMatch(fulfillmentType, scope)) return;
 
-    const limit = config.getPaymentPendingOrderLimit();
-    const pendingCount = await orderRepository.countPendingPayments(config.getPaymentPendingScope());
+    const limit = settings?.pendingOrderLimit || config.getPaymentPendingOrderLimit();
+    const pendingCount = await orderRepository.countPendingPayments(scope, tenantContext);
     if (pendingCount < limit) return;
 
-    await this.notifyPaymentCapacityBlocked(pendingCount, limit);
+    await this.notifyPaymentCapacityBlocked(pendingCount, limit, tenantContext, settings);
     throw {
       status: 409,
       code: 'PAYMENT_CAPACITY_FULL',
@@ -710,32 +719,39 @@ class OrderService {
     };
   }
 
-  async getPaymentCapacityStatus() {
-    await this._expireUnpaidOrders();
-    const scope = config.getPaymentPendingScope();
-    const limit = config.getPaymentPendingOrderLimit();
-    const pendingCount = await orderRepository.countPendingPayments(scope);
+  async getPaymentCapacityStatus(tenantContext = null) {
+    await this._expireUnpaidOrders(tenantContext);
+    const settings = tenantContext?.storeId ? await getEffectiveSettings(tenantContext) : null;
+    const scope = settings?.pendingScope || config.getPaymentPendingScope();
+    const limit = settings?.pendingOrderLimit || config.getPaymentPendingOrderLimit();
+    const pendingCount = await orderRepository.countPendingPayments(scope, tenantContext);
     return {
       scope,
       pendingCount,
       limit,
       available: Math.max(0, limit - pendingCount),
       blocked: pendingCount >= limit,
-      timeoutMinutes: config.getPaymentPendingTimeoutMinutes()
+      timeoutMinutes: settings?.pendingTimeoutMinutes || config.getPaymentPendingTimeoutMinutes()
     };
   }
 
-  async notifyPaymentCapacityBlocked(pendingCount, limit) {
+  async notifyPaymentCapacityBlocked(pendingCount, limit, tenantContext = null, settings = null) {
     const now = Date.now();
-    const cooldown = config.getPaymentCapacityAlertCooldownMinutes() * 60 * 1000;
-    if (this.lastPaymentCapacityAlertAt && now - this.lastPaymentCapacityAlertAt < cooldown) return;
-    this.lastPaymentCapacityAlertAt = now;
+    const cooldown = (settings?.alertCooldownMinutes || config.getPaymentCapacityAlertCooldownMinutes()) * 60 * 1000;
+    if (!this.paymentCapacityAlertTimes) this.paymentCapacityAlertTimes = new Map();
+    const cooldownKey = tenantContext?.storeId
+      ? `${tenantContext.storeId}:${tenantContext.branchId || '__STORE__'}`
+      : 'legacy';
+    const lastAlertAt = this.paymentCapacityAlertTimes.get(cooldownKey) || 0;
+    if (lastAlertAt && now - lastAlertAt < cooldown) return;
+    this.paymentCapacityAlertTimes.set(cooldownKey, now);
 
     try {
       await telegramService.notifyPaymentCapacityBlocked({
         pendingCount,
         limit,
-        timeoutMinutes: config.getPaymentPendingTimeoutMinutes()
+        timeoutMinutes: settings?.pendingTimeoutMinutes || config.getPaymentPendingTimeoutMinutes(),
+        tenantContext
       });
     } catch (err) {
       // Payment capacity must still be enforced if Telegram is unavailable.
@@ -743,10 +759,12 @@ class OrderService {
     }
   }
 
-  async _expireUnpaidOrders() {
-    const cutoff = new Date(Date.now() - config.getPaymentPendingTimeoutMinutes() * 60 * 1000);
-    const scope = config.getPaymentPendingScope();
-    const expiredOrders = await orderRepository.getPendingPaymentOrders({ scope, before: cutoff });
+  async _expireUnpaidOrders(tenantContext = null) {
+    const settings = tenantContext?.storeId ? await getEffectiveSettings(tenantContext) : null;
+    const timeoutMinutes = settings?.pendingTimeoutMinutes || config.getPaymentPendingTimeoutMinutes();
+    const scope = settings?.pendingScope || config.getPaymentPendingScope();
+    const cutoff = new Date(Date.now() - timeoutMinutes * 60 * 1000);
+    const expiredOrders = await orderRepository.getPendingPaymentOrders({ scope, before: cutoff, tenantContext });
     const expired = [];
 
     for (const order of expiredOrders) {
@@ -755,7 +773,8 @@ class OrderService {
         actor: { username: 'payment-timeout', role: 'system' },
         skipToken: true,
         paymentStatus: 'EXPIRED',
-        notifyTelegram: true
+        notifyTelegram: true,
+        tenantContext
       });
       if (updated && updated.orderStatus === 'CANCELLED') expired.push(updated);
     }
@@ -826,9 +845,15 @@ class OrderService {
       await this.restoreOrderStock(order, options.tenantContext);
     }
 
-    if (options.notifyTelegram !== false && config.isTelegramOrderNotificationEnabled()) {
+    const telegramSettings = options.tenantContext?.storeId
+      ? await getEffectiveSettings(options.tenantContext)
+      : null;
+    const shouldNotifyCancellation = telegramSettings
+      ? telegramSettings.enabled !== false && telegramSettings.orderCancelledEnabled !== false
+      : config.isTelegramOrderNotificationEnabled();
+    if (options.notifyTelegram !== false && shouldNotifyCancellation) {
       try {
-        await telegramService.notifyOrderCancelled({ ...order, ...updated });
+        await telegramService.notifyOrderCancelled({ ...order, ...updated }, options.tenantContext);
       } catch (err) {
         console.warn(`[Telegram Cancel ${orderId}]`, err.message);
       }

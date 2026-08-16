@@ -117,6 +117,25 @@ Tài liệu chi tiết cấu trúc Schema, Compound Unique Index và cơ chế p
 - `timezone`: String
 - `updatedAt`: Date
 
+### Telegram Settings Schema (`TelegramSettingsModel`)
+- `storeId`: String (required)
+- `branchId`: String hoặc `null`; `null` là Store default
+- Telegram credential được mã hóa: `botTokenEncrypted`, `webhookSecretEncrypted`
+- `chatId`, `recipientChatIds`: nơi nhận cảnh báo
+- Feature flags: order created/cancelled, pending capacity, inventory, scheduled reports, chart
+- Payment capacity: `pendingOrderLimit`, `pendingTimeoutMinutes`, `pendingScope`, `alertCooldownMinutes`
+- Report schedule: daily/weekly/monthly time và `timezone`
+- **Index**: Compound unique `{ storeId: 1, branchId: 1 }`
+
+### Telegram Report Access (`TelegramReportAccessModel`)
+- `storeId`, `branchId`, `telegramUserId`
+- `canViewReports`, `canReceiveAlerts`, `active`
+- **Index**: Compound unique `{ storeId: 1, branchId: 1, telegramUserId: 1 }`
+
+### Telegram Delivery Log (`TelegramDeliveryLogModel`)
+- Lưu trạng thái gửi scheduled report theo Store/Branch/period/recipient.
+- Compound unique idempotency index chống gửi trùng sau restart hoặc deploy nhiều instance.
+
 ### AuditLog Schema (`AuditLogModel`)
 - `actor`: String
 - `actorRole`: String

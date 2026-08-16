@@ -36,6 +36,13 @@ Tài liệu đặc tả toàn bộ các chuẩn giao tiếp RESTful API trong h�
 - `POST /api/super-admin/stores/:storeId/branches`: Thêm Chi nhánh mới cho Cửa hàng `{ code, name, slug, address, phone }`.
 - `PUT /api/super-admin/branches/:branchId/status`: Khóa/Mở chi nhánh `{ status: 'ACTIVE' | 'INACTIVE' }`.
 - `GET /api/super-admin/audit-logs`: Lấy lịch sử Audit Log hệ thống.
+- `GET /api/super-admin/stores/:storeId/telegram-settings?branchId=...`: Lấy cấu hình Telegram hiệu lực của Store/Branch.
+- `PUT /api/super-admin/stores/:storeId/telegram-settings`: Lưu cấu hình Telegram, cảnh báo pending order và lịch report. `branchId` trong body là tùy chọn.
+- `DELETE /api/super-admin/stores/:storeId/telegram-settings?branchId=...`: Xóa override của Branch để quay về Store default.
+- `GET|PUT /api/super-admin/stores/:storeId/telegram-settings/access`: Quản lý nhiều Telegram User ID được xem report theo Store/Branch.
+- `POST /api/super-admin/stores/:storeId/telegram-settings/test`: Gửi tin nhắn test bằng credential của scope đã chọn.
+- `GET /api/super-admin/stores/:storeId/telegram-settings/webhook-status`: Kiểm tra webhook của bot scope.
+- `POST /api/super-admin/stores/:storeId/telegram-settings/register-webhook`: Đăng ký webhook tenant-scoped.
 
 ---
 
@@ -71,6 +78,7 @@ Tài liệu đặc tả toàn bộ các chuẩn giao tiếp RESTful API trong h�
 - `POST /api/settings`: Yêu cầu `settings.manage`. Lưu cấu hình `{ telegramBotToken, telegramChatId }`.
 - `POST /api/settings/test`: Yêu cầu `settings.manage`. Bắn tin nhắn thử nghiệm vào Telegram.
 - `POST /api/telegram/webhook`: Webhook tiếp nhận tương tác lệnh (Commands, Callback Queries) từ Telegram Bot.
+- `POST /api/telegram/webhook/:storeId`: Webhook tenant-scoped; bắt buộc secret của Store nếu đã cấu hình và mọi report phải truyền `storeId + branchId`.
 
 ---
 

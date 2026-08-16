@@ -14,8 +14,8 @@ async function fetchWithTimeout(url, options, timeoutMs = TIMEOUT_MS) {
   }
 }
 
-async function callTelegramApi(endpoint, body) {
-  const token = config.getTelegramToken();
+async function callTelegramApi(endpoint, body, tokenOverride = '') {
+  const token = tokenOverride || config.getTelegramToken();
   if (!token) {
     throw new Error('Telegram Bot Token chưa được cấu hình.');
   }
@@ -107,6 +107,7 @@ function splitTelegramMessage(text, maxLength = 4000) {
 
 async function sendTelegramMessage(payloadOrText) {
   let targetChatId = config.getTelegramChatId();
+  let telegramConfig = null;
   let text = '';
   let parseMode;
   let replyMarkup;
@@ -115,6 +116,7 @@ async function sendTelegramMessage(payloadOrText) {
     text = payloadOrText;
   } else if (payloadOrText && typeof payloadOrText === 'object') {
     targetChatId = payloadOrText.chatId || payloadOrText.chat_id || targetChatId;
+    telegramConfig = payloadOrText.telegramConfig || null;
     text = payloadOrText.text || '';
     parseMode = payloadOrText.parseMode || payloadOrText.parse_mode;
     replyMarkup = payloadOrText.replyMarkup || payloadOrText.reply_markup;
@@ -138,7 +140,7 @@ async function sendTelegramMessage(payloadOrText) {
     if (parseMode) body.parse_mode = parseMode;
     if (isLast && replyMarkup) body.reply_markup = replyMarkup;
 
-    const result = await callTelegramApi('sendMessage', body);
+    const result = await callTelegramApi('sendMessage', body, telegramConfig?.token || telegramConfig?.botToken);
     lastResult = {
       ok: true,
       messageId: result.message_id
@@ -161,7 +163,7 @@ async function sendTelegramPhoto(payload) {
   if (payload.parseMode || payload.parse_mode) body.parse_mode = payload.parseMode || payload.parse_mode;
   if (payload.replyMarkup || payload.reply_markup) body.reply_markup = payload.replyMarkup || payload.reply_markup;
 
-  const result = await callTelegramApi('sendPhoto', body);
+  const result = await callTelegramApi('sendPhoto', body, payload?.telegramConfig?.token || payload?.telegramConfig?.botToken);
   return { ok: true, messageId: result.message_id };
 }
 
@@ -171,7 +173,7 @@ async function answerCallbackQuery(options) {
     text: typeof options === 'object' ? options.text : undefined,
     show_alert: typeof options === 'object' ? options.showAlert : undefined
   };
-  return callTelegramApi('answerCallbackQuery', body);
+  return callTelegramApi('answerCallbackQuery', body, options?.telegramConfig?.token || options?.telegramConfig?.botToken);
 }
 
 async function editMessageText(options) {
@@ -183,22 +185,22 @@ async function editMessageText(options) {
   if (options.parseMode) body.parse_mode = options.parseMode;
   if (options.replyMarkup) body.reply_markup = options.replyMarkup;
 
-  const result = await callTelegramApi('editMessageText', body);
+  const result = await callTelegramApi('editMessageText', body, options?.telegramConfig?.token || options?.telegramConfig?.botToken);
   return { ok: true, messageId: result.message_id };
 }
 
-async function setWebhook(webhookUrl, secretToken) {
+async function setWebhook(webhookUrl, secretToken, telegramConfig = null) {
   const body = { url: webhookUrl };
   if (secretToken) body.secret_token = secretToken;
-  return callTelegramApi('setWebhook', body);
+  return callTelegramApi('setWebhook', body, telegramConfig?.token || telegramConfig?.botToken);
 }
 
-async function deleteWebhook() {
-  return callTelegramApi('deleteWebhook', {});
+async function deleteWebhook(telegramConfig = null) {
+  return callTelegramApi('deleteWebhook', {}, telegramConfig?.token || telegramConfig?.botToken);
 }
 
-async function getWebhookInfo() {
-  return callTelegramApi('getWebhookInfo', {});
+async function getWebhookInfo(telegramConfig = null) {
+  return callTelegramApi('getWebhookInfo', {}, telegramConfig?.token || telegramConfig?.botToken);
 }
 
 module.exports = {

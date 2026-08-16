@@ -482,7 +482,8 @@ class OrderRepository {
       .map(order => this.formatMemoryOrder(order));
   }
 
-  async getPendingPaymentOrders({ scope = 'DINE_IN', before = null } = {}) {
+  async getPendingPaymentOrders({ scope = 'DINE_IN', before = null, tenantContext = null } = {}) {
+    if (tenantContext) assertTenantContext(tenantContext);
     const query = {
       isPaid: false,
       orderStatus: { $ne: 'CANCELLED' },
@@ -490,6 +491,10 @@ class OrderRepository {
     };
     if (scope === 'DINE_IN') query.fulfillmentType = 'DINE_IN';
     if (before) query.createdAt = { $lte: new Date(before) };
+    if (tenantContext) {
+      query.storeId = tenantContext.storeId;
+      if (tenantContext.branchId) query.branchId = tenantContext.branchId;
+    }
 
     if (isDBConnected()) {
       try {
@@ -507,13 +512,17 @@ class OrderRepository {
           && ['UNPAID', 'PENDING'].includes(order.paymentStatus || (order.isPaid ? 'PAID' : 'UNPAID'));
         const inScope = scope !== 'DINE_IN' || (order.fulfillmentType || 'DELIVERY') === 'DINE_IN';
         const beforeMatch = !before || new Date(order.createdAt || 0) <= new Date(before);
-        return isPending && inScope && beforeMatch;
+          const tenantMatch = !tenantContext
+            || ((order.storeId || 'legacy-store') === tenantContext.storeId
+              && (!tenantContext.branchId || (order.branchId || 'legacy-main-branch') === tenantContext.branchId));
+          return isPending && inScope && beforeMatch && tenantMatch;
       })
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
       .map(order => this.formatMemoryOrder(order));
   }
 
-  async countPendingPayments(scope = 'DINE_IN') {
+  async countPendingPayments(scope = 'DINE_IN', tenantContext = null) {
+    if (tenantContext) assertTenantContext(tenantContext);
     if (isDBConnected()) {
       const query = {
         isPaid: false,
@@ -521,9 +530,13 @@ class OrderRepository {
         paymentStatus: { $in: ['UNPAID', 'PENDING'] }
       };
       if (scope === 'DINE_IN') query.fulfillmentType = 'DINE_IN';
+      if (tenantContext) {
+        query.storeId = tenantContext.storeId;
+        if (tenantContext.branchId) query.branchId = tenantContext.branchId;
+      }
       return await OrderModel.countDocuments(query);
     }
-    const pending = await this.getPendingPaymentOrders({ scope });
+    const pending = await this.getPendingPaymentOrders({ scope, tenantContext });
     return pending.length;
   }
 

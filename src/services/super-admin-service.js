@@ -8,7 +8,10 @@ const {
   BranchInventoryModel,
   CategoryModel,
   OrderModel,
-  SettingsModel
+  SettingsModel,
+  TelegramSettingsModel,
+  TelegramReportAccessModel,
+  TelegramDeliveryLogModel
 } = require('../models');
 const { normalizeVNPhone, formatPhoneDisplay } = require('../utils/phone-normalizer');
 const { isDBConnected } = require('../db');
@@ -291,7 +294,10 @@ async function deleteStore(storeId) {
       CategoryModel.deleteMany({ storeId }),
       MenuItemModel.deleteMany({ storeId }),
       OrderModel.deleteMany({ storeId }),
-      SettingsModel.deleteMany({ storeId })
+      SettingsModel.deleteMany({ storeId }),
+      TelegramSettingsModel.deleteMany({ storeId }),
+      TelegramReportAccessModel.deleteMany({ storeId }),
+      TelegramDeliveryLogModel.deleteMany({ storeId })
     ]);
   } else {
     try {
@@ -307,7 +313,10 @@ async function deleteStore(storeId) {
         CategoryModel.deleteMany({ storeId }),
         MenuItemModel.deleteMany({ storeId }),
         OrderModel.deleteMany({ storeId }),
-        SettingsModel.deleteMany({ storeId })
+        SettingsModel.deleteMany({ storeId }),
+        TelegramSettingsModel.deleteMany({ storeId }),
+        TelegramReportAccessModel.deleteMany({ storeId }),
+        TelegramDeliveryLogModel.deleteMany({ storeId })
       ]);
     } catch (_) {}
   }
