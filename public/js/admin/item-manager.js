@@ -33,7 +33,6 @@ function slugifyOptionId(name) {
 
 export async function initItemManager(workspace = window.__POS_WORKSPACE__) {
   initialCatalog = workspace?.catalog || null;
-  canCatalogWrite = workspace?.permissions?.includes('catalog.write') || false;
   await Promise.all([
     fetchAdminMenu(),
     fetchCategories()
@@ -71,7 +70,6 @@ export async function initItemManager(workspace = window.__POS_WORKSPACE__) {
   }
 }
 
-
 async function fetchCategories() {
   if (!initialCategoriesLoaded && initialCatalog?.categories) {
     availableCategories = initialCatalog.categories;
@@ -87,20 +85,15 @@ async function fetchCategories() {
   }
 }
 
-async function fetchAdminMenu() {
+async function fetchAdminMenu(includeDeleted = false) {
   const tableBody = document.getElementById('admin-menu-table-body');
   if (!tableBody) return;
 
   renderSkeletonTable(tableBody, 5, 7);
 
   try {
-    if (!initialMenuLoaded && initialCatalog?.menuItems) {
-      adminMenuItems = initialCatalog.menuItems;
-      initialMenuLoaded = true;
-      renderMenuTable(adminMenuItems);
-      return;
-    }
-    const data = await API.get('/api/menu');
+    const endpoint = includeDeleted ? '/api/menu?includeDeleted=true' : '/api/menu';
+    const data = await API.get(endpoint);
     adminMenuItems = data.items || [];
     renderMenuTable(adminMenuItems);
   } catch (error) {
@@ -112,14 +105,66 @@ function renderMenuTable(items) {
   const tableBody = document.getElementById('admin-menu-table-body');
   if (!tableBody) return;
 
+  const userPerms = window.__POS_WORKSPACE__?.user?.permissions || [];
+  const canWriteCatalog = userPerms.includes('catalog.write');
+  const canStatusWrite = userPerms.includes('menu.status.write') || canWriteCatalog;
+  const canInventoryWrite = userPerms.includes('inventory.write');
+  const canDeleteCatalog = userPerms.includes('catalog.delete');
+
   window.openItemModal = openItemModal;
+
   window.toggleItemActive = async (itemId, activeState) => {
     try {
       await API.put(`/api/menu/${itemId}/status`, { active: activeState });
-      showToast(activeState ? 'Đã bật bán món hôm nay' : 'Đã ngưng bán món hôm nay', 'success');
+      showToast(activeState ? 'Đã mở bán món hôm nay' : 'Đã tạm ngưng bán món hôm nay', 'success');
       await fetchAdminMenu();
     } catch (error) {
-      showToast('Lỗi cập nhật trạng thái món', 'error');
+      showToast(error.message || 'Lỗi cập nhật trạng thái món', 'error');
+    }
+  };
+
+  window.quickUpdateInventory = async (itemId) => {
+    const item = adminMenuItems.find(i => i.id === itemId);
+    if (!item) return;
+    const currentStock = item.stockQuantity ?? 0;
+    const input = prompt(`Cập nhật số lượng tồn kho cho món "${item.name}":`, String(currentStock));
+    if (input === null) return;
+    const newStock = parseInt(input.trim(), 10);
+    if (isNaN(newStock) || newStock < 0) {
+      showToast('Số lượng tồn kho phải là số nguyên không âm', 'error');
+      return;
+    }
+    try {
+      await API.patch(`/api/menu/${itemId}/inventory`, { stockQuantity: newStock });
+      showToast(`Đã cập nhật tồn kho món "${item.name}" thành ${newStock}`, 'success');
+      await fetchAdminMenu();
+    } catch (error) {
+      showToast(error.message || 'Lỗi cập nhật tồn kho', 'error');
+    }
+  };
+
+  window.deleteMenuItem = async (itemId) => {
+    const item = adminMenuItems.find(i => i.id === itemId);
+    if (!item) return;
+    if (!confirm(`Xác nhận xóa món "${item.name}"?\n(Món đã xóa sẽ bị ẩn trên trang bán hàng)`)) return;
+    try {
+      await API.delete(`/api/menu/${itemId}`);
+      showToast(`Đã xóa món "${item.name}" thành công`, 'success');
+      await fetchAdminMenu();
+    } catch (error) {
+      showToast(error.message || 'Lỗi xóa món', 'error');
+    }
+  };
+
+  window.restoreMenuItem = async (itemId) => {
+    const item = adminMenuItems.find(i => i.id === itemId);
+    if (!confirm(`Khôi phục món "${item?.name || itemId}" trở lại thực đơn?`)) return;
+    try {
+      await API.post(`/api/menu/${itemId}/restore`, {});
+      showToast(`Đã khôi phục món thành công`, 'success');
+      await fetchAdminMenu(true);
+    } catch (error) {
+      showToast(error.message || 'Lỗi khôi phục món', 'error');
     }
   };
 
@@ -129,13 +174,16 @@ function renderMenuTable(items) {
   }
 
   tableBody.innerHTML = items.map(item => {
+    const isDeleted = Boolean(item.deletedAt);
     const isDiscounted = item.discountPercent > 0;
     const salePrice = item.salePrice !== undefined ? item.salePrice : calculateSalePriceClient(item.price, item.discountPercent);
     const stock = item.stockQuantity ?? 0;
     const isActive = item.active !== false;
 
     let stockBadgeHtml = '';
-    if (stock > 5) {
+    if (isDeleted) {
+      stockBadgeHtml = `<span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8;">Đã xóa</span>`;
+    } else if (stock > 5) {
       stockBadgeHtml = `<span class="badge badge-active" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">Còn ${stock}</span>`;
     } else if (stock > 0) {
       stockBadgeHtml = `<span class="badge" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">Sắp hết: ${stock}</span>`;
@@ -145,7 +193,10 @@ function renderMenuTable(items) {
 
     let statusText = 'Đang bán';
     let statusClass = 'badge-active';
-    if (!isActive) {
+    if (isDeleted) {
+      statusText = 'Đã xóa';
+      statusClass = 'badge-inactive';
+    } else if (!isActive) {
       statusText = 'Tạm ngưng';
       statusClass = 'badge-inactive';
     } else if (stock === 0) {
@@ -157,7 +208,7 @@ function renderMenuTable(items) {
     const customCount = customOptions.length;
 
     return `
-      <tr>
+      <tr style="${isDeleted ? 'opacity: 0.6; background: rgba(15,23,42,0.4);' : ''}">
         <td data-label="Hình ảnh">
           <img src="${item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&auto=format&fit=crop&q=80'}" class="item-thumb" alt="${escapeHTML(item.name)}" />
         </td>
@@ -175,23 +226,38 @@ function renderMenuTable(items) {
             <strong>${formatVND(item.price)}</strong>
           `}
         </td>
-        <td data-label="Tồn kho">${stockBadgeHtml}</td>
+        <td data-label="Tồn kho">
+          <div style="display:flex; align-items:center; gap: 6px;">
+            ${stockBadgeHtml}
+            ${canInventoryWrite && !isDeleted ? `
+              <button class="btn btn-secondary btn-sm" style="font-size:10px; padding: 2px 6px;" onclick="window.quickUpdateInventory('${escapeHTML(item.id)}')" title="Sửa tồn kho">✏️</button>
+            ` : ''}
+          </div>
+        </td>
         <td data-label="Bán hôm nay">
-          ${canCatalogWrite ? `<label class="switch" title="Bật/Tắt bán hôm nay">
+          ${canStatusWrite && !isDeleted ? `<label class="switch" title="Bật/Tắt bán hôm nay">
             <input type="checkbox" ${isActive ? 'checked' : ''} onchange="window.toggleItemActive('${escapeHTML(item.id)}', this.checked)" />
             <span class="slider"></span>
-          </label>` : '<span style="color:var(--color-text-muted);">Chỉ xem</span>'}
+          </label>` : `<span style="color:var(--color-text-muted); font-size:12px;">${isActive ? 'Có' : 'Không'}</span>`}
         </td>
         <td data-label="Trạng thái">
           <span class="badge ${statusClass}">${statusText}</span>
         </td>
         <td data-label="Thao tác">
-          ${canCatalogWrite ? `<button class="btn btn-outline" style="min-height: 32px; padding: 4px 12px;" onclick="window.openItemModal('${escapeHTML(item.id)}')">Sửa</button>` : ''}
+          <div style="display:flex; gap: 4px; flex-wrap: wrap;">
+            ${isDeleted ? (
+              canDeleteCatalog ? `<button class="btn btn-primary btn-sm" style="min-height: 28px; padding: 2px 8px; font-size:11px;" onclick="window.restoreMenuItem('${escapeHTML(item.id)}')">♻️ Khôi phục</button>` : ''
+            ) : `
+              ${canWriteCatalog ? `<button class="btn btn-outline btn-sm" style="min-height: 28px; padding: 2px 8px; font-size:11px;" onclick="window.openItemModal('${escapeHTML(item.id)}')">Sửa</button>` : ''}
+              ${canDeleteCatalog ? `<button class="btn btn-secondary btn-sm" style="min-height: 28px; padding: 2px 8px; font-size:11px; color:#ef4444; border-color:rgba(239,68,68,0.3);" onclick="window.deleteMenuItem('${escapeHTML(item.id)}')">Xóa</button>` : ''}
+            `}
+          </div>
         </td>
       </tr>
     `;
   }).join('');
 }
+
 
 async function openItemModal(itemId = null) {
   const modalOverlay = document.getElementById('admin-modal-overlay');

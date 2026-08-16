@@ -3,9 +3,11 @@ const router = express.Router();
 const reportService = require('../services/report-service');
 const reportPdfService = require('../services/report-pdf-service');
 const config = require('../config');
+const { requireAuth, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../auth/permissions');
 
 // GET /api/reports/sales.pdf - Export PDF sales report
-router.get('/sales.pdf', async (req, res) => {
+router.get('/sales.pdf', requireAuth, requirePermission(PERMISSIONS.REPORTS_READ_BRANCH), async (req, res) => {
   try {
     const period = req.query.period || 'today';
     const report = await reportService.generateSalesReport(period, new Date(), req.tenantContext);
@@ -26,7 +28,7 @@ router.get('/sales.pdf', async (req, res) => {
 });
 
 // GET /api/reports/sales - JSON sales report
-router.get('/sales', async (req, res) => {
+router.get('/sales', requireAuth, requirePermission(PERMISSIONS.REPORTS_READ_BRANCH), async (req, res) => {
   try {
     const period = req.query.period || 'today';
     const report = await reportService.generateSalesReport(period, new Date(), req.tenantContext);
@@ -41,3 +43,4 @@ router.get('/sales', async (req, res) => {
 });
 
 module.exports = router;
+

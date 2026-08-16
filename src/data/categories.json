@@ -34,5 +34,38 @@
     "sortOrder": 4,
     "active": true,
     "storeId": "legacy-store"
+  },
+  {
+    "id": "CAT_TEST_1",
+    "name": "Món chính",
+    "slug": "cat_test_1",
+    "active": true,
+    "storeId": "test-menu-store",
+    "description": "",
+    "sortOrder": 0,
+    "createdAt": "2026-08-16T11:38:57.910Z",
+    "updatedAt": "2026-08-16T11:38:57.910Z"
+  },
+  {
+    "id": "CAT_TEST_2",
+    "name": "Món chính",
+    "slug": "cat_test_2",
+    "active": true,
+    "storeId": "test-order-block-store",
+    "description": "",
+    "sortOrder": 0,
+    "createdAt": "2026-08-16T11:38:57.949Z",
+    "updatedAt": "2026-08-16T11:38:57.949Z"
+  },
+  {
+    "id": "CAT_TEST_3",
+    "name": "Món chính",
+    "slug": "cat_test_3",
+    "active": true,
+    "storeId": "test-inv-store",
+    "description": "",
+    "sortOrder": 0,
+    "createdAt": "2026-08-16T11:38:57.978Z",
+    "updatedAt": "2026-08-16T11:38:57.978Z"
   }
 ]

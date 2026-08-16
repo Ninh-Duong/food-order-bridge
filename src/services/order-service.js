@@ -214,7 +214,7 @@ class OrderService {
         const menuItem = tenantContext
           ? await menuRepository.getByIdForTenant(tenantContext, productId)
           : await menuRepository.getById(productId);
-        if (!menuItem) {
+        if (!menuItem || menuItem.deletedAt) {
           throw { status: 422, message: `Món ăn với mã ${productId} không tồn tại` };
         }
         if (menuItem.active === false) {
@@ -441,7 +441,7 @@ class OrderService {
     const insufficientItems = [];
     for (const [productId, totalReqQty] of totalProductQuantityMap.entries()) {
       const menuItem = allItems.find(i => i.id === productId);
-      if (!menuItem) {
+      if (!menuItem || menuItem.deletedAt) {
         throw { status: 422, message: `Món ăn với mã ${productId} không tồn tại` };
       }
       if (menuItem.active === false) {

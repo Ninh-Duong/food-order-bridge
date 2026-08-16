@@ -8,10 +8,15 @@ const branchInventoryRepository = require('./branch-inventory-repository');
 const MENU_FILE = path.join(__dirname, '..', 'data', 'menu.json');
 
 class MenuRepository {
-  async getAllForTenant(tenantContext) {
+  async getAllForTenant(tenantContext, options = {}) {
     const { storeId } = assertTenantContext(tenantContext);
+    const includeDeleted = Boolean(options.includeDeleted);
     if (isDBConnected()) {
-      const items = await MenuItemModel.find({ storeId }).lean();
+      const filter = { storeId };
+      if (!includeDeleted) {
+        filter.$or = [{ deletedAt: null }, { deletedAt: { $exists: false } }];
+      }
+      const items = await MenuItemModel.find(filter).lean();
       const inventory = await branchInventoryRepository.listForTenant(tenantContext);
       const inventoryByItem = new Map(inventory.map((record) => [record.menuItemId, record]));
       return items.map((item) => {
@@ -24,7 +29,7 @@ class MenuRepository {
         } : item);
       });
     }
-    return this.getFromFile().filter((item) => (item.storeId || 'legacy-store') === storeId);
+    return this.getFromFile().filter((item) => (item.storeId || 'legacy-store') === storeId && (includeDeleted || !item.deletedAt));
   }
 
   cleanItem(item) {
@@ -32,8 +37,6 @@ class MenuRepository {
     const { _id, __v, ...rest } = item;
     const id = rest.id || _id;
 
-    // Legacy fallback seed:
-    // If stockQuantity is missing/undefined in item object, seed with 20.
     const stockQuantity = Number.isInteger(rest.stockQuantity) && rest.stockQuantity >= 0
       ? rest.stockQuantity
       : (rest.stockQuantity === undefined ? 20 : 0);
@@ -47,20 +50,22 @@ class MenuRepository {
       id,
       price: Number(rest.price) || 0,
       discountPercent,
-      stockQuantity
+      stockQuantity,
+      deletedAt: rest.deletedAt || null,
+      deletedBy: rest.deletedBy || null
     };
   }
 
   async getAll() {
     if (isDBConnected()) {
       try {
-        let items = await MenuItemModel.find().lean();
+        let items = await MenuItemModel.find({ $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] }).lean();
         if (!items || items.length === 0) {
           const defaultItems = this.getFromFile();
           if (defaultItems.length > 0) {
             console.log('🌱 Seeding initial menu items to MongoDB...');
             await MenuItemModel.insertMany(defaultItems);
-            items = await MenuItemModel.find().lean();
+            items = await MenuItemModel.find({ $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }] }).lean();
           }
         }
         return items.map(i => this.cleanItem(i));
@@ -69,7 +74,7 @@ class MenuRepository {
         throw err;
       }
     }
-    return this.getFromFile();
+    return this.getFromFile().filter(i => !i.deletedAt);
   }
 
   getFromFile() {
@@ -104,14 +109,19 @@ class MenuRepository {
     return items.find(i => i.id === id) || null;
   }
 
-  async getByIdForTenant(tenantContext, id) {
+  async getByIdForTenant(tenantContext, id, options = {}) {
     const { storeId } = assertTenantContext(tenantContext);
     if (!id) return null;
+    const includeDeleted = Boolean(options.includeDeleted);
     if (isDBConnected()) {
-      const item = await MenuItemModel.findOne({ id, storeId }).lean();
+      const filter = { id, storeId };
+      if (!includeDeleted) {
+        filter.$or = [{ deletedAt: null }, { deletedAt: { $exists: false } }];
+      }
+      const item = await MenuItemModel.findOne(filter).lean();
       return item ? this.cleanItem(item) : null;
     }
-    return this.getFromFile().find((item) => item.id === id && (item.storeId || 'legacy-store') === storeId) || null;
+    return this.getFromFile().find((item) => item.id === id && (item.storeId || 'legacy-store') === storeId && (includeDeleted || !item.deletedAt)) || null;
   }
 
   saveAll(items) {
@@ -155,13 +165,42 @@ class MenuRepository {
     return cleanedData;
   }
 
+  async updateInventoryForTenant(tenantContext, id, stockQuantity) {
+    const { storeId } = assertTenantContext(tenantContext);
+    if (tenantContext.branchId && isDBConnected()) {
+      await branchInventoryRepository.updateStock(tenantContext, id, stockQuantity);
+    }
+    if (isDBConnected()) {
+      const updated = await MenuItemModel.findOneAndUpdate(
+        { id, storeId },
+        { $set: { stockQuantity, updatedAt: new Date() } },
+        { returnDocument: 'after' }
+      ).lean();
+      return updated ? this.cleanItem(updated) : null;
+    }
+    const items = this.getFromFile();
+    const item = items.find(i => i.id === id && (i.storeId || 'legacy-store') === storeId);
+    if (item) {
+      item.stockQuantity = stockQuantity;
+      item.updatedAt = new Date().toISOString();
+      this.saveAll(items);
+      return item;
+    }
+    return null;
+  }
+
   async toggleActive(id, activeState, tenantContext = null) {
-    if (tenantContext) assertTenantContext(tenantContext);
+    if (tenantContext) {
+      assertTenantContext(tenantContext);
+      if (tenantContext.branchId && isDBConnected()) {
+        await branchInventoryRepository.updateActive(tenantContext, id, activeState);
+      }
+    }
     if (isDBConnected()) {
       try {
         const updated = await MenuItemModel.findOneAndUpdate(
           { id, ...(tenantContext ? { storeId: tenantContext.storeId } : {}) },
-          { $set: { active: activeState } },
+          { $set: { active: activeState, updatedAt: new Date() } },
           { returnDocument: 'after' }
         ).lean();
         if (updated) return this.cleanItem(updated);
@@ -175,11 +214,59 @@ class MenuRepository {
     const item = items.find(i => i.id === id && (!tenantContext || (i.storeId || 'legacy-store') === tenantContext.storeId));
     if (item) {
       item.active = activeState;
+      item.updatedAt = new Date().toISOString();
       this.saveAll(items);
       return item;
     }
     return null;
   }
+
+  async softDeleteForTenant(tenantContext, id, actorUserId = null) {
+    const { storeId } = assertTenantContext(tenantContext);
+    const now = new Date();
+    if (isDBConnected()) {
+      const updated = await MenuItemModel.findOneAndUpdate(
+        { id, storeId },
+        { $set: { deletedAt: now, deletedBy: actorUserId || null, updatedAt: now } },
+        { returnDocument: 'after' }
+      ).lean();
+      return updated ? this.cleanItem(updated) : null;
+    }
+    const items = this.getFromFile();
+    const item = items.find(i => i.id === id && (i.storeId || 'legacy-store') === storeId);
+    if (item) {
+      item.deletedAt = now.toISOString();
+      item.deletedBy = actorUserId || null;
+      item.updatedAt = now.toISOString();
+      this.saveAll(items);
+      return item;
+    }
+    return null;
+  }
+
+  async restoreForTenant(tenantContext, id) {
+    const { storeId } = assertTenantContext(tenantContext);
+    const now = new Date();
+    if (isDBConnected()) {
+      const updated = await MenuItemModel.findOneAndUpdate(
+        { id, storeId },
+        { $set: { deletedAt: null, deletedBy: null, updatedAt: now } },
+        { returnDocument: 'after' }
+      ).lean();
+      return updated ? this.cleanItem(updated) : null;
+    }
+    const items = this.getFromFile();
+    const item = items.find(i => i.id === id && (i.storeId || 'legacy-store') === storeId);
+    if (item) {
+      item.deletedAt = null;
+      item.deletedBy = null;
+      item.updatedAt = now.toISOString();
+      this.saveAll(items);
+      return item;
+    }
+    return null;
+  }
+
 
   async countByCategoryId(categoryId) {
     if (!categoryId) return 0;

@@ -2,6 +2,11 @@ const express = require('express');
 const router = express.Router();
 const config = require('../config');
 const telegramClient = require('../integrations/telegram-client');
+const { requireAuth, requirePermission } = require('../middleware/auth');
+const { PERMISSIONS } = require('../auth/permissions');
+
+// Apply settings.manage permission to all settings routes
+router.use(requireAuth, requirePermission(PERMISSIONS.SETTINGS_MANAGE));
 
 // GET /api/settings - Get settings (masked tokens for security)
 router.get('/', (req, res) => {
@@ -105,4 +110,5 @@ router.post('/telegram/register-webhook', async (req, res) => {
 });
 
 module.exports = router;
+
 

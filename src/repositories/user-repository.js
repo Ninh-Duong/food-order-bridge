@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
 const { isDBConnected } = require('../db');
 const { UserModel } = require('../models');
+const { assertTenantContext } = require('../middleware/tenant-context');
+const { getEffectivePermissions } = require('../auth/permissions');
 
 const USERS_FILE = path.join(__dirname, '..', 'data', 'users.json');
 
@@ -20,8 +23,23 @@ function writeFileUsers(users) {
 }
 
 function safeUser(user) {
+  if (!user) return null;
   const value = user.toObject ? user.toObject() : user;
-  return { id: String(value._id || value.id), username: value.username, role: value.role, active: value.active, createdAt: value.createdAt };
+  const effectivePermissions = getEffectivePermissions(value);
+  return {
+    id: String(value._id || value.id),
+    username: value.username,
+    role: value.role,
+    active: value.active !== false,
+    storeId: value.storeId || 'legacy-store',
+    branchIds: value.branchIds || [],
+    permissionMode: value.permissionMode || 'DEFAULT',
+    assignedPermissions: value.assignedPermissions || [],
+    effectivePermissions,
+    permissionUpdatedAt: value.permissionUpdatedAt || null,
+    permissionUpdatedBy: value.permissionUpdatedBy || null,
+    createdAt: value.createdAt
+  };
 }
 
 async function findByUsername(username) {
@@ -39,6 +57,26 @@ async function findAdmin() {
   return readFileUsers().find((user) => user.role === 'admin') || null;
 }
 
+async function findByIdForTenant(tenantContext, userId) {
+  const { storeId } = assertTenantContext(tenantContext);
+  if (!userId) return null;
+
+  if (isDBConnected()) {
+    const isMongoId = mongoose.Types.ObjectId.isValid(userId);
+    const query = {
+      storeId,
+      $or: [
+        ...(isMongoId ? [{ _id: userId }] : []),
+        { id: String(userId) }
+      ]
+    };
+    return UserModel.findOne(query).lean();
+  }
+
+  const users = readFileUsers();
+  return users.find((user) => (user.storeId || 'legacy-store') === storeId && (String(user._id || user.id) === String(userId))) || null;
+}
+
 async function create(user) {
   if (isDBConnected()) return safeUser(await UserModel.create(user));
   const users = readFileUsers();
@@ -49,11 +87,103 @@ async function create(user) {
 }
 
 async function listStaff(tenantContext = null) {
-  const query = { role: 'staff', ...(tenantContext?.storeId ? { storeId: tenantContext.storeId } : {}) };
+  const { storeId } = assertTenantContext(tenantContext);
+  const query = { role: { $in: ['staff', 'STAFF'] }, storeId };
   const users = isDBConnected()
     ? await UserModel.find(query).sort({ createdAt: -1 }).lean()
-    : readFileUsers().filter((user) => user.role === 'staff' && (!tenantContext?.storeId || (user.storeId || 'legacy-store') === tenantContext.storeId));
+    : readFileUsers().filter((user) => (user.role === 'staff' || user.role === 'STAFF') && (user.storeId || 'legacy-store') === storeId);
   return users.map(safeUser);
 }
 
-module.exports = { findByUsername, findByPhone, findAdmin, create, listStaff };
+async function updatePermissions(tenantContext, userId, { permissionMode, assignedPermissions, updatedBy }) {
+  const { storeId } = assertTenantContext(tenantContext);
+  const updatedAt = new Date();
+
+  if (isDBConnected()) {
+    const isMongoId = mongoose.Types.ObjectId.isValid(userId);
+    const query = {
+      storeId,
+      $or: [
+        ...(isMongoId ? [{ _id: userId }] : []),
+        { id: String(userId) }
+      ]
+    };
+    const updated = await UserModel.findOneAndUpdate(
+      query,
+      {
+        $set: {
+          permissionMode,
+          assignedPermissions,
+          permissionUpdatedAt: updatedAt,
+          permissionUpdatedBy: updatedBy,
+          updatedAt
+        }
+      },
+      { returnDocument: 'after' }
+    ).lean();
+    return safeUser(updated);
+  }
+
+  const users = readFileUsers();
+  const user = users.find((u) => (u.storeId || 'legacy-store') === storeId && (String(u._id || u.id) === String(userId)));
+  if (user) {
+    user.permissionMode = permissionMode;
+    user.assignedPermissions = assignedPermissions;
+    user.permissionUpdatedAt = updatedAt.toISOString();
+    user.permissionUpdatedBy = updatedBy;
+    user.updatedAt = updatedAt.toISOString();
+    writeFileUsers(users);
+    return safeUser(user);
+  }
+  return null;
+}
+
+async function updateStatus(tenantContext, userId, { active, updatedBy }) {
+  const { storeId } = assertTenantContext(tenantContext);
+  const updatedAt = new Date();
+
+  if (isDBConnected()) {
+    const isMongoId = mongoose.Types.ObjectId.isValid(userId);
+    const query = {
+      storeId,
+      $or: [
+        ...(isMongoId ? [{ _id: userId }] : []),
+        { id: String(userId) }
+      ]
+    };
+    const updated = await UserModel.findOneAndUpdate(
+      query,
+      {
+        $set: {
+          active,
+          updatedAt
+        }
+      },
+      { returnDocument: 'after' }
+    ).lean();
+    return safeUser(updated);
+  }
+
+  const users = readFileUsers();
+  const user = users.find((u) => (u.storeId || 'legacy-store') === storeId && (String(u._id || u.id) === String(userId)));
+  if (user) {
+    user.active = active;
+    user.updatedAt = updatedAt.toISOString();
+    writeFileUsers(users);
+    return safeUser(user);
+  }
+  return null;
+}
+
+module.exports = {
+  safeUser,
+  findByUsername,
+  findByPhone,
+  findAdmin,
+  findByIdForTenant,
+  create,
+  listStaff,
+  updatePermissions,
+  updateStatus
+};
+

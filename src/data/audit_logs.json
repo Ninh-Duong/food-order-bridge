@@ -1,0 +1,513 @@
+[
+  {
+    "id": "1a64034d-cc49-489e-b8e1-2861426f3f34",
+    "actorId": "admin-a",
+    "actorRole": "admin",
+    "storeId": "test-store-a",
+    "branchId": "branch-a",
+    "action": "STAFF_PERMISSIONS_UPDATED",
+    "target": "User:staff-a-1786880245784",
+    "details": {
+      "targetUsername": "staff_a_1786880245784",
+      "permissionMode": "CUSTOM",
+      "assignedPermissions": [
+        "menu.status.write",
+        "catalog.read",
+        "inventory.write",
+        "inventory.read"
+      ]
+    },
+    "timestamp": "2026-08-16T11:37:25.788Z"
+  },
+  {
+    "id": "e8547923-7a23-43f0-940c-ba98b12cbb62",
+    "actorId": "admin",
+    "actorRole": "admin",
+    "storeId": "test-store-lock",
+    "branchId": "branch-lock",
+    "action": "STAFF_ACCOUNT_LOCKED",
+    "target": "User:staff-lock-1786880245789",
+    "details": {
+      "targetUsername": "staff_lock_1786880245789",
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:37:25.792Z"
+  },
+  {
+    "id": "c8271b16-eca4-4c93-8322-da93714b337b",
+    "actorId": "admin-a",
+    "actorRole": "admin",
+    "storeId": "test-store-a",
+    "branchId": "branch-a",
+    "action": "STAFF_PERMISSIONS_UPDATED",
+    "target": "User:staff-a-1786880265134",
+    "details": {
+      "targetUsername": "staff_a_1786880265134",
+      "permissionMode": "CUSTOM",
+      "assignedPermissions": [
+        "menu.status.write",
+        "catalog.read",
+        "inventory.write",
+        "inventory.read"
+      ]
+    },
+    "timestamp": "2026-08-16T11:37:45.139Z"
+  },
+  {
+    "id": "949b64af-9d85-4a4d-9389-84b0838e303a",
+    "actorId": "admin",
+    "actorRole": "admin",
+    "storeId": "test-store-lock",
+    "branchId": "branch-lock",
+    "action": "STAFF_ACCOUNT_LOCKED",
+    "target": "User:staff-lock-1786880265139",
+    "details": {
+      "targetUsername": "staff_lock_1786880265139",
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:37:45.143Z"
+  },
+  {
+    "id": "b74f25a4-5bf3-42a2-a5a8-9c0935839ac1",
+    "actorId": "admin-a",
+    "actorRole": "admin",
+    "storeId": "test-store-a",
+    "branchId": "branch-a",
+    "action": "STAFF_PERMISSIONS_UPDATED",
+    "target": "User:staff-a-1786880317962",
+    "details": {
+      "targetUsername": "staff_a_1786880317962",
+      "permissionMode": "CUSTOM",
+      "assignedPermissions": [
+        "menu.status.write",
+        "catalog.read",
+        "inventory.write",
+        "inventory.read"
+      ]
+    },
+    "timestamp": "2026-08-16T11:38:37.977Z"
+  },
+  {
+    "id": "e096398a-f824-4ca8-8779-a5a17273ddd5",
+    "actorId": "admin",
+    "actorRole": "admin",
+    "storeId": "test-store-lock",
+    "branchId": "branch-lock",
+    "action": "STAFF_ACCOUNT_LOCKED",
+    "target": "User:staff-lock-1786880317983",
+    "details": {
+      "targetUsername": "staff_lock_1786880317983",
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:38:37.989Z"
+  },
+  {
+    "id": "a93b7ea5-2a17-4cd9-a33b-4758a48324c9",
+    "actorId": "admin-a",
+    "actorRole": "admin",
+    "storeId": "test-store-a",
+    "branchId": "branch-a",
+    "action": "STAFF_PERMISSIONS_UPDATED",
+    "target": "User:staff-a-1786880327545",
+    "details": {
+      "targetUsername": "staff_a_1786880327545",
+      "permissionMode": "CUSTOM",
+      "assignedPermissions": [
+        "menu.status.write",
+        "catalog.read",
+        "inventory.write",
+        "inventory.read"
+      ]
+    },
+    "timestamp": "2026-08-16T11:38:47.554Z"
+  },
+  {
+    "id": "f552f4d5-43dc-4de4-b8a6-1f90c0f843e0",
+    "actorId": "admin",
+    "actorRole": "admin",
+    "storeId": "test-store-lock",
+    "branchId": "branch-lock",
+    "action": "STAFF_ACCOUNT_LOCKED",
+    "target": "User:staff-lock-1786880327554",
+    "details": {
+      "targetUsername": "staff_lock_1786880327554",
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:38:47.566Z"
+  },
+  {
+    "id": "28825c9f-99b9-439c-865c-45de0f699503",
+    "actorId": "admin-a",
+    "actorRole": "admin",
+    "storeId": "test-store-a",
+    "branchId": "branch-a",
+    "action": "STAFF_PERMISSIONS_UPDATED",
+    "target": "User:staff-a-1786880337896",
+    "details": {
+      "targetUsername": "staff_a_1786880337896",
+      "permissionMode": "CUSTOM",
+      "assignedPermissions": [
+        "menu.status.write",
+        "catalog.read",
+        "inventory.write",
+        "inventory.read"
+      ]
+    },
+    "timestamp": "2026-08-16T11:38:57.908Z"
+  },
+  {
+    "id": "5c10496d-e7b7-4a37-abfc-3bdb907bbc30",
+    "actorId": "admin",
+    "actorRole": "admin",
+    "storeId": "test-store-lock",
+    "branchId": "branch-lock",
+    "action": "STAFF_ACCOUNT_LOCKED",
+    "target": "User:staff-lock-1786880337908",
+    "details": {
+      "targetUsername": "staff_lock_1786880337908",
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:38:57.920Z"
+  },
+  {
+    "id": "fdc259ce-bb2c-48bb-a542-0beaf133d828",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:TEST_ITEM_1786880337911",
+    "details": {
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:38:57.928Z"
+  },
+  {
+    "id": "88f588e9-4612-4c21-aceb-c088b63898c4",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_SOFT_DELETED",
+    "target": "MenuItem:TEST_ITEM_1786880337911",
+    "details": {
+      "itemName": "Món Thử Nghiệm"
+    },
+    "timestamp": "2026-08-16T11:38:57.934Z"
+  },
+  {
+    "id": "e8d85b41-ad03-4da6-9a58-e0b913c90eae",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_RESTORED",
+    "target": "MenuItem:TEST_ITEM_1786880337911",
+    "details": {
+      "itemName": "Món Thử Nghiệm"
+    },
+    "timestamp": "2026-08-16T11:38:57.943Z"
+  },
+  {
+    "id": "fbb5cf6a-d818-450e-a599-136619724dc5",
+    "actorId": null,
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:BLOCK_ITEM_1786880337950",
+    "details": {
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:38:57.962Z"
+  },
+  {
+    "id": "6492c772-a3bc-400e-921c-39aa5a990dde",
+    "actorId": null,
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:BLOCK_ITEM_1786880337950",
+    "details": {
+      "active": true
+    },
+    "timestamp": "2026-08-16T11:38:57.967Z"
+  },
+  {
+    "id": "3416f19c-c371-4857-b287-44896d1e4cec",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_SOFT_DELETED",
+    "target": "MenuItem:BLOCK_ITEM_1786880337950",
+    "details": {
+      "itemName": "Món Khóa Bán"
+    },
+    "timestamp": "2026-08-16T11:38:57.972Z"
+  },
+  {
+    "id": "ff7e621a-6387-4fb0-bd30-be66002be8be",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-inv-store",
+    "branchId": "branch-1",
+    "action": "MENU_STOCK_UPDATED",
+    "target": "MenuItem:INV_ITEM_1786880337979",
+    "details": {
+      "stockQuantity": 50
+    },
+    "timestamp": "2026-08-16T11:38:57.991Z"
+  },
+  {
+    "id": "4a2725fe-14e5-40c5-ab44-74eb12b580b2",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:TEST_ITEM_1786880346503",
+    "details": {
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:39:06.507Z"
+  },
+  {
+    "id": "f7edb407-2125-43dd-a603-42bba9775ed7",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_SOFT_DELETED",
+    "target": "MenuItem:TEST_ITEM_1786880346503",
+    "details": {
+      "itemName": "Món Thử Nghiệm"
+    },
+    "timestamp": "2026-08-16T11:39:06.509Z"
+  },
+  {
+    "id": "72163311-9077-422b-82e4-2aa1219ea3f8",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_RESTORED",
+    "target": "MenuItem:TEST_ITEM_1786880346503",
+    "details": {
+      "itemName": "Món Thử Nghiệm"
+    },
+    "timestamp": "2026-08-16T11:39:06.511Z"
+  },
+  {
+    "id": "6dc966bd-3976-4768-9c32-729d37d6fdec",
+    "actorId": null,
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:BLOCK_ITEM_1786880346514",
+    "details": {
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:39:06.516Z"
+  },
+  {
+    "id": "d911cd06-1eb3-4edd-80a4-4c1715855e05",
+    "actorId": null,
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:BLOCK_ITEM_1786880346514",
+    "details": {
+      "active": true
+    },
+    "timestamp": "2026-08-16T11:39:06.521Z"
+  },
+  {
+    "id": "9354fcea-a974-4a5e-a0ed-02739ee3579f",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_SOFT_DELETED",
+    "target": "MenuItem:BLOCK_ITEM_1786880346514",
+    "details": {
+      "itemName": "Món Khóa Bán"
+    },
+    "timestamp": "2026-08-16T11:39:06.522Z"
+  },
+  {
+    "id": "4c61e1ee-d86d-42ee-bf27-9390a604b571",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-inv-store",
+    "branchId": "branch-1",
+    "action": "MENU_STOCK_UPDATED",
+    "target": "MenuItem:INV_ITEM_1786880346524",
+    "details": {
+      "stockQuantity": 50
+    },
+    "timestamp": "2026-08-16T11:39:06.527Z"
+  },
+  {
+    "id": "f9863ad1-2fa8-4b79-a317-690d30d524d7",
+    "actorId": "admin-a",
+    "actorRole": "admin",
+    "storeId": "test-store-a",
+    "branchId": "branch-a",
+    "action": "STAFF_PERMISSIONS_UPDATED",
+    "target": "User:staff-a-1786880351130",
+    "details": {
+      "targetUsername": "staff_a_1786880351130",
+      "permissionMode": "CUSTOM",
+      "assignedPermissions": [
+        "menu.status.write",
+        "catalog.read",
+        "inventory.write",
+        "inventory.read"
+      ]
+    },
+    "timestamp": "2026-08-16T11:39:11.134Z"
+  },
+  {
+    "id": "ca7229aa-93dd-4235-aa76-240a65c386e2",
+    "actorId": "admin",
+    "actorRole": "admin",
+    "storeId": "test-store-lock",
+    "branchId": "branch-lock",
+    "action": "STAFF_ACCOUNT_LOCKED",
+    "target": "User:staff-lock-1786880351135",
+    "details": {
+      "targetUsername": "staff_lock_1786880351135",
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:39:11.138Z"
+  },
+  {
+    "id": "1c767490-0825-4483-938d-fb8d8f3e63ce",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:TEST_ITEM_1786880418263",
+    "details": {
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:40:18.267Z"
+  },
+  {
+    "id": "8d0eb316-20ba-4be2-9f56-b3c8c24e05ac",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_SOFT_DELETED",
+    "target": "MenuItem:TEST_ITEM_1786880418263",
+    "details": {
+      "itemName": "Món Thử Nghiệm"
+    },
+    "timestamp": "2026-08-16T11:40:18.269Z"
+  },
+  {
+    "id": "bca102c5-78fd-4e34-be33-20d4e7444c62",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-menu-store",
+    "branchId": "branch-1",
+    "action": "MENU_RESTORED",
+    "target": "MenuItem:TEST_ITEM_1786880418263",
+    "details": {
+      "itemName": "Món Thử Nghiệm"
+    },
+    "timestamp": "2026-08-16T11:40:18.271Z"
+  },
+  {
+    "id": "e0b47945-3a0f-4936-99a5-c6f43bef3106",
+    "actorId": null,
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:BLOCK_ITEM_1786880418274",
+    "details": {
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:40:18.277Z"
+  },
+  {
+    "id": "e95bac47-456d-4f62-9844-153fe4c55b94",
+    "actorId": null,
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_STATUS_CHANGED",
+    "target": "MenuItem:BLOCK_ITEM_1786880418274",
+    "details": {
+      "active": true
+    },
+    "timestamp": "2026-08-16T11:40:18.282Z"
+  },
+  {
+    "id": "8e92539e-eb74-41c0-922b-9178e7d57d1c",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-order-block-store",
+    "branchId": "branch-1",
+    "action": "MENU_SOFT_DELETED",
+    "target": "MenuItem:BLOCK_ITEM_1786880418274",
+    "details": {
+      "itemName": "Món Khóa Bán"
+    },
+    "timestamp": "2026-08-16T11:40:18.283Z"
+  },
+  {
+    "id": "0238b402-aa67-4e7f-9ca8-b1679a167468",
+    "actorId": "admin",
+    "actorRole": null,
+    "storeId": "test-inv-store",
+    "branchId": "branch-1",
+    "action": "MENU_STOCK_UPDATED",
+    "target": "MenuItem:INV_ITEM_1786880418285",
+    "details": {
+      "stockQuantity": 50
+    },
+    "timestamp": "2026-08-16T11:40:18.288Z"
+  },
+  {
+    "id": "6c16d2a5-d7a8-4130-ae9c-7ce1b99a731c",
+    "actorId": "admin-a",
+    "actorRole": "admin",
+    "storeId": "test-store-a",
+    "branchId": "branch-a",
+    "action": "STAFF_PERMISSIONS_UPDATED",
+    "target": "User:staff-a-1786880423045",
+    "details": {
+      "targetUsername": "staff_a_1786880423045",
+      "permissionMode": "CUSTOM",
+      "assignedPermissions": [
+        "menu.status.write",
+        "catalog.read",
+        "inventory.write",
+        "inventory.read"
+      ]
+    },
+    "timestamp": "2026-08-16T11:40:23.049Z"
+  },
+  {
+    "id": "c79ea53f-e554-493f-85fb-0ebac7e25ee1",
+    "actorId": "admin",
+    "actorRole": "admin",
+    "storeId": "test-store-lock",
+    "branchId": "branch-lock",
+    "action": "STAFF_ACCOUNT_LOCKED",
+    "target": "User:staff-lock-1786880423050",
+    "details": {
+      "targetUsername": "staff_lock_1786880423050",
+      "active": false
+    },
+    "timestamp": "2026-08-16T11:40:23.053Z"
+  }
+]

@@ -208,9 +208,17 @@ class CartState {
     for (const [lineId, entry] of Array.from(this.items.entries())) {
       const latestItem = menuMap.get(entry.productId);
 
-      if (!latestItem || latestItem.active === false || (latestItem.stockQuantity ?? 0) <= 0) {
+      if (!latestItem || latestItem.deletedAt) {
         this.items.delete(lineId);
-        showToast(`Món "${entry.item.name}" đã hết hàng hoặc tạm ngưng bán và được xóa khỏi giỏ.`, 'info');
+        showToast(`Món "${entry.item.name}" đã bị xóa khỏi hệ thống và được xóa khỏi giỏ.`, 'info');
+        modified = true;
+      } else if (latestItem.active === false) {
+        this.items.delete(lineId);
+        showToast(`Món "${latestItem.name}" đã tạm ngưng bán và được xóa khỏi giỏ.`, 'info');
+        modified = true;
+      } else if ((latestItem.stockQuantity ?? 0) <= 0) {
+        this.items.delete(lineId);
+        showToast(`Món "${latestItem.name}" đã hết hàng và được xóa khỏi giỏ.`, 'info');
         modified = true;
       } else {
         const latestStock = latestItem.stockQuantity;
@@ -223,7 +231,7 @@ class CartState {
             entry.quantity = allowed;
             productQuantities.set(entry.productId, currentProdQty + allowed);
           }
-          showToast(`Số lượng món "${latestItem.name}" được điều chỉnh do giới hạn tồn kho.`, 'info');
+          showToast(`Số lượng món "${latestItem.name}" được điều chỉnh về mức hợp lệ (${allowed} phần).`, 'info');
           modified = true;
         } else {
           productQuantities.set(entry.productId, currentProdQty + entry.quantity);
@@ -236,6 +244,7 @@ class CartState {
       this.notify();
     }
   }
+
 
   clear() {
     this.items.clear();
