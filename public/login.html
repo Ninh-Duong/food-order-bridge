@@ -160,6 +160,10 @@
   </div>
 
   <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const requestedReturnUrl = urlParams.get('returnUrl');
+    const urlErrorMsg = urlParams.get('error');
+
     const loginForm = document.getElementById('login-form');
     const phoneInput = document.getElementById('phone-input');
     const passwordInput = document.getElementById('password-input');
@@ -220,10 +224,15 @@
           body: JSON.stringify({ phone: loginValue, password })
         });
 
-        const data = await res.json();
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (_) {
+          data = { message: res.ok ? 'Đăng nhập thành công' : `Lỗi máy chủ (${res.status})` };
+        }
 
         if (!res.ok) {
-          showError(data.message || 'Tên đăng nhập/số điện thoại hoặc mật khẩu không đúng');
+          showError(data.message || data.error || 'Tên đăng nhập/số điện thoại hoặc mật khẩu không đúng');
           restoreBtn(btnLogin);
           return;
         }
@@ -235,7 +244,7 @@
 
         // Đổ danh sách chi nhánh
         loginForm.style.display = 'none';
-        subTitle.textContent = `Xin chào ${data.user.phoneDisplay || data.user.id}`;
+        subTitle.textContent = `Xin chào ${data.user.phoneDisplay || data.user.username || data.user.id}`;
         branchSection.style.display = 'block';
         branchContainer.innerHTML = '';
 
@@ -248,7 +257,7 @@
         });
 
       } catch (err) {
-        showError('Không thể kết nối tới máy chủ');
+        showError('Không thể kết nối tới máy chủ. Vui lòng kiểm tra đường truyền.');
         restoreBtn(btnLogin);
       }
     });
@@ -263,9 +272,15 @@
           body: JSON.stringify({ branchId })
         });
 
-        const data = await res.json();
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (_) {
+          data = { message: res.ok ? 'Đã chọn chi nhánh' : `Lỗi máy chủ (${res.status})` };
+        }
+
         if (!res.ok) {
-          showError(data.message || 'Lỗi chọn chi nhánh');
+          showError(data.message || data.error || 'Lỗi chọn chi nhánh');
           if (clickedBtn) restoreBtn(clickedBtn);
           return;
         }
