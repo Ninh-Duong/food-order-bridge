@@ -1,4 +1,5 @@
 import { API } from '../common/api.js';
+import { escapeHTML } from '../common/utils.js';
 import { setButtonLoading, restoreButton } from '../common/ui-state.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -14,28 +15,40 @@ function roleLabel(role) {
 }
 
 function showDashboard(workspace) {
+  if (!workspace || !workspace.user) {
+    throw new Error('Dữ liệu cửa hàng không hợp lệ');
+  }
+
   window.__POS_WORKSPACE__ = workspace;
   const user = workspace.user;
-  $('#auth-screen').hidden = true;
-  document.querySelectorAll('.admin-protected').forEach((element) => { element.hidden = false; });
 
   const storeName = workspace.store?.name || 'Cửa hàng';
   const branchName = workspace.activeBranch?.name || 'Chưa chọn chi nhánh';
   const badge = $('#current-tenant-badge');
   if (badge) badge.textContent = `🏬 ${storeName} · 📍 ${branchName}`;
-  $('#current-user').textContent = `${user.phoneDisplay || user.username || user.id} · ${roleLabel(user.role)}`;
+  
+  const currentUserEl = $('#current-user');
+  if (currentUserEl) {
+    currentUserEl.textContent = `${user.phoneDisplay || user.username || user.id} · ${roleLabel(user.role)}`;
+  }
 
   const branchSwitcher = $('#branch-switcher');
   if (branchSwitcher) {
-    branchSwitcher.innerHTML = workspace.branches.map((branch) => (
-      `<option value="${escapeHtml(branch.id)}" ${branch.id === workspace.activeBranch?.id ? 'selected' : ''}>${escapeHtml(branch.name)} (${escapeHtml(branch.code || '')})</option>`
+    const branches = Array.isArray(workspace.branches) ? workspace.branches : [];
+    branchSwitcher.innerHTML = branches.map((branch) => (
+      `<option value="${escapeHTML(branch.id)}" ${branch.id === workspace.activeBranch?.id ? 'selected' : ''}>${escapeHTML(branch.name)} (${escapeHTML(branch.code || '')})</option>`
     )).join('');
-    branchSwitcher.hidden = workspace.branches.length <= 1;
+    branchSwitcher.hidden = branches.length <= 1;
   }
 
   document.querySelectorAll('[data-permission]').forEach((element) => {
     if (!hasPermission(user, element.dataset.permission)) element.remove();
   });
+
+  // Only reveal protected admin workspace and hide auth screen after full rendering succeeds
+  const authScreen = $('#auth-screen');
+  if (authScreen) authScreen.hidden = true;
+  document.querySelectorAll('.admin-protected').forEach((element) => { element.hidden = false; });
 }
 
 function bindAuthenticatedActions(workspace) {
@@ -109,7 +122,7 @@ export async function initAuth() {
         : (error.message || 'Không thể tải dữ liệu quản trị. Vui lòng thử lại.');
 
       errorBox.innerHTML = `
-        <div style="color: #ef4444; margin-bottom: 12px;">⚠️ ${escapeHtml(friendlyMsg)}</div>
+        <div style="color: #ef4444; margin-bottom: 12px;">⚠️ ${escapeHTML(friendlyMsg)}</div>
         <button type="button" class="btn btn-primary" id="btn-retry-bootstrap" style="min-height: 36px; padding: 6px 16px;">
           🔄 Thử lại
         </button>
