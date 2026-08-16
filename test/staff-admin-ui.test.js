@@ -25,8 +25,8 @@ test('Staff Management Admin UI Frontend Regression Test Suite', async (t) => {
     assert.ok(staffManagerContent.includes('bindStaffTableDelegation'), 'staff-permissions-manager.js must use delegation for table actions');
   });
 
-  await t.test('admin.html gọi await initStaffPermissionsManager(workspace)', () => {
-    assert.ok(adminHtmlContent.includes('await initStaffPermissionsManager(workspace)'), 'admin.html must await initStaffPermissionsManager');
+  await t.test('admin.html gọi initStaffPermissionsManager(workspace)', () => {
+    assert.ok(adminHtmlContent.includes('initStaffPermissionsManager(workspace)'), 'admin.html must call initStaffPermissionsManager');
   });
 
   await t.test('Nút trong bảng nhân viên và modal có type="button"', () => {

@@ -64,12 +64,18 @@ Tài liệu này quy định **Chiến lược Kiểm thử phòng ngừa bug (Z
 * **Kịch bản Test bắt buộc**:
   - Production Healthcheck API & Sanity Smoke Test.
 
-## Kiểm thử đã bổ sung cho merchant workspace
+## Kiểm thử đã bổ sung cho merchant workspace & admin shell
 
-- Mỗi thay đổi chạy `npm test` và `npm run build`.
-- Auth/route test bao gồm unauthenticated redirect/401, owner access, staff permission
-  denial, branch switching và bootstrap scope.
+- Mỗi thay đổi chạy `npm test` và `npm run healthcheck`.
+- Auth/route test bao gồm unauthenticated redirect/401, owner access, staff permission denial, branch switching và bootstrap scope.
+- **Admin Shell & Resiliency**:
+  - `test/admin-bootstrap.test.js`: Kiểm tra bootstrap workspace, trả về đầy đủ store, activeBranch, permissions.
+  - `test/admin-navigation.test.js`: Kiểm tra điều hướng tab độc lập với API, Event Delegation trên `.admin-nav-tabs`.
+  - `test/admin-page.test.js`: Kiểm tra cơ chế timeout, nút Thử lại (Retry), khởi tạo manager song song không bị blocking.
+- **Staff Management & Granular Permissions**:
+  - `test/staff-management-routes.test.js`: Quản lý nhân viên theo storeId, whitelist quyền, phân quyền CUSTOM/DEFAULT, khóa/mở khóa.
+  - `test/staff-duplicate-error.test.js`: Bắt race condition Mongo 11000, chuẩn hóa lỗi 409 `STAFF_USERNAME_EXISTS` không lộ raw string `E11000`.
+  - `test/staff-admin-ui.test.js`: Kiểm tra kiến trúc frontend: tách duplicate handlers trong `auth.js`, kiểm tra `type="button"`, `API.patch`.
 - Repository tenant test kiểm tra `TenantContextMissingError` khi thiếu `storeId`.
-- Production smoke test: `/` chuyển tới login khi chưa có cookie; `/admin.html` không
-  được static middleware phục vụ nếu thiếu session; `/api/auth/bootstrap` trả Store và
-  Branch đúng session.
+- Production smoke test: `/` chuyển tới login khi chưa có cookie; `/admin.html` không được static middleware phục vụ nếu thiếu session; `/api/auth/bootstrap` trả Store và Branch đúng session.
+

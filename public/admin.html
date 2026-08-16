@@ -53,7 +53,7 @@
   <main class="container admin-main admin-protected" hidden style="padding-top: var(--space-6);">
 
     <!-- TAB 1: FOOD ITEMS MANAGEMENT -->
-    <section id="tab-items" class="admin-tab-content">
+    <section id="tab-items" class="admin-tab-content" style="display: none;">
       <div class="admin-card">
         <div class="admin-card-header">
           <h2 style="font-size: var(--font-size-lg); font-weight: 800;">Danh sách món ăn hiện tại</h2>
@@ -163,7 +163,7 @@
 
 
     <!-- TAB 3: ORDERS HISTORY MONITOR -->
-    <section id="tab-orders" class="admin-tab-content" style="display: none;">
+    <section id="tab-orders" class="admin-tab-content">
       <div class="admin-card">
         <div class="admin-card-header" style="flex-wrap: wrap; gap: 12px; align-items: center;">
           <h2 style="font-size: var(--font-size-lg); font-weight: 800; margin: 0;">Lịch sử đơn hàng ghi nhận</h2>
@@ -380,47 +380,52 @@
   </div>
 
   <script type="module">
+    import { initAdminTabNavigation } from './js/admin/admin-shell.js';
     import { initItemManager } from './js/admin/item-manager.js';
     import { initCategoryManager } from './js/admin/category-manager.js';
     import { initOrderMonitor } from './js/admin/order-monitor.js';
-    import { initReportDashboard, refreshReportDashboard } from './js/admin/report-dashboard.js';
+    import { initReportDashboard } from './js/admin/report-dashboard.js';
     import { initStaffPermissionsManager } from './js/admin/staff-permissions-manager.js';
     import { initAuth } from './js/admin/auth.js';
 
+    // Initialize Tab Navigation IMMEDIATELY on script load (before bootstrap finishes)
+    initAdminTabNavigation();
+
     document.addEventListener('DOMContentLoaded', async () => {
+      // 1. Authenticate & bootstrap session
       const user = await initAuth();
       if (!user) return;
       const workspace = window.__POS_WORKSPACE__;
-      
-      // Tab Navigation with ARIA State Management
-      const tabs = document.querySelectorAll('.admin-tab-btn');
-      tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-          tabs.forEach(t => {
-            t.classList.remove('active');
-            t.setAttribute('aria-selected', 'false');
-          });
-          tab.classList.add('active');
-          tab.setAttribute('aria-selected', 'true');
 
-          const target = tab.dataset.target;
-          document.querySelectorAll('.admin-tab-content').forEach(content => {
-            content.style.display = content.id === target ? 'block' : 'none';
-          });
+      // 2. Initialize managers in parallel without blocking each other
+      try {
+        initOrderMonitor();
+      } catch (err) {
+        console.error('Lỗi khởi tạo Order Monitor:', err);
+      }
 
-          if (target === 'tab-reports') {
-            refreshReportDashboard();
-          }
-        });
+      try {
+        initCategoryManager(workspace);
+      } catch (err) {
+        console.error('Lỗi khởi tạo Category Manager:', err);
+      }
+
+      try {
+        initItemManager(workspace);
+      } catch (err) {
+        console.error('Lỗi khởi tạo Item Manager:', err);
+      }
+
+      initStaffPermissionsManager(workspace).catch((err) => {
+        console.error('Lỗi khởi tạo Staff Permissions Manager:', err);
       });
 
-      initCategoryManager(workspace);
-      initItemManager(workspace);
-      initOrderMonitor();
-      await initStaffPermissionsManager(workspace);
-
       if (Array.isArray(user.permissions) && user.permissions.includes('reports.read.store')) {
-        initReportDashboard();
+        try {
+          initReportDashboard();
+        } catch (err) {
+          console.error('Lỗi khởi tạo Report Dashboard:', err);
+        }
       }
     });
   </script>

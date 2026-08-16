@@ -67,20 +67,59 @@ function bindAuthenticatedActions(workspace) {
   }
 }
 
+function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  return Promise.race([
+    API.get(url),
+    new Promise((_, reject) => {
+      setTimeout(() => {
+        const err = new Error('Quá thời gian kết nối tới máy chủ (Timeout). Vui lòng kiểm tra lại mạng hoặc thử lại.');
+        err.isTimeout = true;
+        reject(err);
+      }, timeoutMs);
+    })
+  ]);
+}
+
 export async function initAuth() {
+  const authMsg = document.querySelector('#auth-screen p');
+  const errorBox = $('#login-error');
+
   try {
-    const workspace = await API.get('/api/auth/bootstrap');
+    if (authMsg) authMsg.textContent = 'Đang xác thực phiên làm việc...';
+
+    const workspace = await fetchWithTimeout('/api/auth/bootstrap', {}, 12000);
+
+    if (authMsg) authMsg.textContent = 'Đang tải thông tin cửa hàng & chi nhánh...';
+
     showDashboard(workspace);
     bindAuthenticatedActions(workspace);
     return workspace.user;
   } catch (error) {
+    console.error('[Admin Bootstrap Error]', error);
+
     if (error.status === 401 || error.status === 403) {
       const errorMsg = encodeURIComponent(error.message || 'Phiên làm việc hết hạn hoặc không có quyền truy cập');
       window.location.replace(`/login.html?returnUrl=${encodeURIComponent(window.location.pathname)}&error=${errorMsg}`);
       return null;
     }
-    const errorBox = $('#login-error');
-    if (errorBox) errorBox.textContent = error.message || 'Không thể tải dữ liệu cửa hàng';
+
+    if (errorBox) {
+      const friendlyMsg = error.isTimeout
+        ? 'Quá thời gian tải dữ liệu quản trị từ máy chủ. Vui lòng thử lại.'
+        : (error.message || 'Không thể tải dữ liệu quản trị. Vui lòng thử lại.');
+
+      errorBox.innerHTML = `
+        <div style="color: #ef4444; margin-bottom: 12px;">⚠️ ${escapeHtml(friendlyMsg)}</div>
+        <button type="button" class="btn btn-primary" id="btn-retry-bootstrap" style="min-height: 36px; padding: 6px 16px;">
+          🔄 Thử lại
+        </button>
+      `;
+
+      const retryBtn = document.getElementById('btn-retry-bootstrap');
+      if (retryBtn) {
+        retryBtn.addEventListener('click', () => window.location.reload());
+      }
+    }
     return null;
   }
 }
