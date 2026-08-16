@@ -3,7 +3,7 @@
  */
 import { API } from '../common/api.js';
 import { formatVND, showToast, escapeHTML } from '../common/utils.js';
-import { renderSkeletonTable } from '../common/ui-state.js';
+import { renderSkeletonTable, setButtonLoading, restoreButton } from '../common/ui-state.js';
 
 let adminMenuItems = [];
 let availableCategories = [];
@@ -54,6 +54,7 @@ export async function initItemManager(workspace = window.__POS_WORKSPACE__) {
       if (!confirmReset) return;
 
       const clearOrders = confirm('Bạn có muốn xóa luôn lịch sử Đơn hàng thử nghiệm hiện tại không?');
+      setButtonLoading(resetBtn, 'Đang reset...');
 
       try {
         const res = await API.post('/api/admin/reset-data', { clearOrders });
@@ -65,6 +66,8 @@ export async function initItemManager(workspace = window.__POS_WORKSPACE__) {
         document.dispatchEvent(new CustomEvent('categoriesUpdated'));
       } catch (err) {
         showToast(err.message || 'Lỗi khi reset dữ liệu', 'error');
+      } finally {
+        restoreButton(resetBtn);
       }
     });
   }
@@ -633,6 +636,7 @@ async function openItemModal(itemId = null) {
       };
 
       try {
+        setButtonLoading(saveBtn, 'Đang lưu món...');
         await API.post('/api/menu', payload);
         showToast('Lưu thông tin món thành công!', 'success');
         modalOverlay.classList.remove('active');
@@ -640,7 +644,7 @@ async function openItemModal(itemId = null) {
       } catch (err) {
         showToast(err.message || 'Lỗi lưu thông tin món', 'error');
       } finally {
-        if (saveBtn) saveBtn.disabled = false;
+        restoreButton(saveBtn);
       }
     };
   }

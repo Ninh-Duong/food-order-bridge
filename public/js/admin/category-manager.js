@@ -3,7 +3,7 @@
  */
 import { API } from '../common/api.js';
 import { showToast, escapeHTML } from '../common/utils.js';
-import { renderSkeletonTable } from '../common/ui-state.js';
+import { renderSkeletonTable, setButtonLoading, restoreButton } from '../common/ui-state.js';
 
 let adminCategories = [];
 let initialCatalog = null;
@@ -201,6 +201,7 @@ function openCategoryModal(catId = null) {
       };
 
       try {
+        setButtonLoading(submitBtn, category ? 'Đang lưu...' : 'Đang tạo danh mục...');
         if (category) {
           await API.put(`/api/categories/${category.id}`, payload);
           showToast('Cập nhật danh mục thành công!', 'success');
@@ -215,7 +216,7 @@ function openCategoryModal(catId = null) {
       } catch (err) {
         showToast(err.message || 'Lỗi lưu thông tin danh mục', 'error');
       } finally {
-        if (submitBtn) submitBtn.disabled = false;
+        restoreButton(submitBtn);
       }
     };
   }

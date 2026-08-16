@@ -450,4 +450,42 @@ input:focus:not(:focus-visible) {
   outline: none;
 }
 
+/* Spinner & Button Loading Styles */
+.spinner-sm {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-rotate 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.spinner-md {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  border: 3px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spinner-rotate 0.6s linear infinite;
+  vertical-align: middle;
+}
+
+.btn[aria-busy="true"],
+.btn.is-loading {
+  cursor: not-allowed;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 

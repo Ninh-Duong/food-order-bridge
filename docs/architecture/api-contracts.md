@@ -1,34 +1,84 @@
-# API contracts — Merchant workspace
+# API Contracts — Food POS Multi-Tenant Platform
 
-## Session & Staff Management
+Tài liệu đặc tả toàn bộ các chuẩn giao tiếp RESTful API trong hệ thống.
 
-- `POST /api/auth/phone-login`: nhận `{ phone, password }`, trong đó `phone` có thể là số điện thoại Việt Nam hoặc username của tài khoản nhân viên; trả về user và danh sách Branch. Với nhiều Branch, token tạm được giữ trong HttpOnly cookie `merchant_pre_session`.
-- `POST /api/auth/select-branch`: nhận `{ branchId }`, tạo `admin_session` HttpOnly.
-- `POST /api/auth/switch-branch`: yêu cầu `admin_session`, đổi Branch trong cùng Store.
-- `GET /api/auth/bootstrap`: yêu cầu session; trả về `user`, `store`, `branches`, `activeBranch`, `permissions`, `catalog`.
-- `GET /api/auth/staff`: yêu cầu `staff.manage` hoặc `staff.rules.manage`. Trả về danh sách nhân viên của cửa hàng kèm `permissionMode`, `assignedPermissions`, `effectivePermissions`.
-- `GET /api/auth/permissions/catalog`: yêu cầu `staff.rules.manage`. Trả về danh mục permission được phép gán cho staff.
-- `PUT /api/auth/staff/:id/permissions`: yêu cầu `staff.rules.manage`. Nhận `{ permissionMode: 'DEFAULT'|'CUSTOM', permissions: [...] }`.
-- `PATCH /api/auth/staff/:id/status`: yêu cầu `staff.manage` hoặc `staff.rules.manage`. Nhận `{ active: boolean }`.
-- `POST /api/auth/logout`: xóa merchant và Super Admin cookies.
+---
 
-## Catalog & Inventory Management
+## 1. Authentication & Session Management (`/api/auth`)
 
-- `GET /api/menu`: công khai / optionalAuth. Mặc định chỉ trả về các món chưa bị soft-delete (`deletedAt: null`). Hỗ trợ query `?includeDeleted=true` đối với người dùng có `catalog.read`.
-- `POST /api/menu`: yêu cầu `catalog.write`. Tạo mới hoặc cập nhật thông tin master món (tên, giá gốc, danh mục, mô tả, ảnh, tùy chọn).
-- `PATCH /api/menu/:id/inventory`: yêu cầu `inventory.write`. Cập nhật tồn kho theo `{ stockQuantity: number }`.
-- `PUT /api/menu/:id/status`: yêu cầu `menu.status.write`. Bật/tắt trạng thái kinh doanh hôm nay theo `{ active: boolean }`.
-- `DELETE /api/menu/:id`: yêu cầu `catalog.delete`. Soft-delete món ăn (`deletedAt = new Date()`, `deletedBy = userId`).
-- `POST /api/menu/:id/restore`: yêu cầu `catalog.delete`. Khôi phục món đã bị soft-delete.
+- `POST /api/auth/phone-login`: Nhận `{ phone, password }`. `phone` hỗ trợ:
+  - Số điện thoại di động Việt Nam E.164 (Chủ cửa hàng).
+  - Tên đăng nhập có gắn Store Key: `MÃ_QUÁN/username`, `MÃ_QUÁN:username`, hoặc `username@MÃ_QUÁN` (Nhân viên).
+  - Tên đăng nhập đơn thuần (tự động phân giải nếu duy nhất).
+- `POST /api/auth/select-branch`: Nhận `{ branchId }`, tạo `admin_session` HttpOnly cookie.
+- `POST /api/auth/switch-branch`: Yêu cầu `admin_session`, chuyển đổi chi nhánh đang làm việc trong cùng Cửa hàng.
+- `GET /api/auth/bootstrap`: Yêu cầu `admin_session`; trả về `user`, `store`, `branches`, `activeBranch`, `permissions`, `catalog`.
+- `POST /api/auth/staff`: Yêu cầu `staff.manage`. Tạo tài khoản nhân viên mới trong phạm vi Cửa hàng hiện tại.
+- `GET /api/auth/staff`: Yêu cầu `staff.manage` hoặc `staff.rules.manage`. Trả về danh sách nhân viên của cửa hàng.
+- `GET /api/auth/permissions/catalog`: Yêu cầu `staff.rules.manage`. Trả về danh mục permission được phép gán cho staff.
+- `PUT /api/auth/staff/:id/permissions`: Yêu cầu `staff.rules.manage`. Nhận `{ permissionMode: 'DEFAULT'|'CUSTOM', permissions: [...] }`.
+- `PATCH /api/auth/staff/:id/status`: Yêu cầu `staff.manage` hoặc `staff.rules.manage`. Khóa/Mở tài khoản nhân viên `{ active: boolean }`.
+- `POST /api/auth/logout`: Xóa toàn bộ session cookies.
 
-## Authorization & Security
+---
 
-Các route ghi dữ liệu phải lấy tenant context từ session đã ký. `storeId`/`branchId` trong request body hoặc query không được dùng làm nguồn tin cậy. Mọi API check permission thông qua `getEffectivePermissions` và DB status dynamic lookup.
+## 2. Super Admin Dedicated APIs (`/api/super-admin`)
 
-## Error contract
+*Bảo vệ bởi `SUPER_ADMIN_AUTH_SECRET` và header `x-super-admin-token`.*
 
-- `401`: thiếu/hết hạn session hoặc tài khoản bị khóa/không tồn tại.
-- `403`: session hợp lệ nhưng thiếu permission phù hợp hoặc chi nhánh không thuộc tài khoản.
-- `409`: xung đột tồn kho hoặc chưa chọn Branch.
-- `422`: dữ liệu đầu vào không hợp lệ hoặc món ăn đang tạm ngưng bán / đã bị xóa.
+- `POST /api/super-admin/login`: Nhận `{ phone, password }`, trả về Super Admin JWT token.
+- `GET /api/super-admin/stores`: Danh sách toàn bộ các Cửa hàng trên nền tảng.
+- `POST /api/super-admin/stores`: Tạo Cửa hàng mới `{ code, name, slug, ownerPhone, ownerPassword, maxBranches, plan }`.
+- `PUT /api/super-admin/stores/:id/status`: Chuyển đổi trạng thái Cửa hàng `{ status: 'ACTIVE' | 'SUSPENDED' }`.
+- `DELETE /api/super-admin/stores/:id`: **Xóa vĩnh viễn Cửa hàng (Cascade Delete)** và toàn bộ dữ liệu phụ thuộc (Chi nhánh, Nhân viên, Thực đơn, Đơn hàng, Tồn kho, Cài đặt).
+- `POST /api/super-admin/stores/:storeId/branches`: Thêm Chi nhánh mới cho Cửa hàng `{ code, name, slug, address, phone }`.
+- `PUT /api/super-admin/branches/:branchId/status`: Khóa/Mở chi nhánh `{ status: 'ACTIVE' | 'INACTIVE' }`.
+- `GET /api/super-admin/audit-logs`: Lấy lịch sử Audit Log hệ thống.
 
+---
+
+## 3. Catalog & Menu Management (`/api/menu`, `/api/categories`)
+
+- `GET /api/categories`: Lấy danh sách danh mục món ăn (lọc theo `storeId`).
+- `POST /api/categories`: Yêu cầu `categories.write`. Tạo danh mục mới `{ id, name, description, sortOrder, active }`.
+- `PUT /api/categories/:id`: Yêu cầu `categories.write`. Cập nhật thông tin danh mục.
+- `PUT /api/categories/:id/status`: Yêu cầu `categories.write`. Bật/Tắt hiển thị danh mục `{ active: boolean }`.
+- `GET /api/menu`: Lấy danh sách món ăn (hỗ trợ `?includeDeleted=true` cho admin).
+- `POST /api/menu`: Yêu cầu `catalog.write`. Tạo hoặc cập nhật thông tin món ăn master.
+- `PATCH /api/menu/:id/inventory`: Yêu cầu `inventory.write`. Cập nhật số lượng tồn kho theo chi nhánh `{ stockQuantity: number }`.
+- `PUT /api/menu/:id/status`: Yêu cầu `menu.status.write`. Bật/Tắt trạng thái bán hôm nay `{ active: boolean }`.
+- `DELETE /api/menu/:id`: Yêu cầu `catalog.delete`. Soft-delete món ăn.
+- `POST /api/menu/:id/restore`: Yêu cầu `catalog.delete`. Khôi phục món đã soft-delete.
+
+---
+
+## 4. Orders & Reports (`/api/orders`, `/api/reports`)
+
+- `GET /api/orders`: Yêu cầu `orders.read`. Lấy danh sách đơn hàng có phân trang `?page=1&limit=10`.
+- `POST /api/orders`: Công khai (Khách hàng đặt món). Nhận `{ requestId, fulfillmentType, paymentMethod, customer, items }`.
+- `PATCH /api/orders/:id/status`: Yêu cầu `orders.write`. Cập nhật trạng thái đơn `{ orderStatus: 'PAID'|'CANCELLED' }`.
+- `PATCH /api/orders/:id/payment`: Yêu cầu `orders.write`. Cập nhật trạng thái thanh toán `{ isPaid: boolean }`.
+- `GET /api/reports/sales`: Yêu cầu `reports.read.store` hoặc `reports.read.branch`. Lấy thống kê doanh thu `?period=today|week|month`.
+- `GET /api/reports/sales.pdf`: Xuất báo cáo bán hàng ra file PDF.
+
+---
+
+## 5. Settings & Telegram Integration (`/api/settings`, `/api/telegram`)
+
+- `GET /api/settings`: Yêu cầu `settings.manage`. Lấy cấu hình cửa hàng & Telegram.
+- `POST /api/settings`: Yêu cầu `settings.manage`. Lưu cấu hình `{ telegramBotToken, telegramChatId }`.
+- `POST /api/settings/test`: Yêu cầu `settings.manage`. Bắn tin nhắn thử nghiệm vào Telegram.
+- `POST /api/telegram/webhook`: Webhook tiếp nhận tương tác lệnh (Commands, Callback Queries) từ Telegram Bot.
+
+---
+
+## 6. Error & Status Codes Standard
+
+| HTTP Code | Ý nghĩa | Xử lý UI |
+|---|---|---|
+| `200` / `201` | Thành công | Hiển thị Toast / cập nhật view |
+| `400` | Dữ liệu không hợp lệ | Hiển thị lỗi form / thông báo hướng dẫn |
+| `401` | Chưa xác thực / Hết hạn phiên | Chuyển hướng về `/login.html` |
+| `403` | Thiếu quyền hạn hoặc bị khóa | Hiển thị thông báo cấm truy cập |
+| `404` | Không tìm thấy tài nguyên | Hiển thị thông báo không tìm thấy |
+| `409` | Xung đột dữ liệu / Hết tồn kho | Thông báo giỏ hàng thay đổi tồn kho |
