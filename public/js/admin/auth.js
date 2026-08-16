@@ -38,19 +38,6 @@ function showDashboard(workspace) {
   });
 }
 
-async function loadStaff() {
-  const { users } = await API.get('/api/auth/staff');
-  $('#staff-table-body').innerHTML = users.length ? users.map((user) => `
-    <tr><td data-label="Tên đăng nhập">${escapeHtml(user.username || user.phoneDisplay || '')}</td><td data-label="Vai trò">Nhân viên</td><td data-label="Trạng thái">${user.active ? 'Hoạt động' : 'Đã khóa'}</td><td data-label="Ngày tạo">${new Date(user.createdAt).toLocaleDateString('vi-VN')}</td></tr>
-  `).join('') : '<tr><td colspan="4">Chưa có tài khoản nhân viên.</td></tr>';
-}
-
-function escapeHtml(value) {
-  const div = document.createElement('div');
-  div.textContent = value == null ? '' : String(value);
-  return div.innerHTML;
-}
-
 function bindAuthenticatedActions(workspace) {
   const user = workspace.user;
   const logoutBtn = $('#btn-logout');
@@ -75,26 +62,6 @@ function bindAuthenticatedActions(workspace) {
       } catch (error) {
         event.target.value = originalValue;
         window.alert(error.message || 'Không thể chuyển chi nhánh');
-      }
-    });
-  }
-
-  if (hasPermission(user, 'staff.manage')) {
-    loadStaff().catch(console.error);
-    $('#staff-form')?.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const submitBtn = event.target.querySelector('button[type="submit"]');
-      const message = $('#staff-message');
-      if (submitBtn) setButtonLoading(submitBtn, 'Đang tạo...');
-      try {
-        await API.post('/api/auth/staff', { username: $('#staff-username').value, password: $('#staff-password').value });
-        event.target.reset();
-        message.textContent = 'Đã tạo tài khoản nhân viên.';
-        await loadStaff();
-      } catch (error) {
-        message.textContent = error.message;
-      } finally {
-        if (submitBtn) restoreButton(submitBtn);
       }
     });
   }

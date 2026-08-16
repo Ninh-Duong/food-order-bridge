@@ -332,7 +332,7 @@
           <h2 style="font-size: 18px; font-weight: 700; margin: 0; color: #38bdf8;">🔑 Phân quyền cho: <span id="perm-modal-staff-name" style="color:#fff;">staff01</span></h2>
           <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Tùy chỉnh quyền truy cập & thao tác riêng cho nhân viên</div>
         </div>
-        <button type="button" class="btn btn-secondary" onclick="document.getElementById('staff-permission-modal').style.display='none';" style="min-height: 32px; padding: 2px 10px;">✕ Close</button>
+        <button type="button" class="btn btn-secondary" id="btn-close-staff-permission-modal" style="min-height: 32px; padding: 2px 10px;">✕ Close</button>
       </div>
 
       <!-- Modal Body -->
@@ -417,7 +417,7 @@
       initCategoryManager(workspace);
       initItemManager(workspace);
       initOrderMonitor();
-      initStaffPermissionsManager(workspace);
+      await initStaffPermissionsManager(workspace);
 
       if (Array.isArray(user.permissions) && user.permissions.includes('reports.read.store')) {
         initReportDashboard();

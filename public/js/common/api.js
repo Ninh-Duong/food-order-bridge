@@ -70,5 +70,51 @@ export const API = {
       console.error(`[API PUT Error] ${endpoint}:`, error);
       throw error;
     }
+  },
+
+  async patch(endpoint, payload) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const err = new Error(data.message || `API Error: ${response.status}`);
+        err.status = response.status;
+        err.code = data.code;
+        err.pendingCount = data.pendingCount;
+        err.limit = data.limit;
+        throw err;
+      }
+      return data;
+    } catch (error) {
+      console.error(`[API PATCH Error] ${endpoint}:`, error);
+      throw error;
+    }
+  },
+
+  async delete(endpoint) {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const err = new Error(data.message || `API Error: ${response.status}`);
+        err.status = response.status;
+        err.code = data.code;
+        throw err;
+      }
+      return data;
+    } catch (error) {
+      console.error(`[API DELETE Error] ${endpoint}:`, error);
+      throw error;
+    }
   }
 };

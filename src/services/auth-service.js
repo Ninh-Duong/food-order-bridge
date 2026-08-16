@@ -382,16 +382,32 @@ async function createStaff(rawUsername, password, tenantContext = null) {
   validateCredentials(username, password);
   const storeId = tenantContext?.storeId || 'legacy-store';
   const existing = await userRepository.findByUsernameForTenant({ storeId }, username);
-  if (existing) throw new Error('Tên đăng nhập này đã tồn tại trong cửa hàng của bạn');
-  return userRepository.create({
-    id: crypto.randomUUID(),
-    username,
-    passwordHash: hashPassword(password),
-    role: 'staff',
-    storeId,
-    branchIds: tenantContext?.branchId ? [tenantContext.branchId] : ['legacy-main-branch'],
-    active: true
-  });
+  if (existing) {
+    const error = new Error('Tên đăng nhập này đã tồn tại trong cửa hàng hiện tại.');
+    error.status = 409;
+    error.code = 'STAFF_USERNAME_EXISTS';
+    throw error;
+  }
+
+  try {
+    return await userRepository.create({
+      id: crypto.randomUUID(),
+      username,
+      passwordHash: hashPassword(password),
+      role: 'staff',
+      storeId,
+      branchIds: tenantContext?.branchId ? [tenantContext.branchId] : ['legacy-main-branch'],
+      active: true
+    });
+  } catch (err) {
+    if (err.code === 11000 || err.message?.includes('duplicate key') || err.message?.includes('E11000')) {
+      const error = new Error('Tên đăng nhập này đã tồn tại trong cửa hàng hiện tại.');
+      error.status = 409;
+      error.code = 'STAFF_USERNAME_EXISTS';
+      throw error;
+    }
+    throw err;
+  }
 }
 
 async function listStaff(tenantContext = null) {
