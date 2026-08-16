@@ -180,6 +180,7 @@ function bindStaffEvents() {
   if (staffForm) {
     staffForm.addEventListener('submit', async (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const submitBtn = staffForm.querySelector('button[type="submit"]');
       const usernameInput = document.getElementById('staff-username');
       const passwordInput = document.getElementById('staff-password');
