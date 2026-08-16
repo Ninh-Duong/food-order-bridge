@@ -19,6 +19,7 @@ const superAdminRoutes = require('./routes/super-admin-routes');
 
 const authService = require('./services/auth-service');
 const { executeMigration } = require('./services/tenant-migration-service');
+const { bootstrapLegacyTelegramSettings } = require('./services/tenant-telegram-settings-service');
 const { startOrderExpiryJob } = require('./services/order-expiry-service');
 const { startReportScheduler } = require('./services/report-scheduler');
 const { cookieValue, requireAuth, requirePageAuth, optionalAuth, requirePermission, requireAdmin } = require('./middleware/auth');
@@ -85,6 +86,7 @@ async function startServer() {
   await connectDB();
   await authService.bootstrapAdmin();
   await executeMigration(); // Tự động backfill dữ liệu legacy sang multi-tenant
+  await bootstrapLegacyTelegramSettings(); // Import cấu hình Telegram legacy vào scope Store/Branch một lần
 
   startOrderExpiryJob();
   startReportScheduler();

@@ -37,5 +37,7 @@ Tài liệu quy định các quy tắc nghiệp vụ cốt lõi trong hệ thố
 ---
 
 ## 5. Telegram Notification & Report Scope
-- **Store / Branch Level**: Cấu hình Telegram (Bot Token, Chat ID) nằm tại `StoreSettings`. Nếu Chi nhánh có cấu hình riêng, hệ thống sẽ ưu tiên gửi về Telegram Chi nhánh.
+- **Store / Branch Level**: Cấu hình Telegram, cảnh báo đơn chờ thanh toán, lịch report và quyền report nằm tại `TelegramSettings`/`TelegramReportAccess` trong Database. Nếu Chi nhánh có cấu hình riêng, hệ thống ưu tiên Branch override; nếu không thì dùng Store default.
+- **Tenant Notification Isolation**: Mọi cảnh báo và report phải được resolve bằng `storeId + branchId`; tuyệt đối không gửi dữ liệu của Store này tới Chat ID của Store khác.
+- **Report Access**: Một Store/Branch có thể cấp quyền cho nhiều Telegram User ID xem report và khai báo nhiều Chat ID nhận cảnh báo tự động.
 - **Báo cáo & Thống kê**: Hỗ trợ xem báo cáo doanh thu theo Hôm nay, Tuần này, Tháng này và xuất file PDF.

@@ -1,5 +1,6 @@
 const { sendTelegramMessage } = require('../integrations/telegram-client');
 const config = require('../config');
+const { getEffectiveSettings } = require('./tenant-telegram-settings-service');
 
 function formatVND(amount) {
   if (typeof amount !== 'number') return '0đ';
@@ -119,20 +120,58 @@ function splitTelegramMessage(text, maxLen = 4000) {
   return chunks;
 }
 
-async function notifyNewOrder(order) {
+async function resolveTelegramTarget(tenantContext = null) {
+  if (!tenantContext?.storeId) {
+    return {
+      enabled: config.isTelegramOrderNotificationEnabled(),
+      orderCreatedEnabled: config.isTelegramOrderNotificationEnabled(),
+      orderCancelledEnabled: config.isTelegramOrderNotificationEnabled(),
+      pendingOrderAlertEnabled: config.isTelegramOrderNotificationEnabled(),
+      token: config.getTelegramToken(),
+      recipientChatIds: config.getTelegramChatId() ? [config.getTelegramChatId()] : [],
+      chatId: config.getTelegramChatId(),
+      pendingTimeoutMinutes: config.getPaymentPendingTimeoutMinutes(),
+      alertCooldownMinutes: config.getPaymentCapacityAlertCooldownMinutes()
+    };
+  }
+  return getEffectiveSettings(tenantContext);
+}
+
+async function sendToRecipients(text, target, options = {}) {
+  const recipients = target.recipientChatIds?.length
+    ? target.recipientChatIds
+    : (target.chatId ? [target.chatId] : []);
+  if (!recipients.length) throw new Error('Telegram Chat ID chưa được cấu hình cho tenant.');
+  let lastResult = null;
+  for (const chatId of recipients) {
+    lastResult = await sendTelegramMessage({
+      chatId,
+      text,
+      telegramConfig: target,
+      ...options
+    });
+  }
+  return lastResult;
+}
+
+async function notifyNewOrder(order, tenantContext = null) {
+  const target = await resolveTelegramTarget(tenantContext);
+  if (target.enabled === false || target.orderCreatedEnabled === false) return { messageId: null, skipped: true };
   const ticketText = formatKitchenTicket(order);
   const chunks = splitTelegramMessage(ticketText);
 
   let lastResult = null;
   for (let i = 0; i < chunks.length; i++) {
     const chunkHeader = chunks.length > 1 ? `[ĐƠN #${order.id} · PHẦN ${i + 1}/${chunks.length}]\n` : '';
-    lastResult = await sendTelegramMessage(chunkHeader + chunks[i]);
+    lastResult = await sendToRecipients(`${chunkHeader}${chunks[i]}`, target);
   }
 
   return lastResult || { messageId: null };
 }
 
-async function notifyPaymentCapacityBlocked({ pendingCount, limit, timeoutMinutes }) {
+async function notifyPaymentCapacityBlocked({ pendingCount, limit, timeoutMinutes, tenantContext = null }) {
+  const target = await resolveTelegramTarget(tenantContext);
+  if (target.enabled === false || target.pendingOrderAlertEnabled === false) return { messageId: null, skipped: true };
   const text = [
     '⚠️ CẢNH BÁO QUÁ TẢI THANH TOÁN',
     '',
@@ -141,10 +180,12 @@ async function notifyPaymentCapacityBlocked({ pendingCount, limit, timeoutMinute
     `Các đơn chờ sẽ tự hủy sau ${timeoutMinutes} phút nếu chưa thanh toán.`,
     'Vui lòng kiểm tra và xử lý các đơn đang chờ.'
   ].join('\n');
-  return sendTelegramMessage(text);
+  return sendToRecipients(text, target);
 }
 
-async function notifyOrderCancelled(order) {
+async function notifyOrderCancelled(order, tenantContext = null) {
+  const target = await resolveTelegramTarget(tenantContext);
+  if (target.enabled === false || target.orderCancelledEnabled === false) return { messageId: null, skipped: true };
   const reason = order.cancelReason === 'PAYMENT_TIMEOUT'
     ? 'quá thời gian chờ thanh toán'
     : 'hủy thủ công';
@@ -154,7 +195,7 @@ async function notifyOrderCancelled(order) {
     `Tổng tiền: ${formatVND(Number(order.totalAmount) || 0)}`,
     'Slot chờ thanh toán và tồn kho đã được giải phóng.'
   ].join('\n');
-  return sendTelegramMessage(text);
+  return sendToRecipients(text, target);
 }
 
 module.exports = {

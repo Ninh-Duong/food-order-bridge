@@ -8,10 +8,21 @@ const {
   updateStoreStatus,
   deleteStore,
   createBranch,
-  updateBranchStatus
+  updateBranchStatus,
+  logAuditAction
 } = require('../services/super-admin-service');
 const { AuditLogModel } = require('../models');
 const { isDBConnected } = require('../db');
+const telegramClient = require('../integrations/telegram-client');
+const {
+  getEffectiveSettings,
+  upsertSettings,
+  resetBranchSettings,
+  serializeSettings,
+  listReportAccess,
+  replaceReportAccess
+} = require('../services/tenant-telegram-settings-service');
+const { StoreModel, BranchModel } = require('../models');
 
 // POST /api/super-admin/login
 router.post('/login', async (req, res) => {
@@ -101,6 +112,141 @@ router.put('/branches/:branchId/status', async (req, res) => {
     const { status } = req.body || {};
     const result = await updateBranchStatus(req.params.branchId, status);
     return res.json({ success: true, ...result });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+async function assertTelegramScope(storeId, branchId = null) {
+  if (!storeId) throw new Error('storeId là bắt buộc');
+  if (!isDBConnected()) return;
+  const store = await StoreModel.findOne({ id: storeId }).lean();
+  if (!store) {
+    const error = new Error('Cửa hàng không tồn tại');
+    error.status = 404;
+    throw error;
+  }
+  if (branchId) {
+    const branch = await BranchModel.findOne({ id: branchId, storeId }).lean();
+    if (!branch) {
+      const error = new Error('Chi nhánh không thuộc cửa hàng đã chọn');
+      error.status = 404;
+      throw error;
+    }
+  }
+}
+
+// GET /api/super-admin/stores/:storeId/telegram-settings?branchId=...
+router.get('/stores/:storeId/telegram-settings', async (req, res) => {
+  try {
+    const branchId = req.query.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    const settings = await getEffectiveSettings({ storeId: req.params.storeId, branchId });
+    return res.json({ success: true, settings: await serializeSettings(settings) });
+  } catch (err) {
+    return res.status(err.status || 400).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/super-admin/stores/:storeId/telegram-settings
+router.put('/stores/:storeId/telegram-settings', async (req, res) => {
+  try {
+    const branchId = req.body?.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    const saved = await upsertSettings({
+      storeId: req.params.storeId,
+      branchId,
+      payload: req.body || {},
+      actorId: req.superAdmin?.sub || 'super_admin'
+    });
+    await logAuditAction('super_admin', 'SUPER_ADMIN', 'UPDATE_TELEGRAM_SETTINGS', `${req.params.storeId}:${branchId || 'store'}`, { branchId }, req.params.storeId, branchId);
+    return res.json({ success: true, settings: await serializeSettings(await getEffectiveSettings({ storeId: req.params.storeId, branchId })) });
+  } catch (err) {
+    return res.status(err.status || 400).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE /api/super-admin/stores/:storeId/telegram-settings?branchId=...
+router.delete('/stores/:storeId/telegram-settings', async (req, res) => {
+  try {
+    const branchId = req.query.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    if (!branchId) throw new Error('Chỉ được reset cấu hình override của branch');
+    const settings = await resetBranchSettings({ storeId: req.params.storeId, branchId });
+    await logAuditAction('super_admin', 'SUPER_ADMIN', 'RESET_BRANCH_TELEGRAM_SETTINGS', branchId, {}, req.params.storeId, branchId);
+    return res.json({ success: true, settings: await serializeSettings(settings) });
+  } catch (err) {
+    return res.status(err.status || 400).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/stores/:storeId/telegram-settings/access', async (req, res) => {
+  try {
+    const branchId = req.query.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    return res.json({ success: true, users: await listReportAccess({ storeId: req.params.storeId, branchId }) });
+  } catch (err) {
+    return res.status(err.status || 400).json({ success: false, error: err.message });
+  }
+});
+
+router.put('/stores/:storeId/telegram-settings/access', async (req, res) => {
+  try {
+    const branchId = req.body?.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    const users = await replaceReportAccess({
+      storeId: req.params.storeId,
+      branchId,
+      users: req.body?.users || [],
+      actorId: req.superAdmin?.sub || 'super_admin'
+    });
+    await logAuditAction('super_admin', 'SUPER_ADMIN', 'UPDATE_TELEGRAM_REPORT_ACCESS', `${req.params.storeId}:${branchId || 'store'}`, { count: users.length }, req.params.storeId, branchId);
+    return res.json({ success: true, users });
+  } catch (err) {
+    return res.status(err.status || 400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/stores/:storeId/telegram-settings/test', async (req, res) => {
+  try {
+    const branchId = req.body?.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    const settings = await getEffectiveSettings({ storeId: req.params.storeId, branchId });
+    const chatId = req.body?.chatId || settings.chatId;
+    const result = await telegramClient.sendTelegramMessage({
+      chatId,
+      telegramConfig: settings,
+      text: `🤖 <b>TEST KẾT NỐI TELEGRAM</b>\n\nStore: <code>${req.params.storeId}</code>\nBranch: <code>${branchId || 'STORE_DEFAULT'}</code>\nThời gian: ${new Date().toLocaleString('vi-VN')}`,
+      parseMode: 'HTML'
+    });
+    return res.json({ success: true, result });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.get('/stores/:storeId/telegram-settings/webhook-status', async (req, res) => {
+  try {
+    const branchId = req.query.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    const settings = await getEffectiveSettings({ storeId: req.params.storeId, branchId });
+    const webhookInfo = await telegramClient.getWebhookInfo(settings);
+    return res.json({ success: true, webhookInfo });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+router.post('/stores/:storeId/telegram-settings/register-webhook', async (req, res) => {
+  try {
+    const branchId = req.body?.branchId || null;
+    await assertTelegramScope(req.params.storeId, branchId);
+    const settings = await getEffectiveSettings({ storeId: req.params.storeId, branchId });
+    const baseUrl = (req.body?.publicBaseUrl || process.env.PUBLIC_BASE_URL || '').trim().replace(/\/$/, '');
+    if (!baseUrl) throw new Error('Thiếu PUBLIC_BASE_URL');
+    const webhookUrl = `${baseUrl}/api/telegram/webhook/${encodeURIComponent(req.params.storeId)}`;
+    const result = await telegramClient.setWebhook(webhookUrl, settings.webhookSecret, settings);
+    return res.json({ success: true, webhookUrl, result });
   } catch (err) {
     return res.status(400).json({ success: false, error: err.message });
   }

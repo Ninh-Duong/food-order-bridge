@@ -38,7 +38,7 @@ router.get('/', requireAuth, requirePermission(PERMISSIONS.ORDERS_READ), async (
 // GET /api/orders/payment-capacity - Public storefront pre-check
 router.get('/payment-capacity', async (req, res) => {
   try {
-    res.json(await orderService.getPaymentCapacityStatus());
+    res.json(await orderService.getPaymentCapacityStatus(req.tenantContext));
   } catch (err) {
     console.error('Unhandled Payment Capacity Error:', err);
     res.status(500).json({ message: 'Lỗi kiểm tra khả năng tiếp nhận đơn hàng' });

@@ -185,6 +185,74 @@ const settingsSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 });
 
+const telegramSettingsSchema = new mongoose.Schema({
+  storeId: { type: String, required: true, index: true, trim: true },
+  branchId: { type: String, default: null, index: true, trim: true },
+  overrideFields: { type: [String], default: [] },
+  enabled: { type: Boolean, default: false },
+  botTokenEncrypted: { type: String, default: '' },
+  chatId: { type: String, default: '' },
+  recipientChatIds: { type: [String], default: [] },
+  webhookSecretEncrypted: { type: String, default: '' },
+  orderCreatedEnabled: { type: Boolean, default: true },
+  orderCancelledEnabled: { type: Boolean, default: true },
+  pendingOrderAlertEnabled: { type: Boolean, default: true },
+  inventoryAlertEnabled: { type: Boolean, default: true },
+  scheduledReportEnabled: { type: Boolean, default: false },
+  dailyReportEnabled: { type: Boolean, default: true },
+  weeklyReportEnabled: { type: Boolean, default: true },
+  monthlyReportEnabled: { type: Boolean, default: true },
+  chartEnabled: { type: Boolean, default: true },
+  dailyReportTime: { type: String, default: '23:59' },
+  weeklyReportTime: { type: String, default: '00:05' },
+  monthlyReportTime: { type: String, default: '00:10' },
+  timezone: { type: String, default: 'Asia/Ho_Chi_Minh' },
+  lowStockThreshold: { type: Number, min: 0, default: 5 },
+  pendingOrderLimit: { type: Number, min: 1, default: 3 },
+  pendingTimeoutMinutes: { type: Number, min: 1, default: 5 },
+  pendingScope: { type: String, enum: ['ALL', 'DINE_IN'], default: 'ALL' },
+  alertCooldownMinutes: { type: Number, min: 0, default: 5 },
+  updatedBy: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+telegramSettingsSchema.index({ storeId: 1, branchId: 1 }, { unique: true, name: 'telegram_settings_scope_unique' });
+
+const telegramReportAccessSchema = new mongoose.Schema({
+  storeId: { type: String, required: true, index: true, trim: true },
+  branchId: { type: String, default: null, index: true, trim: true },
+  telegramUserId: { type: String, required: true, trim: true },
+  canViewReports: { type: Boolean, default: true },
+  canReceiveAlerts: { type: Boolean, default: true },
+  active: { type: Boolean, default: true },
+  createdBy: { type: String, default: null },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+telegramReportAccessSchema.index(
+  { storeId: 1, branchId: 1, telegramUserId: 1 },
+  { unique: true, name: 'telegram_report_access_scope_user_unique' }
+);
+
+const telegramDeliveryLogSchema = new mongoose.Schema({
+  storeId: { type: String, required: true, index: true },
+  branchId: { type: String, default: null, index: true },
+  reportType: { type: String, required: true },
+  periodKey: { type: String, required: true },
+  recipientChatId: { type: String, required: true },
+  status: { type: String, enum: ['SENT', 'FAILED'], required: true },
+  telegramMessageId: { type: Number, default: null },
+  error: { type: String, default: null },
+  sentAt: { type: Date, default: Date.now }
+});
+
+telegramDeliveryLogSchema.index(
+  { storeId: 1, branchId: 1, reportType: 1, periodKey: 1, recipientChatId: 1 },
+  { unique: true, name: 'telegram_delivery_idempotency_unique' }
+);
+
 const userSchema = new mongoose.Schema({
   id: { type: String, sparse: true, index: true },
   storeId: { type: String, default: 'legacy-store', index: true, trim: true },
@@ -221,5 +289,8 @@ module.exports = {
   OrderModel: mongoose.model('Order', orderSchema),
   CounterModel: mongoose.model('Counter', counterSchema),
   SettingsModel: mongoose.model('Settings', settingsSchema),
+  TelegramSettingsModel: mongoose.model('TelegramSettings', telegramSettingsSchema),
+  TelegramReportAccessModel: mongoose.model('TelegramReportAccess', telegramReportAccessSchema),
+  TelegramDeliveryLogModel: mongoose.model('TelegramDeliveryLog', telegramDeliveryLogSchema),
   UserModel: mongoose.model('User', userSchema)
 };

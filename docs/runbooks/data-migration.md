@@ -1,5 +1,17 @@
 # Runbook: MongoDB Index Migration — Multi-Tenant Staff Username Scoping
 
+## Migration Telegram config
+
+Trước khi tháo env Production, chạy ứng dụng một release để `bootstrapLegacyTelegramSettings()` import cấu hình legacy vào `TelegramSettingsModel` của `legacy-store/legacy-main-branch`. Kiểm tra:
+
+1. Store/Branch đã có cấu hình Telegram trong Database.
+2. Token/secret không bị trả plaintext qua API.
+3. Test connection và webhook thành công.
+4. Report và cảnh báo pending order không lấy chéo tenant.
+5. Log fallback env không còn xuất hiện trong runtime.
+
+Sau một release ổn định mới tháo các env tenant-specific: `TELEGRAM_*` tenant config, `LOW_STOCK_THRESHOLD`, `PAYMENT_PENDING_*`, `PAYMENT_CAPACITY_ALERT_COOLDOWN_MINUTES` và `REPORT_*` schedule/flag. Giữ `PUBLIC_BASE_URL` và các cấu hình chart hạ tầng toàn hệ thống.
+
 Tài liệu hướng dẫn quy trình chuyển đổi và cập nhật Index MongoDB an toàn trên môi trường Production.
 
 ---

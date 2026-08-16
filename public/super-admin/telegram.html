@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Telegram & Report - Super Admin</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0f172a; --panel:#172033; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --brand:#38bdf8; --ok:#34d399; --danger:#fb7185; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+    .shell { max-width:1180px; margin:0 auto; padding:28px 18px 60px; } header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:22px; }
+    h1,h2 { margin:0 0 8px; } h1 { font-size:26px; } h2 { font-size:18px; color:#f8fafc; } .muted { color:var(--muted); }
+    .toolbar,.card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:18px; } .toolbar { display:grid; grid-template-columns:1fr 1fr auto; gap:12px; margin-bottom:16px; align-items:end; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } .wide { grid-column:1/-1; }
+    label { display:block; color:#cbd5e1; font-size:13px; margin-bottom:6px; } input,select { width:100%; border:1px solid #475569; background:#0b1220; color:var(--text); border-radius:9px; padding:10px 11px; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; } .check { display:flex; align-items:center; gap:9px; margin:10px 0; } .check input { width:auto; }
+    button { border:0; border-radius:9px; padding:10px 14px; background:var(--brand); color:#082f49; font-weight:700; cursor:pointer; } button.secondary { background:#334155; color:var(--text); } button.danger { background:#7f1d1d; color:#fecaca; }
+    .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; } .status { padding:9px 12px; border-radius:9px; background:#0b1220; color:var(--muted); margin-top:12px; } .status.ok { color:var(--ok); } .status.error { color:var(--danger); }
+    .chips { display:flex; flex-wrap:wrap; gap:7px; margin:10px 0; min-height:34px; } .chip { background:#1e3a5f; color:#bae6fd; border-radius:999px; padding:5px 9px; } .chip button { padding:0 0 0 7px; background:none; color:#bae6fd; }
+    @media (max-width:760px) { .toolbar,.grid,.row { grid-template-columns:1fr; } header { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header><div><h1>Telegram & Report</h1><div class="muted">Cấu hình theo cửa hàng và chi nhánh · chỉ Super Admin</div></div><button class="secondary" onclick="location.href='/super-admin/index.html'">← Về Super Admin</button></header>
+    <section class="toolbar">
+      <div><label for="store">Cửa hàng</label><select id="store"></select></div>
+      <div><label for="branch">Phạm vi cấu hình</label><select id="branch"><option value="">Store mặc định</option></select></div>
+      <button onclick="loadSettings()">Tải cấu hình</button>
+    </section>
+    <div class="grid">
+      <section class="card wide"><h2>🔐 Kết nối Telegram</h2><div class="row">
+        <div><label>Bot Token</label><input id="telegramBotToken" type="password" placeholder="Để trống nếu không đổi token"></div>
+        <div><label>Chat ID mặc định</label><input id="chatId"></div>
+        <div><label>Webhook Secret</label><input id="telegramWebhookSecret" type="password" placeholder="Để trống nếu không đổi secret"></div>
+        <div><label>Timezone</label><input id="timezone" value="Asia/Ho_Chi_Minh"></div>
+      </div><label class="check"><input id="enabled" type="checkbox"> Bật Telegram cho scope này</label><div class="actions"><button onclick="saveSettings()">Lưu cấu hình</button><button class="secondary" onclick="testTelegram()">Test kết nối</button><button class="secondary" onclick="registerWebhook()">Đăng ký webhook</button><button class="secondary" onclick="webhookStatus()">Kiểm tra webhook</button><button class="danger" onclick="resetBranch()">Reset Branch về Store</button></div><div id="status" class="status">Đang tải...</div></section>
+      <section class="card"><h2>⚠️ Cảnh báo đơn</h2><label class="check"><input id="pendingOrderAlertEnabled" type="checkbox"> Cảnh báo đơn chờ thanh toán</label><div class="row"><div><label>Số đơn tối đa</label><input id="pendingOrderLimit" type="number" min="1"></div><div><label>Timeout (phút)</label><input id="pendingTimeoutMinutes" type="number" min="1"></div><div><label>Cooldown (phút)</label><input id="alertCooldownMinutes" type="number" min="0"></div><div><label>Phạm vi</label><select id="pendingScope"><option>ALL</option><option>DINE_IN</option></select></div></div></section>
+      <section class="card"><h2>📊 Report tự động</h2><label class="check"><input id="scheduledReportEnabled" type="checkbox"> Bật report tự động</label><div class="row"><div><label>Daily</label><input id="dailyReportTime" type="time"></div><div><label>Weekly</label><input id="weeklyReportTime" type="time"></div><div><label>Monthly</label><input id="monthlyReportTime" type="time"></div><div><label>Ngưỡng tồn kho</label><input id="lowStockThreshold" type="number" min="0"></div></div><label class="check"><input id="dailyReportEnabled" type="checkbox"> Daily report</label><label class="check"><input id="weeklyReportEnabled" type="checkbox"> Weekly report</label><label class="check"><input id="monthlyReportEnabled" type="checkbox"> Monthly report</label><label class="check"><input id="chartEnabled" type="checkbox"> Gửi biểu đồ report</label></section>
+      <section class="card wide"><h2>👥 Quyền xem report & người nhận</h2><div class="row"><div><label>Telegram User ID được xem report</label><input id="viewerInput" placeholder="Ví dụ: 123456789"><div id="viewerChips" class="chips"></div><button class="secondary" onclick="addViewer()">+ Thêm người xem</button></div><div><label>Chat ID nhận cảnh báo tự động</label><input id="recipientInput" placeholder="Ví dụ: -1001234567890"><div id="recipientChips" class="chips"></div><button class="secondary" onclick="addRecipient()">+ Thêm người nhận</button></div></div><div class="actions"><button onclick="saveAccess()">Lưu quyền report</button></div></section>
+    </div>
+  </main>
+  <script>
+    let stores = [], selectedSettings = null, viewers = [], recipients = [];
+    const $ = id => document.getElementById(id);
+    async function api(url, options = {}) { const res = await fetch(url, { credentials:'same-origin', ...options }); const data = await res.json().catch(() => ({})); if (res.status === 401) { location.href='/super-admin/index.html'; throw new Error('Phiên Super Admin hết hạn'); } if (!res.ok) throw new Error(data.error || 'Request thất bại'); return data; }
+    function setStatus(message, type='') { $('status').textContent = message; $('status').className = `status ${type}`; }
+    function selected() { return { storeId:$('store').value, branchId:$('branch').value || null }; }
+    function renderChips(id, values) { $(id).innerHTML = values.map((value,index) => `<span class="chip">${value}<button onclick="removeChip('${id}',${index})" aria-label="Xóa">×</button></span>`).join(''); }
+    function removeChip(id,index) { (id==='viewerChips'?viewers:recipients).splice(index,1); renderChips(id,id==='viewerChips'?viewers:recipients); }
+    function addViewer() { const v=$('viewerInput').value.trim(); if(v&&!viewers.includes(v)) viewers.push(v); $('viewerInput').value=''; renderChips('viewerChips',viewers); }
+    function addRecipient() { const v=$('recipientInput').value.trim(); if(v&&!recipients.includes(v)) recipients.push(v); $('recipientInput').value=''; renderChips('recipientChips',recipients); }
+    function fill(s) { selectedSettings=s; ['enabled','pendingOrderAlertEnabled','scheduledReportEnabled','dailyReportEnabled','weeklyReportEnabled','monthlyReportEnabled','chartEnabled'].forEach(id => $(id).checked=s[id] !== false); ['chatId','timezone','pendingOrderLimit','pendingTimeoutMinutes','alertCooldownMinutes','pendingScope','dailyReportTime','weeklyReportTime','monthlyReportTime','lowStockThreshold'].forEach(id => { if(s[id] !== undefined) $(id).value=s[id]; }); $('telegramBotToken').value=''; $('telegramWebhookSecret').value=''; setStatus(`Đã tải · nguồn: ${s.source}`,'ok'); }
+    async function loadStores() { const data=await api('/api/super-admin/stores'); stores=data.stores||[]; $('store').innerHTML=stores.map(s=>`<option value="${s.id}">${s.name} (${s.code})</option>`).join(''); updateBranches(); await loadSettings(); }
+    function updateBranches() { const s=stores.find(x=>x.id===$('store').value); $('branch').innerHTML='<option value="">Store mặc định</option>'+(s?.branches||[]).map(b=>`<option value="${b.id}">${b.name} (${b.code})</option>`).join(''); }
+    async function loadSettings() { try { updateBranches(); const {storeId,branchId}=selected(); if(!storeId) return; const data=await api(`/api/super-admin/stores/${storeId}/telegram-settings${branchId?`?branchId=${encodeURIComponent(branchId)}`:''}`); fill(data.settings); const access=await api(`/api/super-admin/stores/${storeId}/telegram-settings/access${branchId?`?branchId=${encodeURIComponent(branchId)}`:''}`); viewers=(access.users||[]).filter(x=>x.canViewReports!==false).map(x=>x.telegramUserId); recipients=(data.settings.recipientChatIds||[]); renderChips('viewerChips',viewers); renderChips('recipientChips',recipients); } catch(e) { setStatus(e.message,'error'); } }
+    function payload() { return { branchId:selected().branchId, telegramBotToken:$('telegramBotToken').value, telegramWebhookSecret:$('telegramWebhookSecret').value, enabled:$('enabled').checked, chatId:$('chatId').value, recipientChatIds:recipients, pendingOrderAlertEnabled:$('pendingOrderAlertEnabled').checked, pendingOrderLimit:Number($('pendingOrderLimit').value), pendingTimeoutMinutes:Number($('pendingTimeoutMinutes').value), alertCooldownMinutes:Number($('alertCooldownMinutes').value), pendingScope:$('pendingScope').value, scheduledReportEnabled:$('scheduledReportEnabled').checked, dailyReportEnabled:$('dailyReportEnabled').checked, weeklyReportEnabled:$('weeklyReportEnabled').checked, monthlyReportEnabled:$('monthlyReportEnabled').checked, chartEnabled:$('chartEnabled').checked, dailyReportTime:$('dailyReportTime').value, weeklyReportTime:$('weeklyReportTime').value, monthlyReportTime:$('monthlyReportTime').value, lowStockThreshold:Number($('lowStockThreshold').value), timezone:$('timezone').value }; }
+    async function saveSettings() { try { const {storeId}=selected(); const data=await api(`/api/super-admin/stores/${storeId}/telegram-settings`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload())}); fill(data.settings); setStatus('Đã lưu cấu hình thành công','ok'); } catch(e) { setStatus(e.message,'error'); } }
+    async function saveAccess() { try { const {storeId,branchId}=selected(); await api(`/api/super-admin/stores/${storeId}/telegram-settings/access`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({branchId,users:viewers.map(telegramUserId=>({telegramUserId}))})}); setStatus('Đã lưu danh sách quyền report','ok'); } catch(e) { setStatus(e.message,'error'); } }
+    async function testTelegram() { try { const {storeId,branchId}=selected(); await api(`/api/super-admin/stores/${storeId}/telegram-settings/test`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({branchId})}); setStatus('Đã gửi tin nhắn test','ok'); } catch(e) { setStatus(e.message,'error'); } }
+    async function registerWebhook() { try { const {storeId,branchId}=selected(); const d=await api(`/api/super-admin/stores/${storeId}/telegram-settings/register-webhook`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({branchId})}); setStatus(`Webhook: ${d.webhookUrl}`,'ok'); } catch(e) { setStatus(e.message,'error'); } }
+    async function webhookStatus() { try { const {storeId,branchId}=selected(); const d=await api(`/api/super-admin/stores/${storeId}/telegram-settings/webhook-status${branchId?`?branchId=${branchId}`:''}`); setStatus(JSON.stringify(d.webhookInfo),'ok'); } catch(e) { setStatus(e.message,'error'); } }
+    async function resetBranch() { const {storeId,branchId}=selected(); if(!branchId) return setStatus('Hãy chọn branch để reset','error'); if(!confirm('Reset cấu hình branch về Store default?')) return; try { const d=await api(`/api/super-admin/stores/${storeId}/telegram-settings?branchId=${branchId}`,{method:'DELETE'}); fill(d.settings); setStatus('Đã reset branch về Store default','ok'); } catch(e) { setStatus(e.message,'error'); } }
+    $('store').addEventListener('change',()=>{updateBranches();loadSettings();}); $('branch').addEventListener('change',loadSettings); loadStores().catch(e=>setStatus(e.message,'error'));
+  </script>
+</body>
+</html>
