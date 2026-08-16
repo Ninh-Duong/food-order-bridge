@@ -188,7 +188,7 @@ const settingsSchema = new mongoose.Schema({
 const userSchema = new mongoose.Schema({
   id: { type: String, sparse: true, index: true },
   storeId: { type: String, default: 'legacy-store', index: true, trim: true },
-  username: { type: String, required: true, unique: true, lowercase: true, trim: true },
+  username: { type: String, required: true, lowercase: true, trim: true },
   phoneNormalized: { type: String, default: null, sparse: true, index: true },
   phoneDisplay: { type: String, default: null },
   passwordHash: { type: String, required: true },
@@ -203,6 +203,8 @@ const userSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
+
+userSchema.index({ storeId: 1, username: 1 }, { unique: true });
 
 userSchema.index(
   { role: 1 },

@@ -11,6 +11,12 @@ export async function initStaffPermissionsManager(workspace) {
   const container = document.getElementById('tab-accounts');
   if (!container) return;
 
+  const storeCode = workspace?.store?.code || '';
+  const hint = document.getElementById('staff-store-code-hint');
+  if (hint && storeCode) {
+    hint.innerHTML = `Mã đăng nhập của nhân viên: <code style="color:#38bdf8; font-weight:700;">${escapeHTML(storeCode)}/tên_đăng_nhập</code> (Ví dụ: <code>${escapeHTML(storeCode)}/ddn</code>)`;
+  }
+
   bindStaffEvents();
   await loadStaffList();
 
@@ -86,10 +92,13 @@ function renderStaffTable() {
     const canManageRules = hasPermission('staff.rules.manage') && !isOwnerOrAdmin;
     const canManageStatus = (hasPermission('staff.manage') || hasPermission('staff.rules.manage')) && !isOwnerOrAdmin;
 
+    const storeCode = window.__POS_WORKSPACE__?.store?.code || '';
+
     return `
       <tr>
         <td data-label="Tên đăng nhập">
           <strong>${escapeHTML(user.username)}</strong>
+          ${storeCode ? `<br><small style="color:var(--color-text-muted); font-size:11px;">Mã đăng nhập: <code style="color:#38bdf8;">${escapeHTML(storeCode)}/${escapeHTML(user.username)}</code></small>` : ''}
         </td>
         <td data-label="Chi nhánh">
           <span style="font-size: var(--font-size-xs); color: var(--color-text-muted);">
