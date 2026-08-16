@@ -195,7 +195,7 @@ async function upsertSettings({ storeId, branchId = null, payload = {}, actorId 
     return TelegramSettingsModel.findOneAndUpdate(
       { storeId, branchId: branchId || null },
       { $set: update, $setOnInsert: { storeId, branchId: branchId || null, createdAt: new Date() } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     ).lean();
   }
 
