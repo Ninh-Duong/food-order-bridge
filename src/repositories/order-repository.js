@@ -362,7 +362,7 @@ class OrderRepository {
         const doc = await OrderModel.findOneAndUpdate(
           { id: orderId, ...(tenantContext ? { storeId: tenantContext.storeId, ...(tenantContext.branchId ? { branchId: tenantContext.branchId } : {}) } : {}) },
           { $set: paymentData },
-          { returnDocument: 'after', new: true }
+          { returnDocument: 'after' }
         ).lean();
         if (!doc) return null;
         updatedOrder = this.formatDoc(doc);
@@ -553,7 +553,7 @@ class OrderRepository {
             paymentStatus: { $in: ['UNPAID', 'PENDING'] }
           },
           { $set: fields },
-          { returnDocument: 'after', new: true }
+          { returnDocument: 'after' }
         ).lean();
         return doc ? this.formatDoc(doc) : null;
       } catch (err) {
