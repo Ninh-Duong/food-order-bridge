@@ -53,10 +53,16 @@ function escapeHtml(value) {
 
 function bindAuthenticatedActions(workspace) {
   const user = workspace.user;
-  $('#btn-logout').addEventListener('click', async () => {
-    await API.post('/api/auth/logout', {});
-    window.location.replace('/login.html');
-  });
+  const logoutBtn = $('#btn-logout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      setButtonLoading(logoutBtn, 'Đang đăng xuất...');
+      try {
+        await API.post('/api/auth/logout', {});
+      } catch (_) {}
+      window.location.replace('/login.html');
+    });
+  }
 
   const branchSwitcher = $('#branch-switcher');
   if (branchSwitcher) {

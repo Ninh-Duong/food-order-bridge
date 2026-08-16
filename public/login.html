@@ -167,8 +167,23 @@
     const branchSection = document.getElementById('branch-section');
     const branchContainer = document.getElementById('branch-container');
     const subTitle = document.getElementById('sub-title');
-    const requestedReturnUrl = new URLSearchParams(window.location.search).get('returnUrl');
-    const urlErrorMsg = new URLSearchParams(window.location.search).get('error');
+    const btnLogin = document.getElementById('btn-login');
+
+    function setBtnLoading(btn, text) {
+      if (!btn) return;
+      btn.dataset.origHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner-sm" aria-hidden="true" style="display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spinner-rotate 0.6s linear infinite; vertical-align:middle; margin-right:6px;"></span> <span>${text}</span>`;
+    }
+
+    function restoreBtn(btn) {
+      if (!btn) return;
+      if (btn.dataset.origHtml) {
+        btn.innerHTML = btn.dataset.origHtml;
+        delete btn.dataset.origHtml;
+      }
+      btn.disabled = false;
+    }
 
     function goToWorkspace() {
       const safeReturnUrl = requestedReturnUrl && requestedReturnUrl.startsWith('/') && !requestedReturnUrl.startsWith('//')
@@ -193,6 +208,7 @@
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       hideError();
+      setBtnLoading(btnLogin, 'Đang xác thực...');
 
       const loginValue = phoneInput.value.trim();
       const password = passwordInput.value;
@@ -208,6 +224,7 @@
 
         if (!res.ok) {
           showError(data.message || 'Tên đăng nhập/số điện thoại hoặc mật khẩu không đúng');
+          restoreBtn(btnLogin);
           return;
         }
 
@@ -226,17 +243,19 @@
           const btn = document.createElement('button');
           btn.className = 'branch-btn';
           btn.innerHTML = `<strong>${branch.name}</strong> <span style="font-size:0.8rem; color:#94a3b8">(${branch.code})</span>`;
-          btn.onclick = () => handleSelectBranch(branch.id);
+          btn.onclick = () => handleSelectBranch(branch.id, btn);
           branchContainer.appendChild(btn);
         });
 
       } catch (err) {
         showError('Không thể kết nối tới máy chủ');
+        restoreBtn(btnLogin);
       }
     });
 
-    async function handleSelectBranch(branchId) {
+    async function handleSelectBranch(branchId, clickedBtn) {
       hideError();
+      if (clickedBtn) setBtnLoading(clickedBtn, 'Đang vào chi nhánh...');
       try {
         const res = await fetch('/api/auth/select-branch', {
           method: 'POST',
@@ -247,12 +266,14 @@
         const data = await res.json();
         if (!res.ok) {
           showError(data.message || 'Lỗi chọn chi nhánh');
+          if (clickedBtn) restoreBtn(clickedBtn);
           return;
         }
 
         goToWorkspace();
       } catch (err) {
         showError('Lỗi kết nối khi chọn chi nhánh');
+        if (clickedBtn) restoreBtn(clickedBtn);
       }
     }
   </script>

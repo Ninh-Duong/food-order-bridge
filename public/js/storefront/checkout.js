@@ -612,8 +612,7 @@ async function handleOrderSubmit(e) {
 
   const submitBtn = document.getElementById('btn-submit-order');
   if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Đang xử lý đơn hàng...';
+    setButtonLoading(submitBtn, 'Đang gửi đơn hàng...');
   }
 
   const note = noteInput ? noteInput.value.trim() : '';

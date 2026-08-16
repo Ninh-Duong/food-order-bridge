@@ -347,11 +347,29 @@
     let selectedStoreId = null;
     let storesCache = [];
 
+    function setBtnLoading(btn, text) {
+      if (!btn) return;
+      btn.dataset.origHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<span style="display:inline-block; width:14px; height:14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:spinner-rotate 0.6s linear infinite; vertical-align:middle; margin-right:6px;"></span> <span>${text}</span>`;
+    }
+
+    function restoreBtn(btn) {
+      if (!btn) return;
+      if (btn.dataset.origHtml) {
+        btn.innerHTML = btn.dataset.origHtml;
+        delete btn.dataset.origHtml;
+      }
+      btn.disabled = false;
+    }
+
     async function handleSuperLogin() {
+      const loginBtn = document.querySelector('#login-overlay .btn-primary');
       const phone = document.getElementById('sa-phone').value;
       const password = document.getElementById('sa-password').value;
       const errEl = document.getElementById('login-error');
       errEl.style.display = 'none';
+      setBtnLoading(loginBtn, 'Đang đăng nhập...');
 
       try {
         const res = await fetch('/api/super-admin/login', {
@@ -364,6 +382,7 @@
         if (!res.ok) {
           errEl.textContent = data.error || 'Đăng nhập thất bại';
           errEl.style.display = 'block';
+          restoreBtn(loginBtn);
           return;
         }
 
@@ -376,6 +395,7 @@
       } catch (err) {
         errEl.textContent = 'Lỗi kết nối server';
         errEl.style.display = 'block';
+        restoreBtn(loginBtn);
       }
     }
 
@@ -409,11 +429,11 @@
             <td>${store.plan || 'FREE'} (max ${store.maxBranches || 5} branch)</td>
             <td><span class="status-pill ${isSuspended ? 'status-suspended' : 'status-active'}">${store.status}</span></td>
             <td>
-              <button class="btn ${isSuspended ? '' : 'btn-danger'}" onclick="toggleStoreStatus('${store.id}', '${isSuspended ? 'ACTIVE' : 'SUSPENDED'}')">
+              <button class="btn ${isSuspended ? '' : 'btn-danger'}" onclick="toggleStoreStatus('${store.id}', '${isSuspended ? 'ACTIVE' : 'SUSPENDED'}', this)">
                 ${isSuspended ? 'Mở lại' : 'Khóa Store'}
               </button>
               <button class="btn" style="margin-left:6px;" onclick="openBranchModal('${store.id}')">Chi nhánh (${(store.branches || []).length})</button>
-              <button class="btn btn-danger" style="margin-left:6px; background:#7f1d1d; color:#fca5a5; border-color:#991b1b;" onclick="deleteStore('${store.id}', '${safeName}')">🗑️ Xóa</button>
+              <button class="btn btn-danger" style="margin-left:6px; background:#7f1d1d; color:#fca5a5; border-color:#991b1b;" onclick="deleteStore('${store.id}', '${safeName}', this)">🗑️ Xóa</button>
             </td>
           `;
           tbody.appendChild(tr);
@@ -449,8 +469,9 @@
       } catch (_) {}
     }
 
-    async function toggleStoreStatus(storeId, newStatus) {
+    async function toggleStoreStatus(storeId, newStatus, btn) {
       if (!confirm(`Bạn có chắc muốn chuyển trạng thái cửa hàng sang ${newStatus}?`)) return;
+      if (btn) setBtnLoading(btn, 'Đang lưu...');
 
       try {
         await fetch(`/api/super-admin/stores/${storeId}/status`, {
@@ -461,14 +482,17 @@
           },
           body: JSON.stringify({ status: newStatus })
         });
-        fetchStores();
-        fetchAuditLogs();
-      } catch (_) {}
+        await fetchStores();
+        await fetchAuditLogs();
+      } catch (_) {
+        if (btn) restoreBtn(btn);
+      }
     }
 
-    async function deleteStore(storeId, storeName) {
+    async function deleteStore(storeId, storeName, btn) {
       const confirmMsg = `⚠️ CẢNH BÁO NGUY HIỂM:\n\nBạn có chắc chắn muốn XÓA VĨNH VIỄN cửa hàng "${storeName}"?\n\nThao tác này sẽ XÓA TOÀN BỘ dữ liệu liên quan bao gồm:\n- Tất cả Chi nhánh\n- Tất cả Tài khoản Chủ quán & Nhân viên\n- Toàn bộ Thực đơn & Danh mục\n- Toàn bộ Lịch sử Đơn hàng & Báo cáo Doanh thu\n\nDữ liệu sau khi xóa sẽ KHÔNG THỂ khôi phục!`;
       if (!confirm(confirmMsg)) return;
+      if (btn) setBtnLoading(btn, 'Đang xóa...');
 
       try {
         const res = await fetch(`/api/super-admin/stores/${storeId}`, {
@@ -480,13 +504,15 @@
         const data = await res.json();
         if (!res.ok) {
           alert(data.error || 'Lỗi khi xóa cửa hàng');
+          if (btn) restoreBtn(btn);
           return;
         }
         alert(data.message || 'Đã xóa cửa hàng thành công');
-        fetchStores();
-        fetchAuditLogs();
+        await fetchStores();
+        await fetchAuditLogs();
       } catch (err) {
         alert('Lỗi kết nối khi xóa cửa hàng');
+        if (btn) restoreBtn(btn);
       }
     }
 
@@ -521,7 +547,7 @@
       list.innerHTML = branches.map((branch) => `
         <div class="branch-row">
           <span><strong>${branch.code}</strong> — ${branch.name}<br><small style="color:var(--muted);">${branch.address || ''}</small></span>
-          <button class="btn ${branch.status === 'ACTIVE' ? 'btn-danger' : ''}" onclick="toggleBranchStatus('${branch.id}', '${branch.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'}')">
+          <button class="btn ${branch.status === 'ACTIVE' ? 'btn-danger' : ''}" onclick="toggleBranchStatus('${branch.id}', '${branch.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'}', this)">
             ${branch.status === 'ACTIVE' ? 'Khóa' : 'Mở lại'}
           </button>
         </div>
@@ -530,8 +556,11 @@
 
     async function submitCreateBranch() {
       if (!selectedStoreId) return;
+      const submitBtn = document.querySelector('#branch-modal .modal-footer .btn');
       const errEl = document.getElementById('branch-form-error');
       errEl.style.display = 'none';
+      setBtnLoading(submitBtn, 'Đang thêm chi nhánh...');
+
       try {
         const res = await fetch(`/api/super-admin/stores/${selectedStoreId}/branches`, {
           method: 'POST',
@@ -553,10 +582,13 @@
       } catch (error) {
         errEl.textContent = error.message;
         errEl.style.display = 'block';
+      } finally {
+        restoreBtn(submitBtn);
       }
     }
 
-    async function toggleBranchStatus(branchId, status) {
+    async function toggleBranchStatus(branchId, status, btn) {
+      if (btn) setBtnLoading(btn, 'Đang lưu...');
       try {
         const res = await fetch(`/api/super-admin/branches/${branchId}/status`, {
           method: 'PUT',
@@ -572,16 +604,20 @@
         const errEl = document.getElementById('branch-form-error');
         errEl.textContent = error.message;
         errEl.style.display = 'block';
+        if (btn) restoreBtn(btn);
       }
     }
 
     async function submitCreateStore() {
+      const submitBtn = document.querySelector('#create-store-modal .modal-footer .btn');
       const code = document.getElementById('new-store-code').value;
       const name = document.getElementById('new-store-name').value;
       const slug = document.getElementById('new-store-slug').value;
       const ownerPhone = document.getElementById('new-owner-phone').value;
       const ownerPassword = document.getElementById('new-owner-pass').value;
       const errEl = document.getElementById('store-form-error');
+      errEl.style.display = 'none';
+      setBtnLoading(submitBtn, 'Đang tạo cửa hàng...');
 
       try {
         const res = await fetch('/api/super-admin/stores', {
@@ -596,14 +632,18 @@
         if (!res.ok) {
           errEl.textContent = data.error || 'Không thể tạo store';
           errEl.style.display = 'block';
+          restoreBtn(submitBtn);
           return;
         }
 
         closeCreateStoreModal();
-        fetchStores();
+        await fetchStores();
+        await fetchAuditLogs();
       } catch (err) {
         errEl.textContent = 'Lỗi kết nối server';
         errEl.style.display = 'block';
+      } finally {
+        restoreBtn(submitBtn);
       }
     }
   </script>
