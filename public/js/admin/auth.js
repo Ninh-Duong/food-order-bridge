@@ -102,7 +102,8 @@ export async function initAuth() {
     return workspace.user;
   } catch (error) {
     if (error.status === 401 || error.status === 403) {
-      window.location.replace(`/login.html?returnUrl=${encodeURIComponent(window.location.pathname)}`);
+      const errorMsg = encodeURIComponent(error.message || 'Phiên làm việc hết hạn hoặc không có quyền truy cập');
+      window.location.replace(`/login.html?returnUrl=${encodeURIComponent(window.location.pathname)}&error=${errorMsg}`);
       return null;
     }
     const errorBox = $('#login-error');
