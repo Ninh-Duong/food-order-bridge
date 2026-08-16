@@ -316,19 +316,33 @@ async function getBootstrap(userSession) {
       : { storeId: userSession.storeId, id: { $in: userSession.branchIds || [] }, status: 'ACTIVE' };
     branches = await BranchModel.find(branchQuery).sort({ name: 1 }).lean();
   } else {
-    store = {
-      id: userSession.storeId,
-      name: 'Cửa hàng Mặc định',
-      code: 'LEGACY',
-      status: 'ACTIVE'
-    };
-    branches = [{
-      id: 'legacy-main-branch',
-      storeId: userSession.storeId,
-      code: 'MAIN',
-      name: 'Chi nhánh Chính',
-      status: 'ACTIVE'
-    }];
+    try {
+      store = await StoreModel.findOne({ id: userSession.storeId }).lean();
+    } catch (_) {}
+    if (!store) {
+      store = {
+        id: userSession.storeId,
+        name: 'Cửa hàng Mặc định',
+        code: 'LEGACY',
+        status: 'ACTIVE'
+      };
+    }
+    try {
+      const branchQuery = userSession.role === 'STORE_OWNER' || userSession.role === 'admin'
+        ? { storeId: userSession.storeId, status: 'ACTIVE' }
+        : { storeId: userSession.storeId, id: { $in: userSession.branchIds || [] }, status: 'ACTIVE' };
+      const found = await BranchModel.find(branchQuery);
+      branches = (typeof found?.lean === 'function' ? await found.lean() : found) || [];
+    } catch (_) {}
+    if (!branches || branches.length === 0) {
+      branches = [{
+        id: userSession.branchId || 'legacy-main-branch',
+        storeId: userSession.storeId,
+        code: 'MAIN',
+        name: 'Chi nhánh Chính',
+        status: 'ACTIVE'
+      }];
+    }
   }
 
   const activeBranch = branches.find(branch => branch.id === userSession.branchId) || null;
@@ -343,7 +357,7 @@ async function getBootstrap(userSession) {
   }, {});
   return {
     user: {
-      id: userSession.sub,
+      id: userSession.sub || userSession.id,
       role: userSession.role,
       storeId: userSession.storeId,
       branchId: userSession.branchId || null,
